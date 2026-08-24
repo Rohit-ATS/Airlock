@@ -1,0 +1,101 @@
+{
+  "dossier_id": "dos_currency_fix",
+  "change_class": "DATA_OPERATION",
+  "request": "Every EU invoice created before 2026-01-01 was stored in USD instead of EUR. Correct them.",
+  "requested_by": "rohit@airlock.dev",
+  "started_by": "ui",
+  "created_at": "2026-08-24T10:14:00Z",
+  "session_id": null,
+  "turn_id": null,
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_9c3de",
+    "systems": [
+      "postgres"
+    ]
+  },
+  "forward": [
+    {
+      "system": "postgres",
+      "op": "UPDATE invoices\n   SET currency = 'EUR',\n       amount_minor = ROUND(amount_minor / 1.0871)\n WHERE region = 'EU'\n   AND created_at < '2026-01-01';",
+      "reversible": false,
+      "proven": true
+    }
+  ],
+  "rollback": [
+    {
+      "system": "postgres",
+      "op": "UPDATE invoices\n   SET currency = 'USD',\n       amount_minor = ROUND(amount_minor * 1.0871)\n WHERE region = 'EU'\n   AND created_at < '2026-01-01';",
+      "reversible": false,
+      "proven": true
+    }
+  ],
+  "certificate": {
+    "kind": "UNDO",
+    "status": "FAILED",
+    "checksums": {
+      "pre": "sha256:874716ef66830d0a5451f2388e6f82a59dd49d7d3371cb794c526bede8e3e4d2",
+      "post": "sha256:b8f1ae0b42a1ffb10cc2006b953f3bf26272207473814c928ea58379f31588be",
+      "post_rollback": "sha256:bb1053fed076436e48ac599cb260f1ff8502ee619f33a150cdf70ab76a3f9e09",
+      "match": false
+    },
+    "lock_ms_estimate": 18740,
+    "table_rewrite": true,
+    "failure_reason": "Rollback restored 47,118 of 47,120 rows.\n\nTwo rows did not return to their starting value: ROUND() is not invertible, and amounts 1699 and 2549 minor units both map to 1563 on the forward pass, so they cannot be told apart on the way back.\n\nA rollback that mostly restores data is a failure, not a warning.",
+    "verified_at": "2026-08-24T10:19:52Z"
+  },
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "invoices",
+      "rows": 47120,
+      "operation": "update currency and amount"
+    }
+  ],
+  "blast_radius": [
+    {
+      "repo": "airlock/app",
+      "file": "src/billing/invoice.ts",
+      "line": 210,
+      "symbol": "formatAmount"
+    },
+    {
+      "repo": "airlock/app",
+      "file": "src/reports/revenue.ts",
+      "line": 64,
+      "symbol": "sumByCurrency"
+    }
+  ],
+  "questions": [],
+  "recommendation": "EXPAND_CONTRACT",
+  "risk_notes": [
+    {
+      "note": "A lossy arithmetic correction cannot be proven reversible. Write the corrected value into a new column, migrate readers to it, then drop the old column once nothing reads it."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.2891,
+    "by_model": {
+      "anthropic/claude-sonnet-4-6": 0.2313,
+      "zai/glm-5.2": 0.0578
+    },
+    "tokens": {
+      "input": 121004,
+      "output": 8420,
+      "total": 129424
+    }
+  },
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  }
+}
