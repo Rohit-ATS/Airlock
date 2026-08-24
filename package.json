@@ -1,0 +1,27 @@
+{
+  "name": "airlock",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Nothing reaches production without passing through the airlock.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.14"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @airlock/console",
+    "build": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/console",
+    "test": "npm run test --workspace @airlock/contract",
+    "lint": "npm run lint --workspace @airlock/console",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "gen:schema": "node scripts/gen-schema.mjs",
+    "gen:capabilities": "node scripts/gen-capabilities.mjs",
+    "gen": "npm run build --workspace @airlock/contract && npm run gen:schema && npm run gen:capabilities"
+  },
+  "overrides": {
+    "zustand": "^5.0.15"
+  }
+}
