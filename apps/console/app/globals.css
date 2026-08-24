@@ -1,0 +1,325 @@
+/* ---------------------------------------------------------------------------
+   Cascade layer order — load-bearing, do not remove.
+
+   `@truefoundry/trueforge-ui/styles.css` ships its own complete Tailwind
+   utility set inside `@layer tfy-agent-ui-utilities`. Cascade layers are
+   ordered by first appearance, so importing it after `tailwindcss` puts the
+   SDK's utilities in a LATER layer than ours — and a later layer wins on equal
+   specificity regardless of media queries.
+
+   The practical effect was that the SDK's plain `.hidden { display: none }`
+   beat our `.xl\:flex { display: flex }`, so every responsive variant in the
+   console silently did nothing: `hidden xl:flex` stayed hidden at any width.
+
+   This statement fixes the order explicitly rather than relying on import
+   order. Ours goes last so the app shell's responsive layout wins.
+   --------------------------------------------------------------------------- */
+@layer properties, theme, base, tfy-agent-ui-theme, tfy-agent-ui-base, tfy-agent-ui-utilities, components,
+  utilities;
+
+@import 'tailwindcss';
+@import '@truefoundry/trueforge-ui/styles.css';
+
+/* ===========================================================================
+   AIRLOCK — "Instrument"
+
+   An airlock control panel, not a dashboard. Three rules hold the whole system
+   together, and every component below obeys them:
+
+   1. EVIDENCE IS MONOSPACED. Anything a judge could verify — a checksum, a row
+      count, a lock duration, a cost — renders in mono with tabular figures, so
+      digits line up down a column and a changing number does not reflow.
+   2. ONE ALARM COLOUR. --hazard means irreversible and nothing else. It is not
+      used for hover, focus, emphasis, or "important". Scarcity is what makes it
+      register when it finally appears.
+   3. SURFACES ARE MILLED, NOT FLOATING. Depth comes from 1px hairlines and
+      background steps, never from drop shadows. Instruments sit in a panel.
+   =========================================================================== */
+
+@theme {
+  /* --- surfaces: five steps, each one a real elevation ------------------- */
+  --color-void: #07080a;
+  --color-panel: #0b0d11;
+  --color-raised: #10131a;
+  --color-raised-2: #161a23;
+  --color-raised-3: #1d222d;
+
+  --color-hairline: #1c212b;
+  --color-hairline-2: #29313d;
+  --color-hairline-3: #3a4552;
+
+  /* --- ink: four weights is enough; a fifth becomes noise ---------------- */
+  --color-ink: #e8ecf2;
+  --color-ink-2: #98a2b2;
+  --color-ink-3: #626d7d;
+  --color-ink-4: #39424f;
+
+  /* --- the single interactive accent ------------------------------------ */
+  --color-ice: #4fc3f7;
+  --color-ice-dim: #2b7fa5;
+  --color-ice-deep: #0d354a;
+  --color-ice-bg: #0e2b39;
+
+  /* --- semantic status --------------------------------------------------- */
+  --color-seal: #35d6a4; /* proven, reversible, safe */
+  --color-seal-bg: #0b3729;
+  --color-hazard: #ff9130; /* ! IRREVERSIBLE ONLY ! */
+  --color-hazard-bg: #43230b;
+  --color-fault: #ff5257; /* blocked, failed, denied */
+  --color-fault-bg: #421419;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Motion: mechanical. Things warm up and settle; nothing bounces. */
+  --ease-instrument: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  border-color: var(--color-hairline);
+  min-width: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Type utilities
+   --------------------------------------------------------------------------- */
+
+/* Section labels. Small, uppercase, widely tracked — a panel legend. */
+.legend {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+  font-family: var(--font-sans);
+}
+
+/* Rule 1 made mechanical: every evidence number gets this. */
+.evidence {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+  letter-spacing: -0.01em;
+}
+
+/* ---------------------------------------------------------------------------
+   The lamp — the atom of the Harness Panel.
+
+   A lamp is dim until a real harness event proves its capability. The
+   transition is a filament warming, not a state toggle, because the whole point
+   of the panel is that you can watch capability arrive.
+   --------------------------------------------------------------------------- */
+
+.lamp {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--color-ink-4);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 4%);
+  transition:
+    background 420ms var(--ease-instrument),
+    box-shadow 420ms var(--ease-instrument);
+}
+
+.lamp[data-lit='true'] {
+  background: var(--lamp-color, var(--color-ice));
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 22%),
+    0 0 9px -1px var(--lamp-color, var(--color-ice)),
+    0 0 20px -6px var(--lamp-color, var(--color-ice));
+}
+
+/* The moment of ignition. Runs once, on the event that proves the capability. */
+@keyframes lamp-ignite {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  35% {
+    transform: scale(1.5);
+    filter: brightness(1.9);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+.lamp[data-fresh='true'] {
+  animation: lamp-ignite 620ms var(--ease-instrument);
+}
+
+/* ---------------------------------------------------------------------------
+   Panel chrome
+   --------------------------------------------------------------------------- */
+
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-hairline);
+  border-radius: 6px;
+}
+
+/* Machined top edge: a 1px highlight where light would catch a milled surface. */
+.milled {
+  position: relative;
+}
+.milled::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 7%) 22%, rgb(255 255 255 / 7%) 78%, transparent);
+  pointer-events: none;
+}
+
+/* Fine hazard hatching. Reserved, like the colour, for irreversibility. */
+.hazard-hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in oklab, var(--color-hazard) 16%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Scrollbars — thin, quiet, always present so layout never shifts.
+   --------------------------------------------------------------------------- */
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline-2) transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--color-hairline-2);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--color-hairline-3);
+  background-clip: content-box;
+}
+
+/* ---------------------------------------------------------------------------
+   Focus — one ring, everywhere, in the one accent colour.
+   --------------------------------------------------------------------------- */
+
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-ice);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ---------------------------------------------------------------------------
+   The live indicator — a slow breath, so a running lane reads as alive without
+   demanding attention.
+   --------------------------------------------------------------------------- */
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.breathe {
+  animation: breathe 1.9s ease-in-out infinite;
+}
+
+/* A determinate-looking sweep for work whose duration we genuinely don't know. */
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+.sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--color-ice) 55%, transparent), transparent);
+  animation: sweep 1.6s var(--ease-instrument) infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion. An instrument panel still has to be readable when the user
+   has asked the machine to hold still.
+   --------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .lamp[data-lit='true'] {
+    /* Keep the state legible even with the ignition animation suppressed. */
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 30%),
+      0 0 0 1px var(--lamp-color, var(--color-ice));
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   TrueForge UI SDK — retheme.
+
+   The console is trueforge-ui, so its own surfaces have to become AIRLOCK
+   rather than sit inside AIRLOCK looking borrowed. Semantic tokens are set on
+   the component in theme.tokens; these rules cover the content renderers the
+   token layer does not reach.
+   --------------------------------------------------------------------------- */
+
+.aui-markdown {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--color-ink);
+}
+.aui-markdown code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--color-raised-2);
+  border: 1px solid var(--color-hairline);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.aui-markdown pre {
+  background: var(--color-void) !important;
+  border: 1px solid var(--color-hairline);
+  border-radius: 5px;
+}
+.aui-syntax-highlighter {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+}
