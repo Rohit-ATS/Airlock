@@ -1,0 +1,135 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "stripe",
+      "op": "refunds.create({ charge, amount }) × 1046  — total GBP 41,904.00",
+      "reversible": false,
+      "proven": true
+    },
+    {
+      "system": "postgres",
+      "op": "UPDATE invoices SET status = 'refunded' WHERE id = ANY($1);",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "rollback": [],
+  "magnitude": {
+    "records": 1046,
+    "people": 1046,
+    "amount_minor": 4190400,
+    "currency": "GBP",
+    "undo_window_seconds": null
+  },
+  "principals": [],
+  "affected_tables": [
+    {
+      "system": "stripe",
+      "name": "charge",
+      "rows": 1046,
+      "operation": "refund"
+    },
+    {
+      "system": "postgres",
+      "name": "invoices",
+      "rows": 1046,
+      "operation": "mark refunded"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "BLOCK",
+  "risk_notes": [
+    {
+      "note": "A refund cannot be recalled. There is no undo certificate for money that has left, so the proof offered is a scope certificate: exactly these 1,046 charges, and explicitly not the 15 that would have gone out twice."
+    },
+    {
+      "note": "GBP 41,904 is above the GBP 25,000 ceiling AIRLOCK is authorised to move. The correct outcome is that a human treasury process handles it, and that this dossier is what they read."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.5511,
+    "by_model": {
+      "anthropic/claude-sonnet-4-6": 0.4402,
+      "openai/gpt-5.2-mini": 0.1109
+    },
+    "tokens": {
+      "input": 220140,
+      "output": 14002,
+      "total": 234142
+    }
+  },
+  "signatures": [],
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_refund_stripe",
+  "change_class": "MONEY_MOVEMENT",
+  "request": "The 14 August pricing bug double-charged term subscribers. Refund the duplicate charge to everyone affected.",
+  "requested_by": "support@airlock.dev",
+  "created_at": "2026-08-24T10:04:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "systems": [
+      "stripe",
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "SCOPE",
+    "status": "PROVEN",
+    "scope": {
+      "records": [
+        {
+          "system": "stripe",
+          "table": "charge",
+          "id": "1,046 duplicate charges from 2026-08-14",
+          "action": "transfer",
+          "count": 1046
+        },
+        {
+          "system": "postgres",
+          "table": "invoices",
+          "id": "status -> refunded",
+          "action": "update",
+          "count": 1046
+        }
+      ],
+      "exclusions": [
+        {
+          "system": "stripe",
+          "table": "charge",
+          "reason": "Eleven charges from the same window were already refunded manually by support on 15 August. Refunding them again would send money twice.",
+          "count": 11
+        },
+        {
+          "system": "stripe",
+          "table": "charge",
+          "reason": "Four charges are under dispute. A refund on a disputed charge forfeits the dispute and the fee, so these are left for the chargeback process.",
+          "count": 4
+        }
+      ]
+    },
+    "sandbox_artifact_url": "sandbox://verify/dos_refund_stripe/charges.ndjson",
+    "verified_at": "2026-08-24T10:26:41Z"
+  }
+}

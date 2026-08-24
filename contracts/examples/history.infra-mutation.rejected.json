@@ -1,0 +1,122 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "object_storage",
+      "op": "aws s3 rb s3://airlock-uploads-legacy --force  (2,204,118 objects)",
+      "reversible": false,
+      "proven": true
+    }
+  ],
+  "rollback": [],
+  "magnitude": {
+    "records": 2204118,
+    "people": 0,
+    "amount_minor": 0,
+    "undo_window_seconds": null
+  },
+  "principals": [],
+  "affected_tables": [
+    {
+      "system": "object_storage",
+      "name": "airlock-uploads-legacy",
+      "rows": 2204118,
+      "operation": "delete bucket"
+    }
+  ],
+  "blast_radius": [
+    {
+      "repo": "airlock/app",
+      "file": "src/attachments/resolve.ts",
+      "line": 66,
+      "symbol": "legacyBucketFallback"
+    },
+    {
+      "repo": "airlock/app",
+      "file": "src/attachments/resolve.ts",
+      "line": 91,
+      "symbol": "signLegacyUrl"
+    }
+  ],
+  "questions": [],
+  "recommendation": "BLOCK",
+  "risk_notes": [
+    {
+      "note": "The scope is correct and the claim that nothing reads from it is correct. What the blast-radius scan found is that 11,908 of those objects are still referenced by rows in attachments, so the objects are unread because the feature that reads them is broken, not because they are unused."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.2402,
+    "by_model": {
+      "openai/gpt-5.2-mini": 0.2402
+    },
+    "tokens": {
+      "input": 102400,
+      "output": 6220,
+      "total": 108620
+    }
+  },
+  "signatures": [
+    {
+      "approver": "sam.okafor@airlock.dev",
+      "at": "2026-08-23T16:10:00Z",
+      "decision": "rejected",
+      "reason": "11,908 attachments still point at this bucket. Fix the resolver first, then re-open this change.",
+      "break_glass": false
+    }
+  ],
+  "approval": {
+    "approver": "sam.okafor@airlock.dev",
+    "at": "2026-08-23T16:10:00Z",
+    "role_required": "approver",
+    "decision": "rejected",
+    "reason": "11,908 attachments still point at this bucket. Fix the resolver first, then re-open this change."
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  },
+  "receipt": {
+    "seq": 2,
+    "prev_hash": "sha256:b1f92092422ae09bc96a64c60025e00c35af8417ecd7724e04bac1412416078b",
+    "hash": "sha256:359ee55856e0f63436add30a19539691f115eebc753b2b3ac16da7b92f1e193b",
+    "sealed_at": "2026-08-23T16:10:00Z"
+  },
+  "dossier_id": "dos_bucket_delete",
+  "change_class": "INFRA_MUTATION",
+  "request": "Delete the airlock-uploads-legacy bucket. Nothing has read from it since May.",
+  "requested_by": "platform@airlock.dev",
+  "created_at": "2026-08-23T15:20:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "systems": [
+      "object_storage"
+    ]
+  },
+  "certificate": {
+    "kind": "SCOPE",
+    "status": "PROVEN",
+    "scope": {
+      "records": [
+        {
+          "system": "object_storage",
+          "table": "airlock-uploads-legacy",
+          "id": "**/*",
+          "action": "delete",
+          "count": 2204118
+        }
+      ],
+      "exclusions": []
+    },
+    "verified_at": "2026-08-23T15:44:00Z"
+  }
+}

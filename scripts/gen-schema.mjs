@@ -21,7 +21,7 @@ const schema = z.toJSONSchema(Dossier, { target: 'draft-2020-12', io: 'input' })
 const out = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'https://github.com/Rohit-ATS/Airlock/contracts/dossier.schema.json',
-  title: 'Change Dossier v2',
+  title: 'Change Dossier v3',
   description:
     'The single contract AIRLOCK is built on. The agent produces it, the verifier fills in the certificate, the console renders it, and the approval gate reads it. Generated from packages/contract/src/dossier.ts — do not edit by hand.',
   ...schema,

@@ -116,8 +116,8 @@ export const CAPABILITIES: readonly CapabilitySpec[] = [
     id: 9,
     name: 'Least-privilege tool scoping',
     loadBearing:
-      'Production connectors are mounted read-only and the single write path is gated by require_approval_for_tools. The agent cannot reach production unsupervised.',
-    visibleAt: 'Permissions view in the run header',
+      'Production connectors are mounted read-only, and the only tool that moves a change towards production is airlock_request_approval on our own MCP server, listed in require_approval_for_tools. There is no code path — in the root agent or in any subagent it spawns — that changes production without a human.',
+    visibleAt: 'Permissions view in the run header; packages/mcp/src/tools.ts',
     proof: 'config',
     evidence: 'enable_tools / require_approval_for_tools on the agent spec',
     group: 'CONTROL',
@@ -152,7 +152,8 @@ export const CAPABILITIES: readonly CapabilitySpec[] = [
   {
     id: 13,
     name: 'Human approval checkpoint',
-    loadBearing: 'Applying to production is the only gated action, and it is gated on a certificate.',
+    loadBearing:
+      'Applying to production is the only gated action, it is gated on a certificate, and the gate is a tool the harness holds rather than a prompt the model is asked to respect.',
     visibleAt: 'The Certificate card',
     proof: 'stream',
     evidence: 'tool.approval_required',
@@ -207,8 +208,9 @@ export const CAPABILITIES: readonly CapabilitySpec[] = [
   {
     id: 19,
     name: 'HTTP API + SDK',
-    loadBearing: 'A migration PR opens an AIRLOCK change on its own. Nobody types anything.',
-    visibleAt: 'The started-by-webhook badge on the run',
+    loadBearing:
+      'A migration PR opens an AIRLOCK change on its own, and the agent writes its dossier back through the same API. Nobody types anything.',
+    visibleAt: 'The started-by badge on the run: webhook, agent or schedule',
     proof: 'runtime',
     evidence: 'session created through the HTTP API by the webhook',
     group: 'PLATFORM',

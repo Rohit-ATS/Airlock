@@ -1,0 +1,143 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "postgres",
+      "op": "GRANT SELECT ON ALL TABLES IN SCHEMA public TO svc_analytics;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "rollback": [
+    {
+      "system": "postgres",
+      "op": "REVOKE SELECT ON ALL TABLES IN SCHEMA public FROM svc_analytics;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "magnitude": {
+    "records": 215,
+    "people": 0,
+    "amount_minor": 0,
+    "undo_window_seconds": 0
+  },
+  "principals": [
+    {
+      "subject": "svc-analytics@airlock.dev",
+      "grants": [
+        "iam:role/prod_reader",
+        "postgres:SELECT ON ALL TABLES IN SCHEMA public"
+      ],
+      "scope": "airlock-production",
+      "expires_at": null,
+      "unlocks": [
+        "Reading every row of customer data in public.*, indefinitely, with no scheduled review",
+        "Surviving the departure of everyone who remembers why it was granted"
+      ]
+    }
+  ],
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "public.* (214 tables)",
+      "rows": 214,
+      "operation": "grant SELECT"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "EXPAND_CONTRACT",
+  "risk_notes": [
+    {
+      "note": "The certificate is fine. The change is not. Nothing about this grant is unproven — policy simply does not permit access that never expires, so the gate never opens however good the proof is."
+    },
+    {
+      "note": "The workable version of this request is a grant that expires nightly and is re-issued by the scheduled export itself, which AIRLOCK can open as a change on its own."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.1904,
+    "by_model": {
+      "anthropic/claude-sonnet-4-6": 0.1502,
+      "openai/gpt-5.2-mini": 0.0402
+    },
+    "tokens": {
+      "input": 81200,
+      "output": 5940,
+      "total": 87140
+    }
+  },
+  "signatures": [],
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_access_standing",
+  "change_class": "ACCESS_GRANT",
+  "request": "The analytics service account needs permanent read access to production so the nightly export stops failing.",
+  "requested_by": "data@airlock.dev",
+  "created_at": "2026-08-24T11:36:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "systems": [
+      "iam",
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "SCOPE",
+    "status": "PROVEN",
+    "scope": {
+      "records": [
+        {
+          "system": "iam",
+          "table": "role_binding",
+          "id": "oncall@airlock.dev -> prod_reader",
+          "action": "grant",
+          "count": 1
+        },
+        {
+          "system": "postgres",
+          "table": "grants",
+          "id": "prod_reader -> public.*",
+          "action": "grant",
+          "count": 214
+        }
+      ],
+      "exclusions": [
+        {
+          "system": "postgres",
+          "table": "payment_methods",
+          "reason": "Cardholder data is out of scope for the on-call role under PCI-DSS 7.2. The grant explicitly excludes it.",
+          "count": 1
+        },
+        {
+          "system": "iam",
+          "table": "role_binding",
+          "reason": "No write binding is created. The role is read-only, so the grant cannot be escalated by using it.",
+          "count": 0
+        }
+      ]
+    },
+    "sandbox_artifact_url": "sandbox://verify/access/effective-permissions.json",
+    "verified_at": "2026-08-24T11:40:00Z"
+  }
+}

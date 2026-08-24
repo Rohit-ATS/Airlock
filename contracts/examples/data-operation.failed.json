@@ -1,55 +1,48 @@
 {
-  "dossier_id": "dos_currency_fix",
-  "change_class": "DATA_OPERATION",
-  "request": "Every EU invoice created before 2026-01-01 was stored in USD instead of EUR. Correct them.",
-  "requested_by": "rohit@airlock.dev",
   "started_by": "ui",
-  "created_at": "2026-08-24T10:14:00Z",
   "session_id": null,
   "turn_id": null,
-  "target": {
-    "project_ref": "airlock-demo",
-    "branch_ref": "br_shadow_9c3de",
-    "systems": [
-      "postgres"
-    ]
-  },
   "forward": [
     {
       "system": "postgres",
-      "op": "UPDATE invoices\n   SET currency = 'EUR',\n       amount_minor = ROUND(amount_minor / 1.0871)\n WHERE region = 'EU'\n   AND created_at < '2026-01-01';",
-      "reversible": false,
+      "op": "UPDATE invoices\n   SET currency = 'EUR',\n       amount_minor = ROUND(amount_minor / rate.usd_per_eur)\n  FROM fx_rates rate\n WHERE invoices.region = 'EU'\n   AND invoices.created_at < '2026-01-01';",
+      "reversible": true,
       "proven": true
     }
   ],
   "rollback": [
     {
       "system": "postgres",
-      "op": "UPDATE invoices\n   SET currency = 'USD',\n       amount_minor = ROUND(amount_minor * 1.0871)\n WHERE region = 'EU'\n   AND created_at < '2026-01-01';",
-      "reversible": false,
+      "op": "UPDATE invoices\n   SET currency = prev.currency,\n       amount_minor = prev.amount_minor\n  FROM invoices_backup_20260824 prev\n WHERE invoices.id = prev.id;",
+      "reversible": true,
       "proven": true
     }
   ],
-  "certificate": {
-    "kind": "UNDO",
-    "status": "FAILED",
-    "checksums": {
-      "pre": "sha256:874716ef66830d0a5451f2388e6f82a59dd49d7d3371cb794c526bede8e3e4d2",
-      "post": "sha256:b8f1ae0b42a1ffb10cc2006b953f3bf26272207473814c928ea58379f31588be",
-      "post_rollback": "sha256:bb1053fed076436e48ac599cb260f1ff8502ee619f33a150cdf70ab76a3f9e09",
-      "match": false
-    },
-    "lock_ms_estimate": 18740,
-    "table_rewrite": true,
-    "failure_reason": "Rollback restored 47,118 of 47,120 rows.\n\nTwo rows did not return to their starting value: ROUND() is not invertible, and amounts 1699 and 2549 minor units both map to 1563 on the forward pass, so they cannot be told apart on the way back.\n\nA rollback that mostly restores data is a failure, not a warning.",
-    "verified_at": "2026-08-24T10:19:52Z"
+  "magnitude": {
+    "records": 1200000,
+    "people": 0,
+    "amount_minor": 0,
+    "undo_window_seconds": null
   },
+  "principals": [],
   "affected_tables": [
     {
       "system": "postgres",
       "name": "invoices",
-      "rows": 47120,
+      "rows": 1200000,
       "operation": "update currency and amount"
+    },
+    {
+      "system": "postgres",
+      "name": "fx_rates",
+      "rows": 2190,
+      "operation": "read only (conversion source)"
+    },
+    {
+      "system": "stripe",
+      "name": "invoice",
+      "rows": 41882,
+      "operation": "read only (reconciliation)"
     }
   ],
   "blast_radius": [
@@ -57,35 +50,41 @@
       "repo": "airlock/app",
       "file": "src/billing/invoice.ts",
       "line": 210,
-      "symbol": "formatAmount"
+      "symbol": "formatInvoiceTotal"
     },
     {
       "repo": "airlock/app",
-      "file": "src/reports/revenue.ts",
-      "line": 64,
-      "symbol": "sumByCurrency"
+      "file": "src/reports/revenue.sql",
+      "line": 14,
+      "symbol": "monthly_revenue"
     }
   ],
   "questions": [],
-  "recommendation": "EXPAND_CONTRACT",
+  "recommendation": "BLOCK",
   "risk_notes": [
     {
-      "note": "A lossy arithmetic correction cannot be proven reversible. Write the corrected value into a new column, migrate readers to it, then drop the old column once nothing reads it."
+      "note": "The rewrite holds an ACCESS EXCLUSIVE lock for an estimated 91 seconds. Every query against invoices queues behind it for the duration.",
+      "source_url": "https://www.postgresql.org/docs/16/explicit-locking.html",
+      "source_title": "PostgreSQL 16 — Explicit Locking"
+    },
+    {
+      "note": "Two rows changed underneath the verification run, which is itself the finding: this table is written to continuously and cannot be corrected with a single statement."
     }
   ],
   "harness_events": [],
   "cost": {
-    "usd": 0.2891,
+    "usd": 0.8814,
     "by_model": {
-      "anthropic/claude-sonnet-4-6": 0.2313,
-      "zai/glm-5.2": 0.0578
+      "anthropic/claude-sonnet-4-6": 0.7702,
+      "openai/gpt-5.2-mini": 0.1112
     },
     "tokens": {
-      "input": 121004,
-      "output": 8420,
-      "total": 129424
+      "input": 402118,
+      "output": 21005,
+      "total": 423123
     }
   },
+  "signatures": [],
   "approval": {
     "approver": null,
     "at": null,
@@ -93,9 +92,43 @@
     "decision": null,
     "reason": null
   },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
   "audit": {
     "applied_at": null,
     "post_apply_checksum": null,
     "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_currency_fix",
+  "change_class": "DATA_OPERATION",
+  "request": "Every EU invoice created before 2026-01-01 was stored in USD instead of EUR. Correct them, and show me exactly which rows you would touch before you touch any of them.",
+  "requested_by": "marco.b@airlock.dev",
+  "created_at": "2026-08-24T08:40:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_9c30d",
+    "systems": [
+      "postgres",
+      "stripe"
+    ]
+  },
+  "certificate": {
+    "kind": "UNDO",
+    "status": "FAILED",
+    "checksums": {
+      "pre": "sha256:257959548d6337cc221cd091f4cb77195df6eb7ccc3a7dcc7a2acc0eaf2b8e40",
+      "post": "sha256:d7629ce7ea3cb43e4f508c87c8b2e479cd4c2d9b1f9cacddd0507abfcf92bc98",
+      "post_rollback": "sha256:5bd89078540ac40e42317d5daf21d14bca9d94d9792cfdb5aea4707b892322c5",
+      "match": false
+    },
+    "lock_ms_estimate": 91400,
+    "table_rewrite": true,
+    "sandbox_artifact_url": "sandbox://verify/dos_currency_fix/diff.ndjson",
+    "failure_reason": "The rollback restored 1,199,998 of 1,200,000 rows.\n\nTwo invoices (id 88213, 88217) were written by a concurrent process between the forward operation and the rollback, so their pre-migration values were overwritten and could not be restored from invoices_backup_20260824.\n\nA rollback that mostly restores the data is a failed rollback. The gate stays sealed.",
+    "verified_at": "2026-08-24T08:59:02Z"
   }
 }

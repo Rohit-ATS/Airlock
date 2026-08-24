@@ -1,19 +1,7 @@
 {
-  "dossier_id": "dos_tier_migration",
-  "change_class": "SCHEMA_MIGRATION",
-  "request": "Add a tier column to users, backfill it from subscriptions, then drop the deprecated plan_name column.",
-  "requested_by": "rohit@airlock.dev",
   "started_by": "ui",
-  "created_at": "2026-08-24T09:02:00Z",
   "session_id": null,
   "turn_id": null,
-  "target": {
-    "project_ref": "airlock-demo",
-    "branch_ref": "br_shadow_4f21a",
-    "systems": [
-      "postgres"
-    ]
-  },
   "forward": [
     {
       "system": "postgres",
@@ -54,20 +42,13 @@
       "proven": true
     }
   ],
-  "certificate": {
-    "kind": "UNDO",
-    "status": "PROVEN",
-    "checksums": {
-      "pre": "sha256:d532cbba70f7dccf7984d0ceb690c46c317d7e4ba9f3b0142b22438c9cb3c6da",
-      "post": "sha256:c297219d34d482aed5085f64d14d2b4d303d1d250acf85e1688b38f18d21fe71",
-      "post_rollback": "sha256:d532cbba70f7dccf7984d0ceb690c46c317d7e4ba9f3b0142b22438c9cb3c6da",
-      "match": true
-    },
-    "lock_ms_estimate": 4210,
-    "table_rewrite": false,
-    "sandbox_artifact_url": "sandbox://verify/dos_tier_migration/report.json",
-    "verified_at": "2026-08-24T09:06:11Z"
+  "magnitude": {
+    "records": 1200000,
+    "people": 0,
+    "amount_minor": 0,
+    "undo_window_seconds": 604800
   },
+  "principals": [],
   "affected_tables": [
     {
       "system": "postgres",
@@ -131,7 +112,7 @@
     "usd": 0.4127,
     "by_model": {
       "anthropic/claude-sonnet-4-6": 0.3312,
-      "zai/glm-5.2": 0.0815
+      "openai/gpt-5.2-mini": 0.0815
     },
     "tokens": {
       "input": 184220,
@@ -139,6 +120,7 @@
       "total": 197114
     }
   },
+  "signatures": [],
   "approval": {
     "approver": null,
     "at": null,
@@ -146,9 +128,41 @@
     "decision": null,
     "reason": null
   },
+  "drift": {
+    "checked_at": "2026-08-24T09:06:40Z",
+    "production_checksum": "sha256:d532cbba70f7dccf7984d0ceb690c46c317d7e4ba9f3b0142b22438c9cb3c6da",
+    "drifted": false
+  },
   "audit": {
     "applied_at": null,
     "post_apply_checksum": null,
     "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_tier_migration",
+  "change_class": "SCHEMA_MIGRATION",
+  "request": "Add a tier column to users, backfill it from subscriptions, then drop the deprecated plan_name column.",
+  "requested_by": "priya.n@airlock.dev",
+  "created_at": "2026-08-24T09:02:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_4f21a",
+    "systems": [
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "UNDO",
+    "status": "PROVEN",
+    "checksums": {
+      "pre": "sha256:d532cbba70f7dccf7984d0ceb690c46c317d7e4ba9f3b0142b22438c9cb3c6da",
+      "post": "sha256:c297219d34d482aed5085f64d14d2b4d303d1d250acf85e1688b38f18d21fe71",
+      "post_rollback": "sha256:d532cbba70f7dccf7984d0ceb690c46c317d7e4ba9f3b0142b22438c9cb3c6da",
+      "match": true
+    },
+    "lock_ms_estimate": 4210,
+    "table_rewrite": false,
+    "sandbox_artifact_url": "sandbox://verify/dos_tier_migration/report.json",
+    "verified_at": "2026-08-24T09:06:11Z"
   }
 }
