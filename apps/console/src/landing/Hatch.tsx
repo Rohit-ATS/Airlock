@@ -53,7 +53,7 @@ export function Hatch({ sealed = true, className }: { sealed?: boolean; classNam
         <path d="M14 200h34M352 200h34M200 14v34M200 352v34" />
         <path d="M14 194v12M386 194v12M194 14h12M194 386h12" />
       </g>
-      <g fill="var(--color-ink-4)" fontFamily="var(--font-mono)" fontSize="8.5" letterSpacing="0.06em">
+      <g fill="var(--color-ink-3)" fontFamily="var(--font-mono)" fontSize="8.5" letterSpacing="0.06em">
         <text x="14" y="186">
           Ø 344
         </text>
@@ -117,7 +117,7 @@ export function Hatch({ sealed = true, className }: { sealed?: boolean; classNam
               stroke="var(--color-hairline-3)"
               strokeWidth="1"
             />
-            <circle cx="200" cy="83" r="3.2" fill={sealed ? accent : 'var(--color-ink-4)'} opacity={sealed ? 0.9 : 0.5} />
+            <circle cx="200" cy="83" r="3.2" fill={sealed ? accent : 'var(--color-lamp-off)'} opacity={sealed ? 0.9 : 0.5} />
           </g>
         ))}
       </g>

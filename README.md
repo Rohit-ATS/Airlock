@@ -349,7 +349,7 @@ one lamp.**
 ## Tests
 
 ```bash
-npm test        # 92 tests, 11 fixtures, 4 agent specs
+npm test        # 106 tests, 11 fixtures, 4 agent specs
 ```
 
 Four suites, and each pins a property rather than an implementation:
@@ -360,6 +360,7 @@ Four suites, and each pins a property rather than an implementation:
 | `policy.test.mjs` | Quorum counts people; freezes are evaluated in London wall-clock time; a claim of safety is recomputed; break-glass can never become an approval |
 | `receipt.test.mjs` | Editing, reordering or deleting a sealed record is detected, at the record where it happened |
 | `harness.test.mjs` | Nothing but a real harness event lights a lamp — noise, repeated connectors, and prose that merely *mentions* a chart light nothing |
+| `observer.test.mjs` | The tap is a faithful passthrough: same chunks, same objects, same order, none added, none lost — even when a detector throws or the transport dies mid-stream. Then a realistic turn stream is driven through it into the real ledger, and the lamps that come out are checked both ways: the thirteen it earned, and the five that must stay dark |
 | `mcp/server.test.mjs` | Exactly one tool is destructive and it is the one held for approval; there is no tool that applies a change |
 
 Plus two structural checks that run in CI:
@@ -373,6 +374,31 @@ Plus two structural checks that run in CI:
 Generated artefacts (`contracts/dossier.schema.json`, `docs/CAPABILITIES.md`,
 `docs/POLICY.md`, the fixtures) come from `npm run gen` and are idempotent, so what the docs
 claim and what the code does cannot drift.
+
+### Accessibility
+
+```bash
+npm run check:a11y      # axe-core, WCAG 2.1 AA, all three routes
+```
+
+**Currently clean: 0 failing nodes.** The first run of it found **106** — legends, hints and
+secondary evidence text on every page — because two ink tokens had been chosen for the mood
+they created rather than measured. `--ink-3` was at 3.03:1 and `--ink-4` at 1.57:1 against a
+required 4.5:1.
+
+Lifting just those two would have pushed `ink-4` above where `ink-3` had been and collapsed
+four steps into two, so the whole scale was rebalanced: every step now clears 4.5:1 against
+every surface it can sit on, and adjacent steps stay 1.37–1.64× apart in relative luminance so
+the hierarchy still reads. De-emphasis comes from weight, size and tracking as much as from
+lightness.
+
+The unlit lamp got its own token in the process. It had been sharing `--ink-4`, so raising the
+text scale to pass AA would have made every unexercised capability look exercised — which is
+the one thing that panel must never do.
+
+It is deliberately not part of `npm test`: it needs a built console, a running server and a
+downloaded browser, and a check that is flaky for environmental reasons trains people to
+ignore it.
 
 ---
 

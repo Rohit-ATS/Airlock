@@ -25,7 +25,8 @@
     "gen:examples": "node contracts/examples/generate.mjs",
     "gen": "npm run build --workspace @airlock/contract && npm run gen:schema && npm run gen:capabilities && npm run gen:policy && npm run gen:examples && npm run check:fixtures",
     "gen:policy": "node scripts/gen-policy.mjs",
-    "check:agents": "node scripts/check-agents.mjs"
+    "check:agents": "node scripts/check-agents.mjs",
+    "check:a11y": "node scripts/check-a11y.mjs"
   },
   "overrides": {
     "zustand": "^5.0.15"
