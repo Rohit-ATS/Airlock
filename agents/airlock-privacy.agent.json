@@ -1,41 +1,97 @@
 {
   "name": "airlock-privacy",
   "comment": "Routing at the agent boundary, part two. An erasure is not a migration wearing a different hat: the work is finding every system that holds a person, deciding what the law obliges you to keep, and being able to defend both lists. That needs a different toolbox (no Kubernetes, no IAM), a different temperature, and an instruction set whose defaults lean towards retention rather than deletion. TrueForge cannot scope tools per subagent, but it can route a whole class of work to a differently-scoped agent — which is what this is.",
-
   "manifest": {
     "model": {
-      "name": "anthropic/claude-sonnet-4-6",
-      "params": { "max_tokens": 8192, "temperature": 0 }
+      "name": "openai/gpt-4.1",
+      "params": {
+        "max_tokens": 8192,
+        "temperature": 0
+      }
     },
-
     "instructions": "You handle ERASURE changes for AIRLOCK: right-to-erasure requests, retention purges, and anything else that destroys a person's data.\n\nYou produce SCOPE certificates only. There is no undo certificate for a deletion, and offering one is a lie about the only thing that matters here.\n\nWHAT A SCOPE CERTIFICATE MUST CONTAIN\nTwo lists, both complete, both defensible:\n\nDESTROYED — every record, in every system, that this change removes or anonymises. Per system, per table, counted. Computed against a shadow copy, never estimated from a schema.\n\nRETAINED — every record you are deliberately NOT touching, with the obligation that justifies it. 'Statutory retention' alone is not a reason. Name the obligation: which regime, which article or section, how many years, and when it expires. An exclusion without a stated reason is not an exclusion, and the contract will reject it.\n\nFIND EVERY SYSTEM\nThe failure mode is not deleting too much; it is missing a copy. Before computing scope, enumerate:\n- primary database, including denormalised copies and materialised views\n- the payment provider (customer objects hold email and address independently of your database)\n- object storage, including thumbnails and derived files under a different key prefix\n- the messaging platform, if the person ever had an account\n- analytics and product-telemetry stores\n- search indexes, which hold a copy that survives a database delete\n- caches with a long TTL\n- logs, and specifically any log line containing the address\n- backups — see below\n\nIf you cannot enumerate a system, say so and mark the scope incomplete. An incomplete erasure that claims to be complete is worse than one that admits what it could not reach.\n\nBACKUPS\nDo not force-delete from immutable backups. Record them as an exclusion with the expiry schedule, because breaking the restore chain to satisfy one request damages every other customer. Article 17 does not require you to destroy a backup on demand; it requires you not to restore the person back into production. Say that in the exclusion reason.\n\nANONYMISE OR DELETE\nPrefer anonymising in place where a foreign key or a financial record depends on the row. A deleted user row with twelve invoices pointing at it produces either a cascade you did not intend or an orphan you cannot explain. Anonymise the personal fields, keep the referential structure, and say in the certificate that you did.\n\nAnonymisation must be irreversible to count. Hashing an email address with no salt is not anonymisation: the space of email addresses is small enough to enumerate. Null it, or replace it with a value derived from a secret you also destroy.\n\nASK, DO NOT DECIDE\nRetention is a legal judgement and it is not yours. Use ask_user_question whenever the obligation is arguable, and give each option its real consequence — 'destroy the invoices' should say that doing so breaches a retention obligation, not merely that it is unusual. Do not ask which tables hold the person; count them.\n\nSCALE\nA batch erasure covering many subjects is still counted in people. Policy caps how many people one automated change may erase. If the batch is over the ceiling, say so and split it into changes a human can actually review, rather than presenting one number nobody can check.\n\nReport what you found, what you will destroy, what you will keep, and why. Then stop, and let a human sign it. Two humans, in fact: policy requires a second pair of eyes on every erasure, because there is no rollback to catch the mistake later.",
-
     "mcp_servers": [
       {
         "name": "airlock",
-        "command": "npx",
-        "args": ["-y", "@airlock/mcp"],
-        "env": { "AIRLOCK_CONSOLE_URL": "http://localhost:3000" },
-        "enable_tools": ["@all"],
-        "require_approval_for_tools": ["airlock_request_approval"],
-        "preload": true
+        "enable_tools": [
+          "@all"
+        ],
+        "require_approval_for_tools": [
+          "airlock_request_approval"
+        ],
+        "preload": true,
+        "comment": "AIRLOCK itself, attached by configured name. TrueForge 0.1.4 mounts REMOTE MCP servers only - its MCPServerType enum has a single member, \"remote\" - so the server is registered once against the harness and referenced here by name, never spawned as a subprocess. Register it with: POST /api/v1/settings/mcp-servers {\"manifest\":{\"type\":\"remote\",\"name\":\"airlock\",\"url\":\"http://<host>:8975/mcp\",\"description\":\"...\"}} after starting `npm run mcp -- --http 8975`. From a containerised harness, <host> is host.docker.internal. See docs/TRUEFORGE-NOTES.md section 4.4."
       },
-      { "name": "supabase", "enable_tools": ["@read-only"], "require_approval_for_tools": ["@write", "@destructive"], "preload": false },
-      { "name": "stripe", "enable_tools": ["@read-only"], "require_approval_for_tools": ["@all"], "preload": false },
-      { "name": "slack", "enable_tools": ["@read-only"], "require_approval_for_tools": ["@all"], "preload": false },
-      { "name": "exa", "comment": "Retention periods are cited from the regime, not recalled.", "enable_tools": ["@read-only"], "preload": false }
+      {
+        "name": "supabase",
+        "enable_tools": [
+          "@read-only"
+        ],
+        "require_approval_for_tools": [
+          "@write",
+          "@destructive"
+        ],
+        "preload": false
+      },
+      {
+        "name": "stripe",
+        "enable_tools": [
+          "@read-only"
+        ],
+        "require_approval_for_tools": [
+          "@all"
+        ],
+        "preload": false
+      },
+      {
+        "name": "slack",
+        "enable_tools": [
+          "@read-only"
+        ],
+        "require_approval_for_tools": [
+          "@all"
+        ],
+        "preload": false
+      },
+      {
+        "name": "exa",
+        "comment": "Retention periods are cited from the regime, not recalled.",
+        "enable_tools": [
+          "@read-only"
+        ],
+        "preload": false
+      }
     ],
-
-    "skills": [{ "name": "data-retention" }, { "name": "postgres-safety" }],
-
+    "skills": [
+      {
+        "name": "data-retention"
+      },
+      {
+        "name": "postgres-safety"
+      }
+    ],
     "config": {
-      "sandbox": { "enabled": true, "file_downloads": true },
-      "generative_ui": { "enabled": true },
-      "ask_user_questions": { "enabled": true },
-      "dynamic_sub_agents": { "enabled": true },
+      "sandbox": {
+        "enabled": true,
+        "file_downloads": true
+      },
+      "generative_ui": {
+        "enabled": true
+      },
+      "ask_user_questions": {
+        "enabled": true
+      },
+      "dynamic_sub_agents": {
+        "enabled": true
+      },
       "context_management": {
-        "compaction": { "enabled": true, "compaction_threshold_tokens": 50000 },
-        "large_tool_response": { "enabled": true }
+        "compaction": {
+          "enabled": true,
+          "compaction_threshold_tokens": 50000
+        },
+        "large_tool_response": {
+          "enabled": true
+        }
       },
       "iteration_limit": 90
     }

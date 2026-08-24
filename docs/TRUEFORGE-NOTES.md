@@ -128,7 +128,7 @@ server publishes**, not from anything we declare.
 
 ---
 
-## 4. Three corrections to the AIRLOCK blueprint
+## 4. Six corrections to the AIRLOCK blueprint
 
 These matter because three planned capabilities rest on API that does not exist.
 
@@ -198,6 +198,87 @@ as written, and neither is per-subagent model routing (capability 18).
 label and the cost counter are therefore honest readouts, not decoration.
 
 ---
+
+### 4.4 MCP servers are **remote only**. There is no stdio transport.
+
+Found by running it, on 24 August, against 0.1.4.
+
+`MCPServerType` is an enum with exactly one member:
+
+```jsonc
+// GET /api/v1/openapi.json -> components.schemas.MCPServerType
+{ "type": "string", "enum": ["remote"] }
+```
+
+A configured MCP server is `{ type: "remote", name, url, description, auth? }`,
+registered through `POST /api/v1/settings/mcp-servers`, and an agent attaches it
+**by configured name**:
+
+```jsonc
+// components.schemas.MCPServer — the agent-side entry
+{ "name": "airlock", "enable_tools": [...], "require_approval_for_tools": [...], "preload": false }
+```
+
+There is no `command`, no `args`, no `env`, anywhere in the API. The blueprint's
+`{ "command": "npx", "args": ["-y", "@airlock/mcp"] }` cannot work, and — this is
+the part that matters — it would not have failed loudly. TrueForge would have
+accepted the agent, the connector would simply have had no tools, and
+`airlock_request_approval` would not have existed. The entire human-in-the-loop
+guarantee would have been missing, silently, with the console still looking
+correct.
+
+**What we do instead.** `@airlock/mcp` gained a Streamable HTTP transport
+(`packages/mcp/src/http.ts`) alongside stdio. It runs beside the console and is
+registered as a remote server. Verified end to end: the harness enumerates all
+seven tools and reads their annotations, which is what `@read-only` and
+`@destructive` resolve against.
+
+```console
+$ curl localhost:8791/api/v1/mcp-servers/airlock/tools
+airlock_read_policy         {"readOnlyHint":true}
+airlock_request_approval    {"readOnlyHint":false,"destructiveHint":true}   <- the held one
+```
+
+`scripts/register-agent.mjs` reconciles a canonical spec with what a given
+server actually supports, and prints every adaptation rather than keeping a
+second, degraded copy of each spec.
+
+### 4.5 The sandbox is Daytona, and it is not optional
+
+`GET /api/v1/capabilities` is authoritative and worth calling before blaming
+your own spec:
+
+```json
+{ "sandbox": { "enabled": false },
+  "skill":   { "enabled": false, "reason": "Skills run in a sandbox, which is not configured." } }
+```
+
+The shipped sandbox catalog offers exactly one provider type, `daytona`, and it
+requires its own API key. **Skills require a sandbox**, so without a Daytona
+account capabilities 5 (sandbox), 6 (Code Mode) and 7 (Skills) cannot light, and
+`skills` must be dropped from the spec rather than sent and rejected. That is a
+hard constraint on any demo, and it is better discovered here than an hour into
+one.
+
+### 4.6 The UI SDK's composer does not work against a live server
+
+The `getSnapshot should be cached` defect in §1 is worse than a development
+warning. Against a real TrueForge server the console throws
+
+```
+Maximum update depth exceeded. The result of getSnapshot should be cached to avoid an infinite loop.
+Maximum update depth exceeded. This can happen when a resource repeatedly calls setState inside useEffect.
+```
+
+and the composer stops submitting: typing a message and pressing the send
+control creates **no session on the server** — confirmed by
+`GET /api/v1/sessions`, which showed only the sessions created by curl.
+
+Reproduced previously with zero AIRLOCK code, mounting `TrueForgeUI` with its
+own built-in layout, so it is not something the custom layout introduces. Turns
+driven through the HTTP API against the same server work perfectly, which is how
+the runs in §11 were done.
+
 
 ## 5. Sessions, turns, events
 

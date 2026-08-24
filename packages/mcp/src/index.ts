@@ -18,6 +18,7 @@ import { airlockTools, CONSOLE_URL } from './tools.js';
 
 export { McpServer, log } from './protocol.js';
 export { airlockTools } from './tools.js';
+export { serveHttp } from './http.js';
 
 const INSTRUCTIONS = [
   'AIRLOCK is the change-control gate for irreversible production work.',
@@ -32,7 +33,15 @@ const INSTRUCTIONS = [
   'There is no tool that applies a change to production. That is not an omission.',
 ].join('\n');
 
-export async function main(): Promise<void> {
+/**
+ * Start the server on whichever transport was asked for.
+ *
+ * stdio by default, because that is what a local MCP client speaks. HTTP when
+ * `--http` or `AIRLOCK_MCP_HTTP_PORT` is given, because TrueForge attaches
+ * *remote* MCP servers and only remote ones — a stdio-only build cannot be
+ * mounted by the harness this exists for.
+ */
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   const server = new McpServer({
     name: 'airlock',
     version: '0.1.0',
@@ -41,6 +50,23 @@ export async function main(): Promise<void> {
 
   for (const tool of airlockTools()) server.tool(tool);
 
+  const flag = argv.indexOf('--http');
+  const port =
+    flag !== -1 && argv[flag + 1] && /^\d+$/.test(argv[flag + 1]!)
+      ? Number(argv[flag + 1])
+      : flag !== -1
+        ? 8975
+        : process.env.AIRLOCK_MCP_HTTP_PORT
+          ? Number(process.env.AIRLOCK_MCP_HTTP_PORT)
+          : null;
+
   log(`ready — ${airlockTools().length} tools, console at ${CONSOLE_URL}`);
+
+  if (port !== null) {
+    const { serveHttp } = await import('./http.js');
+    await serveHttp({ server, port, path: process.env.AIRLOCK_MCP_HTTP_PATH ?? '/mcp' });
+    return;
+  }
+
   await server.listen();
 }

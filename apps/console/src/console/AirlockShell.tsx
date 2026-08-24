@@ -107,6 +107,11 @@ export function AirlockShell({ baseUrl }: { baseUrl: string }) {
     () =>
       createAirlockServer({
         baseUrl,
+        // Every session in this console runs the change-control agent, so the
+        // airlock MCP server is always mounted and the gate is always in the
+        // loop. A console that could talk to a bare model would be a chat
+        // window with an airlock painted on it.
+        agentName: process.env.NEXT_PUBLIC_AIRLOCK_AGENT ?? 'airlock-change-control',
         hooks: {
           onEvent: (event) => store.ingest(event),
           onStreamOpen: ({ sessionId, resumed }) => {
