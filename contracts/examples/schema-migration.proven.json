@@ -1,0 +1,154 @@
+{
+  "dossier_id": "dos_tier_migration",
+  "change_class": "SCHEMA_MIGRATION",
+  "request": "Add a tier column to users, backfill it from subscriptions, then drop the deprecated plan_name column.",
+  "requested_by": "rohit@airlock.dev",
+  "started_by": "ui",
+  "created_at": "2026-08-24T09:02:00Z",
+  "session_id": null,
+  "turn_id": null,
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_4f21a",
+    "systems": [
+      "postgres"
+    ]
+  },
+  "forward": [
+    {
+      "system": "postgres",
+      "op": "ALTER TABLE users ADD COLUMN tier text;",
+      "reversible": true,
+      "proven": true
+    },
+    {
+      "system": "postgres",
+      "op": "UPDATE users u SET tier = s.plan_tier\n  FROM subscriptions s\n WHERE s.user_id = u.id;",
+      "reversible": true,
+      "proven": true
+    },
+    {
+      "system": "postgres",
+      "op": "ALTER TABLE users DROP COLUMN plan_name;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "rollback": [
+    {
+      "system": "postgres",
+      "op": "ALTER TABLE users ADD COLUMN plan_name text;",
+      "reversible": true,
+      "proven": true
+    },
+    {
+      "system": "postgres",
+      "op": "UPDATE users u SET plan_name = s.legacy_plan_name\n  FROM subscriptions s\n WHERE s.user_id = u.id;",
+      "reversible": true,
+      "proven": true
+    },
+    {
+      "system": "postgres",
+      "op": "ALTER TABLE users DROP COLUMN tier;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "certificate": {
+    "kind": "UNDO",
+    "status": "PROVEN",
+    "checksums": {
+      "pre": "sha256:d532cbba70f7dccf7984d0ceb690c46c317d7e4ba9f3b0142b22438c9cb3c6da",
+      "post": "sha256:c297219d34d482aed5085f64d14d2b4d303d1d250acf85e1688b38f18d21fe71",
+      "post_rollback": "sha256:d532cbba70f7dccf7984d0ceb690c46c317d7e4ba9f3b0142b22438c9cb3c6da",
+      "match": true
+    },
+    "lock_ms_estimate": 4210,
+    "table_rewrite": false,
+    "sandbox_artifact_url": "sandbox://verify/dos_tier_migration/report.json",
+    "verified_at": "2026-08-24T09:06:11Z"
+  },
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "users",
+      "rows": 1200000,
+      "operation": "add column, backfill, drop column"
+    },
+    {
+      "system": "postgres",
+      "name": "subscriptions",
+      "rows": 1180422,
+      "operation": "read only (backfill source)"
+    }
+  ],
+  "blast_radius": [
+    {
+      "repo": "airlock/app",
+      "file": "src/billing/plan.ts",
+      "line": 42,
+      "symbol": "resolvePlanName"
+    },
+    {
+      "repo": "airlock/app",
+      "file": "src/billing/plan.ts",
+      "line": 118,
+      "symbol": "serializeUser"
+    },
+    {
+      "repo": "airlock/app",
+      "file": "src/api/users/route.ts",
+      "line": 57,
+      "symbol": "GET"
+    },
+    {
+      "repo": "airlock/app",
+      "file": "src/emails/welcome.tsx",
+      "line": 23,
+      "symbol": "WelcomeEmail"
+    },
+    {
+      "repo": "airlock/app",
+      "file": "tests/billing.spec.ts",
+      "line": 88,
+      "symbol": "plan name fixture"
+    }
+  ],
+  "questions": [],
+  "recommendation": "APPLY",
+  "risk_notes": [
+    {
+      "note": "ADD COLUMN with no default does not rewrite the table on PostgreSQL 11 and later, so the ACCESS EXCLUSIVE lock is held only briefly.",
+      "source_url": "https://www.postgresql.org/docs/16/sql-altertable.html",
+      "source_title": "PostgreSQL 16 — ALTER TABLE"
+    },
+    {
+      "note": "The backfill runs in batches of 10,000 rows to avoid holding one long transaction over 1.2M rows."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.4127,
+    "by_model": {
+      "anthropic/claude-sonnet-4-6": 0.3312,
+      "zai/glm-5.2": 0.0815
+    },
+    "tokens": {
+      "input": 184220,
+      "output": 12894,
+      "total": 197114
+    }
+  },
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  }
+}

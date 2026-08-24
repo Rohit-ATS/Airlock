@@ -1,0 +1,200 @@
+{
+  "dossier_id": "dos_erasure_dana_reyes",
+  "change_class": "ERASURE",
+  "request": "Right-to-erasure request for dana.reyes@example.com. Remove them from every system we hold them in.",
+  "requested_by": "rohit@airlock.dev",
+  "started_by": "ui",
+  "created_at": "2026-08-24T11:40:00Z",
+  "session_id": null,
+  "turn_id": null,
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_e71b3",
+    "systems": [
+      "postgres",
+      "stripe",
+      "slack",
+      "object_storage"
+    ]
+  },
+  "forward": [
+    {
+      "system": "postgres",
+      "op": "DELETE FROM users WHERE email = $1;\n-- cascades: sessions, preferences",
+      "reversible": false,
+      "proven": false
+    },
+    {
+      "system": "stripe",
+      "op": "customers.del(\"cus_Qk29ZtL4mXbW1p\")",
+      "reversible": false,
+      "proven": false
+    },
+    {
+      "system": "slack",
+      "op": "admin.users.remove(\"U04H2K9PLQ2\")",
+      "reversible": false,
+      "proven": false
+    },
+    {
+      "system": "object_storage",
+      "op": "DELETE s3://airlock-uploads/avatars/8f21c/*   (3 objects)",
+      "reversible": false,
+      "proven": false
+    }
+  ],
+  "rollback": [],
+  "certificate": {
+    "kind": "SCOPE",
+    "status": "PROVEN",
+    "scope": {
+      "records": [
+        {
+          "system": "postgres",
+          "table": "users",
+          "id": "usr_8f21c",
+          "action": "delete",
+          "count": 1
+        },
+        {
+          "system": "postgres",
+          "table": "sessions",
+          "id": "user_id=usr_8f21c",
+          "action": "delete",
+          "count": 47
+        },
+        {
+          "system": "postgres",
+          "table": "preferences",
+          "id": "user_id=usr_8f21c",
+          "action": "delete",
+          "count": 12
+        },
+        {
+          "system": "stripe",
+          "table": "customers",
+          "id": "cus_Qk29ZtL4mXbW1p",
+          "action": "delete",
+          "count": 1
+        },
+        {
+          "system": "stripe",
+          "table": "payment_methods",
+          "id": "pm_1PxQ2LEXAMPLE",
+          "action": "delete",
+          "count": 1
+        },
+        {
+          "system": "slack",
+          "table": "members",
+          "id": "U04H2K9PLQ2",
+          "action": "delete",
+          "count": 1
+        },
+        {
+          "system": "object_storage",
+          "table": "avatars",
+          "id": "s3://airlock-uploads/avatars/8f21c/",
+          "action": "delete",
+          "count": 3
+        }
+      ],
+      "exclusions": [
+        {
+          "system": "postgres",
+          "table": "invoices",
+          "reason": "Seven-year statutory retention under UK VAT record-keeping rules. Retained with the customer name replaced by a pseudonym, which satisfies the erasure request without destroying the financial record.",
+          "count": 12
+        },
+        {
+          "system": "postgres",
+          "table": "audit_log",
+          "reason": "Immutable security audit trail. The actor id is retained; every personal field is nulled.",
+          "count": 318
+        },
+        {
+          "system": "stripe",
+          "table": "charges",
+          "reason": "Stripe retains charge records for financial reporting and does not delete them when a customer is deleted. Nothing further is held on our side.",
+          "count": 9
+        }
+      ]
+    },
+    "lock_ms_estimate": 890,
+    "table_rewrite": false,
+    "sandbox_artifact_url": "sandbox://verify/dos_erasure_dana_reyes/scope.json",
+    "verified_at": "2026-08-24T11:47:03Z"
+  },
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "users",
+      "rows": 1,
+      "operation": "delete"
+    },
+    {
+      "system": "postgres",
+      "name": "sessions",
+      "rows": 47,
+      "operation": "cascade delete"
+    },
+    {
+      "system": "postgres",
+      "name": "preferences",
+      "rows": 12,
+      "operation": "cascade delete"
+    }
+  ],
+  "blast_radius": [
+    {
+      "repo": "airlock/app",
+      "file": "src/privacy/erasure.ts",
+      "line": 31,
+      "symbol": "eraseSubject"
+    }
+  ],
+  "questions": [
+    {
+      "asked": "Invoices for this person fall under a seven-year statutory retention obligation. Delete them anyway, pseudonymise them, or retain them unchanged?",
+      "options": [
+        "Delete them",
+        "Pseudonymise and retain",
+        "Retain unchanged"
+      ],
+      "answered_by": "rohit@airlock.dev",
+      "answer": "Pseudonymise and retain",
+      "at": "2026-08-24T11:45:12Z"
+    }
+  ],
+  "recommendation": "APPLY",
+  "risk_notes": [
+    {
+      "note": "Stripe does not delete charge objects when a customer is deleted; they remain in Stripe for financial reporting. That is disclosed in the exclusion list rather than quietly ignored."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.6633,
+    "by_model": {
+      "anthropic/claude-sonnet-4-6": 0.5104,
+      "zai/glm-5.2": 0.1529
+    },
+    "tokens": {
+      "input": 288411,
+      "output": 19203,
+      "total": 307614
+    }
+  },
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  }
+}

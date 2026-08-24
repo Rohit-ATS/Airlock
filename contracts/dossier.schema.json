@@ -1,0 +1,700 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Rohit-ATS/Airlock/contracts/dossier.schema.json",
+  "title": "Change Dossier v2",
+  "description": "The single contract AIRLOCK is built on. The agent produces it, the verifier fills in the certificate, the console renders it, and the approval gate reads it. Generated from packages/contract/src/dossier.ts — do not edit by hand.",
+  "type": "object",
+  "properties": {
+    "dossier_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "change_class": {
+      "type": "string",
+      "enum": [
+        "SCHEMA_MIGRATION",
+        "DATA_OPERATION",
+        "ERASURE"
+      ]
+    },
+    "request": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requested_by": {
+      "type": "string"
+    },
+    "started_by": {
+      "default": "ui",
+      "type": "string",
+      "enum": [
+        "ui",
+        "webhook",
+        "api"
+      ]
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "session_id": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "turn_id": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "project_ref": {
+          "type": "string"
+        },
+        "branch_ref": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "systems": {
+          "default": [
+            "postgres"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "postgres",
+              "stripe",
+              "slack",
+              "object_storage",
+              "github"
+            ]
+          }
+        }
+      }
+    },
+    "forward": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "enum": [
+              "postgres",
+              "stripe",
+              "slack",
+              "object_storage",
+              "github"
+            ]
+          },
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reversible": {
+            "default": false,
+            "type": "boolean"
+          },
+          "proven": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "system",
+          "op"
+        ]
+      }
+    },
+    "rollback": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "enum": [
+              "postgres",
+              "stripe",
+              "slack",
+              "object_storage",
+              "github"
+            ]
+          },
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reversible": {
+            "default": false,
+            "type": "boolean"
+          },
+          "proven": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "system",
+          "op"
+        ]
+      }
+    },
+    "certificate": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "UNDO",
+            "SCOPE"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "PROVEN",
+            "FAILED"
+          ]
+        },
+        "checksums": {
+          "type": "object",
+          "properties": {
+            "pre": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "post": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "post_rollback": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "match": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "pre",
+            "post",
+            "post_rollback",
+            "match"
+          ]
+        },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "records": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string",
+                    "enum": [
+                      "postgres",
+                      "stripe",
+                      "slack",
+                      "object_storage",
+                      "github"
+                    ]
+                  },
+                  "table": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "delete",
+                      "anonymize",
+                      "update"
+                    ]
+                  },
+                  "count": {
+                    "default": 1,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "system",
+                  "id",
+                  "action"
+                ]
+              }
+            },
+            "exclusions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string",
+                    "enum": [
+                      "postgres",
+                      "stripe",
+                      "slack",
+                      "object_storage",
+                      "github"
+                    ]
+                  },
+                  "table": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "count": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "system",
+                  "reason"
+                ]
+              }
+            }
+          },
+          "required": [
+            "records",
+            "exclusions"
+          ]
+        },
+        "lock_ms_estimate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "table_rewrite": {
+          "type": "boolean"
+        },
+        "sandbox_artifact_url": {
+          "type": "string"
+        },
+        "failure_reason": {
+          "type": "string"
+        },
+        "verified_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "status"
+      ]
+    },
+    "affected_tables": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "default": "postgres",
+            "type": "string",
+            "enum": [
+              "postgres",
+              "stripe",
+              "slack",
+              "object_storage",
+              "github"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "operation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "rows",
+          "operation"
+        ]
+      }
+    },
+    "blast_radius": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo",
+          "file",
+          "line"
+        ]
+      }
+    },
+    "questions": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "asked": {
+            "type": "string"
+          },
+          "options": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "answered_by": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answer": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "asked"
+        ]
+      }
+    },
+    "recommendation": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "APPLY",
+            "EXPAND_CONTRACT",
+            "BLOCK"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "risk_notes": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "source_title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
+        ]
+      }
+    },
+    "harness_events": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "at": {
+            "type": "string"
+          },
+          "step_id": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "thread_id": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "at",
+          "step_id",
+          "evidence"
+        ]
+      }
+    },
+    "cost": {
+      "default": {
+        "usd": 0,
+        "by_model": {},
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "total": 0
+        }
+      },
+      "type": "object",
+      "properties": {
+        "usd": {
+          "default": 0,
+          "type": "number",
+          "minimum": 0
+        },
+        "by_model": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "tokens": {
+          "default": {
+            "input": 0,
+            "output": 0,
+            "total": 0
+          },
+          "type": "object",
+          "properties": {
+            "input": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "output": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "total": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      }
+    },
+    "approval": {
+      "default": {
+        "approver": null,
+        "at": null,
+        "role_required": "approver",
+        "decision": null,
+        "reason": null
+      },
+      "type": "object",
+      "properties": {
+        "approver": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "at": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role_required": {
+          "default": "approver",
+          "type": "string",
+          "enum": [
+            "requester",
+            "approver"
+          ]
+        },
+        "decision": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "approved",
+                "rejected"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "audit": {
+      "default": {
+        "applied_at": null,
+        "post_apply_checksum": null,
+        "applied_by": null
+      },
+      "type": "object",
+      "properties": {
+        "applied_at": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "post_apply_checksum": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applied_by": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "required": [
+    "dossier_id",
+    "change_class",
+    "request",
+    "requested_by",
+    "created_at",
+    "target"
+  ]
+}
