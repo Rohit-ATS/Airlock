@@ -323,3 +323,162 @@ body {
   font-family: var(--font-mono) !important;
   font-size: 12px !important;
 }
+
+/* ===========================================================================
+   The public surfaces — landing page and control room.
+
+   Same instrument, more air. A marketing page and an operator console have
+   different jobs, but a product whose front door is built from a different
+   design system than its interior is a product that was built twice. So the
+   tokens, the hairlines and the one-alarm-colour rule all carry over; what
+   changes is the scale and the amount of space around things.
+   =========================================================================== */
+
+/* The technical-drawing ground. Two grids at different pitches, both barely
+   there, so a large dark surface has structure without having decoration. */
+.blueprint {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--color-hairline) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-hairline) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to right, color-mix(in oklab, var(--color-hairline) 25%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-hairline) 25%, transparent) 1px, transparent 1px);
+  background-size:
+    128px 128px,
+    128px 128px,
+    32px 32px,
+    32px 32px;
+}
+
+/* A single cold light source above the fold. */
+.aurora::before {
+  content: '';
+  position: absolute;
+  inset: -30% 0 auto 0;
+  height: 70vh;
+  background: radial-gradient(
+    58% 46% at 50% 0%,
+    color-mix(in oklab, var(--color-ice) 13%, transparent) 0%,
+    transparent 72%
+  );
+  pointer-events: none;
+}
+
+/* Fade the ground out at the bottom of a section so the grid never just stops. */
+.fade-b {
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+}
+
+/* ---------------------------------------------------------------------------
+   Scroll reveal. One transform, one opacity, no stagger beyond a small delay —
+   an instrument settling into place, not an entrance.
+   --------------------------------------------------------------------------- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 620ms var(--ease-instrument),
+    transform 620ms var(--ease-instrument);
+}
+.reveal[data-shown='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Display type. The landing page is the only place AIRLOCK shouts.
+   --------------------------------------------------------------------------- */
+
+.display {
+  font-size: clamp(34px, 5.6vw, 68px);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+}
+
+.subhead {
+  font-size: clamp(18px, 2.2vw, 25px);
+  line-height: 1.32;
+  letter-spacing: -0.018em;
+  font-weight: 500;
+}
+
+.lede {
+  font-size: clamp(14px, 1.35vw, 16px);
+  line-height: 1.66;
+  color: var(--color-ink-2);
+}
+
+/* The rule, set as the object it is. */
+.axiom {
+  font-family: var(--font-mono);
+  font-size: clamp(13px, 1.7vw, 20px);
+  letter-spacing: -0.02em;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------------
+   The hatch. Slow, mechanical, and stopped entirely under reduced motion.
+   --------------------------------------------------------------------------- */
+
+@keyframes hatch-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.hatch-ring {
+  transform-origin: 50% 50%;
+  animation: hatch-turn 64s linear infinite;
+}
+.hatch-ring-reverse {
+  transform-origin: 50% 50%;
+  animation: hatch-turn 96s linear infinite reverse;
+}
+
+/* A seal that is holding: a slow pressure pulse rather than a blink. */
+@keyframes seal-pressure {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.035);
+  }
+}
+.seal-pressure {
+  transform-origin: 50% 50%;
+  animation: seal-pressure 5.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hatch-ring,
+  .hatch-ring-reverse,
+  .seal-pressure {
+    animation: none !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Meter — a horizontal bar chart cell used across the control room.
+   --------------------------------------------------------------------------- */
+
+.meter {
+  position: relative;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--color-raised-2);
+  overflow: hidden;
+}
+.meter > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 99px;
+  transition: width 700ms var(--ease-instrument);
+}

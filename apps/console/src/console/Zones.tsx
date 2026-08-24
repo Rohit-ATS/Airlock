@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Dossier, Viewer } from '@airlock/contract';
-import { openGate } from '@airlock/contract';
+import { approversFor, formatMoney, openGate, sealsOutstanding } from '@airlock/contract';
 import { Chip, Dot, Empty, Evidence, Legend, cx } from '@/design/primitives';
 
 /* -------------------------------------------------------------------------- */
@@ -52,16 +52,31 @@ function QueueRow({
           ? 'hazard'
           : 'seal';
 
+  const signed = approversFor(dossier).length;
+  const outstanding = sealsOutstanding(dossier);
+  const quorum = signed + outstanding;
+
+  // What is actually in the way, said in one line. The sealed reason is used
+  // verbatim rather than summarised, so this row and the certificate card can
+  // never tell a reader two different stories about the same change.
   const blockedOn =
     cert?.status === 'PENDING'
       ? 'verifying in the sandbox'
-      : cert?.status === 'FAILED'
-        ? 'verification failed — cannot be approved'
-        : decision.state === 'OPEN'
+      : decision.state === 'OPEN'
+        ? decision.grant.final
           ? 'ready for your decision'
-          : decision.state === 'SEALED' && decision.reason === 'ROLE_NOT_APPROVER'
-            ? 'waiting on an approver'
-            : 'blocked';
+          : `needs ${outstanding} more signature${outstanding === 1 ? '' : 's'}`
+        : decision.reason === 'ROLE_NOT_APPROVER'
+          ? 'waiting on an approver'
+          : decision.reason;
+
+  const magnitude = (() => {
+    const m = dossier.magnitude;
+    if (m.amount_minor !== 0) return formatMoney(Math.abs(m.amount_minor), m.currency);
+    if (m.people > 0) return `${m.people.toLocaleString()} ${m.people === 1 ? 'person' : 'people'}`;
+    if (m.records > 0) return `${m.records.toLocaleString()} records`;
+    return null;
+  })();
 
   return (
     <button
@@ -95,8 +110,27 @@ function QueueRow({
               {dossier.started_by}
             </Chip>
           ) : null}
+          {magnitude ? (
+            <Evidence size="xs" className={dossier.magnitude.people > 0 ? 'text-hazard' : 'text-ink-3'}>
+              {magnitude}
+            </Evidence>
+          ) : null}
+          {quorum > 1 ? (
+            <span className="flex items-center gap-1" title={`${signed} of ${quorum} signatures`}>
+              {Array.from({ length: quorum }, (_, i) => (
+                <span key={i} className={cx('h-1.5 w-3 rounded-[1px]', i < signed ? 'bg-seal' : 'bg-hairline-3')} />
+              ))}
+            </span>
+          ) : null}
         </div>
-        <p className="mt-1.5 text-[10.5px] text-ink-3">{blockedOn}</p>
+        <p
+          className={cx(
+            'mt-1.5 text-[10.5px] leading-relaxed',
+            decision.state === 'OPEN' ? 'text-seal' : 'text-ink-3',
+          )}
+        >
+          {blockedOn}
+        </p>
       </div>
 
       <div className="shrink-0 text-right">
