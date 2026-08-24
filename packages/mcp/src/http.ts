@@ -1,0 +1,157 @@
+/**
+ * MCP over Streamable HTTP.
+ *
+ * TrueForge 0.1.4 attaches *remote* MCP servers and only remote ones — its
+ * `MCPServerType` enum has a single member, `"remote"`, and a configured server
+ * is `{ type, name, url, description }`. There is no stdio transport and no
+ * `command`/`args` anywhere in the API. A stdio-only AIRLOCK MCP server is
+ * therefore unmountable by the harness it was built for, which would quietly
+ * take the whole human-in-the-loop guarantee with it.
+ *
+ * So the same tools are served over HTTP as well. This is the stateless
+ * variant of the Streamable HTTP transport: every POST carries a complete
+ * JSON-RPC message and gets its response in the body. The spec permits a plain
+ * `application/json` response where the server has nothing to stream, and this
+ * server never initiates anything — it answers questions about a change ledger.
+ *
+ * Deliberately not implemented, each with a correct refusal rather than a
+ * silent misbehaviour:
+ *   - GET (server-initiated SSE) -> 405, per the spec's allowance
+ *   - DELETE (session teardown)  -> 405, because sessions carry no state here
+ */
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { McpServer, log, type JsonRpcRequest } from './protocol.js';
+
+/** Requests larger than this are refused rather than buffered. */
+const MAX_BODY_BYTES = 1_000_000;
+
+const PARSE_ERROR = -32700;
+
+function send(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
+  const payload = body === null ? '' : JSON.stringify(body);
+  res.writeHead(status, {
+    'content-type': 'application/json',
+    'content-length': Buffer.byteLength(payload).toString(),
+    // The console and the harness are different origins in every deployment
+    // this is meant for, and the server exposes nothing that is not already
+    // readable by anyone who can reach the console API.
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': 'content-type, mcp-session-id, mcp-protocol-version, authorization',
+    'access-control-allow-methods': 'POST, OPTIONS',
+    ...headers,
+  });
+  res.end(payload);
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error('request body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+export interface HttpOptions {
+  server: McpServer;
+  port: number;
+  /** Path the MCP endpoint is served at. Default `/mcp`. */
+  path?: string;
+  host?: string;
+}
+
+export async function serveHttp({ server, port, path = '/mcp', host = '0.0.0.0' }: HttpOptions): Promise<void> {
+  const http = createServer((req, res) => {
+    void handle(req, res).catch((error) => {
+      log(`unhandled: ${String(error)}`);
+      if (!res.headersSent) send(res, 500, { error: 'internal error' });
+    });
+  });
+
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+
+    if (req.method === 'OPTIONS') {
+      send(res, 204, null);
+      return;
+    }
+
+    // A liveness probe that does not require speaking MCP, so a deployment can
+    // tell "the process is up" from "the protocol is wrong".
+    if (req.method === 'GET' && url.pathname === '/healthz') {
+      send(res, 200, { ok: true, server: 'airlock', transport: 'streamable-http' });
+      return;
+    }
+
+    if (url.pathname !== path) {
+      send(res, 404, { error: `Not found. The MCP endpoint is ${path}.` });
+      return;
+    }
+
+    if (req.method === 'GET' || req.method === 'DELETE') {
+      // Allowed by the spec: a server with nothing to push says so plainly.
+      send(res, 405, { error: 'This server does not open server-initiated streams. POST JSON-RPC to this path.' }, {
+        allow: 'POST, OPTIONS',
+      });
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      send(res, 405, { error: 'Method not allowed.' }, { allow: 'POST, OPTIONS' });
+      return;
+    }
+
+    let raw: string;
+    try {
+      raw = await readBody(req);
+    } catch (error) {
+      send(res, 413, { jsonrpc: '2.0', id: null, error: { code: PARSE_ERROR, message: String(error) } });
+      return;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      send(res, 400, { jsonrpc: '2.0', id: null, error: { code: PARSE_ERROR, message: 'Invalid JSON' } });
+      return;
+    }
+
+    // The spec allows a batch. Answering one and ignoring the rest would be a
+    // silent partial failure, so batches are handled properly.
+    const batch = Array.isArray(parsed);
+    const requests = (batch ? parsed : [parsed]) as JsonRpcRequest[];
+    const replies: unknown[] = [];
+    for (const request of requests) {
+      const reply = await server.respond(request);
+      if (reply !== null) replies.push(reply);
+    }
+
+    // Nothing to say: every message was a notification.
+    if (replies.length === 0) {
+      send(res, 202, null);
+      return;
+    }
+
+    send(res, 200, batch ? replies : replies[0]);
+  }
+
+  await new Promise<void>((resolve) => {
+    http.listen(port, host, () => {
+      log(`streamable-http on http://${host}:${port}${path}`);
+      resolve();
+    });
+  });
+
+  // Hold the process open until the socket closes.
+  await new Promise<void>((resolve) => http.on('close', () => resolve()));
+}

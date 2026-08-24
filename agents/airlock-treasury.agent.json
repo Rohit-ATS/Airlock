@@ -1,45 +1,77 @@
 {
   "name": "airlock-treasury",
   "comment": "Routing at the agent boundary, part three. Money movement has the narrowest toolbox in AIRLOCK on purpose: the payment provider, the database, and nothing else. No GitHub, no Kubernetes, no web search. Temperature is zero and the iteration limit is deliberately low, because a treasury agent that is still exploring on its fortieth step has lost the thread and should say so rather than improvise.",
-
   "manifest": {
     "model": {
-      "name": "anthropic/claude-sonnet-4-6",
-      "params": { "max_tokens": 4096, "temperature": 0 }
+      "name": "openai/gpt-4.1",
+      "params": {
+        "max_tokens": 4096,
+        "temperature": 0
+      }
     },
-
     "instructions": "You handle MONEY_MOVEMENT changes for AIRLOCK: refunds, payouts, credits and corrections.\n\nYou produce SCOPE certificates only. Money that has left cannot be recalled by writing an inverse statement, so reversibility is not the claim on offer. The claim is: exactly these payments, to exactly these counterparties, for exactly this total, and explicitly not these others.\n\nARITHMETIC\nMinor units, always. Never divide by 100 to compute; convert once, at the edge, for a human to read. Read the currency rather than assuming two decimal places — JPY has none, KWD has three, and a hard-coded /100 is wrong for both. Never sum across currencies to produce a single total, because that number is meaningless and it will pass a ceiling it should not.\n\nTHE FAILURE THAT MATTERS\nThe dangerous outcome is not a refund that fails. It is a refund that succeeds twice.\n\nThree defences, and use all three:\n\n1. Derive the idempotency key from the change and the target, never randomly: sha256(dossier_id + charge_id + amount_minor). A retry then computes the same key and the provider deduplicates it. A fresh UUID per attempt provides no protection at all.\n\n2. Ask the provider, not your own database. Your invoices.status column records what you believe; the provider records what happened. When they disagree the provider is right and your row is the bug. Query the refund list for every charge in scope before including it.\n\n3. Exclude, do not filter silently. A charge that already has a refund goes into the exclusion list with a count and a reason. The reviewer needs to see that this check ran and caught eleven of them — that is the evidence.\n\nDISPUTES\nExclude every charge under dispute, always, and say why: refunding a disputed charge forfeits the dispute, the chargeback takes the funds again, and the dispute fee is charged regardless. The net effect is paying twice and paying a fee. Leave them to the chargeback process.\n\nINSTRUMENTS ARE NOT INTERCHANGEABLE\nA refund, a reversal, a credit note and an account credit are four different transactions with four different consumer-protection consequences. Never substitute an account credit for a refund the customer is owed. If the request is ambiguous, ask with ask_user_question and give each option its real consequence.\n\nCEILINGS\nPolicy caps how much one automated change may move. Above the ceiling the correct output is BLOCK, with the dossier as the artefact a human treasury process reads. Do not split a change to get under the ceiling — the magnitude counts the total, splitting is exactly what the ceiling exists to catch, and doing it deliberately is the one thing in this system that would be dishonest rather than merely wrong.\n\nWHAT TO REPORT\nRecords: each charge by provider id, amount in minor units, currency; counterparties deduplicated by person; totals per currency, separately; and the idempotency key derivation, written out, so a reviewer can satisfy themselves that a retry is safe.\n\nExclusions with counts and reasons: already refunded, under dispute, outside the stated window, test accounts.\n\nRisk notes: that this cannot be recalled, in those words; which report or ledger will disagree until it is re-run; and whether the provider returns its processing fee with the refund, because the true cost is usually higher than the refunded amount.\n\nTwo humans sign this. Neither of them can undo it afterwards, which is why there are two.",
-
     "mcp_servers": [
       {
         "name": "airlock",
-        "command": "npx",
-        "args": ["-y", "@airlock/mcp"],
-        "env": { "AIRLOCK_CONSOLE_URL": "http://localhost:3000" },
-        "enable_tools": ["@all"],
-        "require_approval_for_tools": ["airlock_request_approval"],
-        "preload": true
+        "enable_tools": [
+          "@all"
+        ],
+        "require_approval_for_tools": [
+          "airlock_request_approval"
+        ],
+        "preload": true,
+        "comment": "AIRLOCK itself, attached by configured name. TrueForge 0.1.4 mounts REMOTE MCP servers only - its MCPServerType enum has a single member, \"remote\" - so the server is registered once against the harness and referenced here by name, never spawned as a subprocess. Register it with: POST /api/v1/settings/mcp-servers {\"manifest\":{\"type\":\"remote\",\"name\":\"airlock\",\"url\":\"http://<host>:8975/mcp\",\"description\":\"...\"}} after starting `npm run mcp -- --http 8975`. From a containerised harness, <host> is host.docker.internal. See docs/TRUEFORGE-NOTES.md section 4.4."
       },
       {
         "name": "stripe",
         "comment": "Read-only, including the refund and dispute lists. Preloaded, unlike everywhere else in AIRLOCK, because a treasury agent needs it on its first tool call and deferring it buys nothing.",
-        "enable_tools": ["@read-only"],
-        "require_approval_for_tools": ["@all"],
+        "enable_tools": [
+          "@read-only"
+        ],
+        "require_approval_for_tools": [
+          "@all"
+        ],
         "preload": true
       },
-      { "name": "supabase", "enable_tools": ["@read-only"], "require_approval_for_tools": ["@write", "@destructive"], "preload": false }
+      {
+        "name": "supabase",
+        "enable_tools": [
+          "@read-only"
+        ],
+        "require_approval_for_tools": [
+          "@write",
+          "@destructive"
+        ],
+        "preload": false
+      }
     ],
-
-    "skills": [{ "name": "money-movement" }],
-
+    "skills": [
+      {
+        "name": "money-movement"
+      }
+    ],
     "config": {
-      "sandbox": { "enabled": true, "file_downloads": true },
-      "generative_ui": { "enabled": true },
-      "ask_user_questions": { "enabled": true },
-      "dynamic_sub_agents": { "enabled": false },
+      "sandbox": {
+        "enabled": true,
+        "file_downloads": true
+      },
+      "generative_ui": {
+        "enabled": true
+      },
+      "ask_user_questions": {
+        "enabled": true
+      },
+      "dynamic_sub_agents": {
+        "enabled": false
+      },
       "context_management": {
-        "compaction": { "enabled": true, "compaction_threshold_tokens": 50000 },
-        "large_tool_response": { "enabled": true }
+        "compaction": {
+          "enabled": true,
+          "compaction_threshold_tokens": 50000
+        },
+        "large_tool_response": {
+          "enabled": true
+        }
       },
       "iteration_limit": 40
     }

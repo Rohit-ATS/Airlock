@@ -39,17 +39,42 @@ export function withHarnessObserver(base: AgentUIServer, hooks: ObserverHooks): 
   return { ...base, createTurn };
 }
 
+/**
+ * Make every session in this console run the AIRLOCK agent.
+ *
+ * Left alone, the SDK creates a session from whatever the composer's model
+ * picker is set to — a bare model with no connectors. That is a perfectly good
+ * chat window and a completely useless airlock: with no `airlock` MCP server
+ * mounted there is no `airlock_request_approval`, nothing is held for a human,
+ * and the gate the whole product is built around simply is not in the loop.
+ *
+ * So the console pins the agent. A caller that explicitly asks for a different
+ * one still gets it — this sets a default, it does not remove a choice — but
+ * the default for *this* console is the change-control agent, because that is
+ * what this console is.
+ */
+export function withAirlockAgent(base: AgentUIServer, agentName: string): AgentUIServer {
+  const createSession: AgentUIServer['createSession'] = (req) =>
+    base.createSession(req?.agentName || req?.agentSpec ? req : { ...req, agentName });
+
+  return { ...base, createSession };
+}
+
 export interface AirlockServerOptions {
   baseUrl: string;
   token?: string;
   hooks: ObserverHooks;
+  /** The registered agent every new session runs. */
+  agentName?: string;
 }
 
-/** Build the real TrueForge server, observed. */
-export function createAirlockServer({ baseUrl, token, hooks }: AirlockServerOptions): AgentUIServer {
+/** Build the real TrueForge server, pinned to the AIRLOCK agent and observed. */
+export function createAirlockServer({ baseUrl, token, hooks, agentName }: AirlockServerOptions): AgentUIServer {
   const base = createTrueForgeAgentUIServer({
     baseUrl,
     ...(token ? { token } : {}),
   }) as unknown as AgentUIServer;
-  return withHarnessObserver(base, hooks);
+
+  const pinned = agentName ? withAirlockAgent(base, agentName) : base;
+  return withHarnessObserver(pinned, hooks);
 }

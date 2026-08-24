@@ -120,6 +120,33 @@ export class McpServer {
     }
   }
 
+  /**
+   * Handle one parsed JSON-RPC message and return what should be sent back,
+   * or `null` when the message is a notification and takes no reply.
+   *
+   * Public because there are two transports. TrueForge 0.1.4 only speaks to
+   * *remote* MCP servers over HTTP — its `MCPServerType` enum has exactly one
+   * member, `"remote"` — so stdio alone would make this server unmountable by
+   * the very harness it exists for. Both transports share this method so they
+   * cannot drift into answering the same request differently.
+   */
+  async respond(request: JsonRpcRequest): Promise<Record<string, unknown> | null> {
+    if (request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
+      if (request.id === undefined || request.id === null) return null;
+      return { jsonrpc: '2.0', id: request.id, error: { code: INVALID_REQUEST, message: 'Not a JSON-RPC 2.0 request' } };
+    }
+
+    try {
+      const result = await this.dispatch(request);
+      if (result === null || request.id === undefined || request.id === null) return null;
+      return { jsonrpc: '2.0', id: request.id, result };
+    } catch (error) {
+      const code = (error as { code?: number }).code ?? INTERNAL_ERROR;
+      if (request.id === undefined || request.id === null) return null;
+      return { jsonrpc: '2.0', id: request.id, error: { code, message: message(error) } };
+    }
+  }
+
   /** Read newline-delimited JSON-RPC from stdin until it closes. */
   async listen(): Promise<void> {
     const stdin = process.stdin;
@@ -147,21 +174,10 @@ export class McpServer {
       return;
     }
 
-    if (request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
-      this.send({ jsonrpc: '2.0', id: request.id ?? null, error: { code: INVALID_REQUEST, message: 'Not a JSON-RPC 2.0 request' } });
-      return;
-    }
-
-    try {
-      const result = await this.dispatch(request);
-      // A notification carries no id and expects no reply.
-      if (result === null || request.id === undefined || request.id === null) return;
-      this.send({ jsonrpc: '2.0', id: request.id, result });
-    } catch (error) {
-      const code = (error as { code?: number }).code ?? INTERNAL_ERROR;
-      if (request.id === undefined || request.id === null) return;
-      this.send({ jsonrpc: '2.0', id: request.id, error: { code, message: message(error) } });
-    }
+    // An invalid-but-parseable message still needs its error delivered, and a
+    // notification still needs its silence. `respond` decides both.
+    const reply = await this.respond(request);
+    if (reply !== null) this.send(reply);
   }
 
   private send(payload: unknown): void {
