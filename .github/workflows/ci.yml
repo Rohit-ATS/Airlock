@@ -1,0 +1,83 @@
+# AIRLOCK CI.
+#
+# The point of this workflow is not "the tests pass". It is that the four
+# claims AIRLOCK makes on its front page are checked mechanically on every
+# push, so none of them can quietly stop being true:
+#
+#   1. no non-PROVEN certificate can open the gate      -> the test suite
+#   2. a sealed ledger record cannot be edited unnoticed -> the test suite
+#   3. every fixture really is refused for the reason    -> check:fixtures
+#      its filename claims
+#   4. no agent can write to production without holding  -> check:agents
+#      the approval tool
+#
+# The generated-artefact step is the fifth: docs/CAPABILITIES.md,
+# docs/POLICY.md and contracts/dossier.schema.json are emitted from the code,
+# so a drift between what we claim and what we do fails the build rather than
+# surviving until a judge notices it.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # The compile-time half of the gate proof lives here: gate.typetest.ts
+      # asserts that six ways of forging an ApprovalGrant are type errors. If
+      # anyone weakens the type, tsc reports an unused @ts-expect-error and
+      # this step fails.
+      - name: Build the contract (this is also the compile-time gate proof)
+        run: npm run build --workspace @airlock/contract
+
+      - name: Build the MCP server
+        run: npm run build --workspace @airlock/mcp
+
+      - name: Test
+        run: node --test packages/contract/test/*.test.mjs packages/mcp/test/*.test.mjs
+
+      - name: Fixtures produce the gate verdict they claim
+        run: npm run check:fixtures
+
+      - name: No agent can write to production without holding the gate
+        run: npm run check:agents
+
+      - name: Typecheck every workspace
+        run: npm run typecheck
+
+      - name: Build the console
+        run: npm run build --workspace @airlock/console
+
+      # Generated files are emitted from the source of truth. If regenerating
+      # them changes anything, the docs and the code have drifted.
+      - name: Generated artefacts are up to date
+        run: |
+          npm run gen:schema
+          npm run gen:capabilities
+          npm run gen:policy
+          npm run gen:examples
+          if ! git diff --quiet --exit-code; then
+            echo "::error::Generated files are stale. Run 'npm run gen' and commit the result."
+            git --no-pager diff --stat
+            exit 1
+          fi

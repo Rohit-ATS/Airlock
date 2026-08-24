@@ -160,6 +160,33 @@ as written, and neither is per-subagent model routing (capability 18).
   `require_approval_for_tools`. Because subagent tool calls still pause for approval, *no
   principal in the run* — root or subagent — can touch production without a human. That is
   a better safety story than "the scout has a smaller toolbox", and it is real.
+
+  **Since v0.2 of this document that claim got stronger still, and it is worth writing down
+  why.** The weakness of the original version was that "the write path is gated" depended on
+  every connector being configured correctly, forever, by everyone. AIRLOCK now ships its own
+  MCP server (`packages/mcp`), and the agent's entire vocabulary towards production is five
+  tools: read the policy, open a change, attach a certificate, check the gate, ask a human.
+  There is deliberately **no tool that applies a change**, so the dangerous state is not
+  "misconfigured", it is *unrepresentable* — the same move the gate makes in the type system,
+  made again in the tool surface.
+
+  ```jsonc
+  { "name": "airlock",
+    "command": "npx", "args": ["-y", "@airlock/mcp"],
+    "enable_tools": ["@all"],
+    "require_approval_for_tools": ["airlock_request_approval"] }   // exactly one
+  ```
+
+  Two details make this work rather than merely read well:
+
+  - MCP tool **annotations** (`readOnlyHint`, `destructiveHint`) are what TrueForge's
+    `@read-only` and `@destructive` selectors resolve against, so they have to be set on our
+    own tools too. `packages/mcp/test/server.test.mjs` asserts that exactly one tool is
+    annotated destructive and that it is the one held for approval — if someone adds a second
+    write path, the suite fails rather than the guarantee quietly weakening.
+  - Because subagents **inherit** the root agent's MCP scope (§4.1), this needs no per-subagent
+    configuration. The property TrueForge's design makes awkward for tool scoping is exactly
+    the property that makes this airtight.
 - **Capability 18 becomes per-agent routing.** Several named agents, each saved with its own
   `model`, invoked for the job that suits them. Cost is read from real telemetry, not
   estimated (§6).
