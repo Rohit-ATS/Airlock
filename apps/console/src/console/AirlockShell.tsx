@@ -32,7 +32,7 @@ const TOKENS: Partial<SemanticTokens> = {
   border: '#1c212b',
 
   textPrimary: '#e8ecf2',
-  textSecondary: '#98a2b2',
+  textSecondary: '#b4bece',
 
   inputBoxBg: '#10131a',
   inputBorder: '#29313d',
@@ -50,7 +50,7 @@ const TOKENS: Partial<SemanticTokens> = {
   secondaryButtonText: '#e8ecf2',
   ghostButtonBg: 'transparent',
   ghostButtonHover: '#161a23',
-  ghostButtonText: '#98a2b2',
+  ghostButtonText: '#b4bece',
 
   dropdownSelectedItemBg: '#161a23',
   dropdownSelectedItemText: '#e8ecf2',
