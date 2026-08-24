@@ -33,9 +33,9 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22.14'
           cache: npm
@@ -70,14 +70,31 @@ jobs:
 
       # Generated files are emitted from the source of truth. If regenerating
       # them changes anything, the docs and the code have drifted.
+      #
+      # The diff is scoped to exactly the paths the generators write, and mode
+      # changes are ignored. An earlier version diffed the whole tree, which
+      # meant `npm ci` chmod-ing a declared `bin` to 755 on Linux was reported
+      # as "generated files are stale" — an error that sends the reader to the
+      # wrong file entirely. A check whose failure message is misleading is
+      # worse than no check.
       - name: Generated artefacts are up to date
         run: |
           npm run gen:schema
           npm run gen:capabilities
           npm run gen:policy
           npm run gen:examples
-          if ! git diff --quiet --exit-code; then
+          if ! git -c core.fileMode=false diff --quiet --exit-code --                  contracts/dossier.schema.json                  'contracts/examples/*.json'                  docs/CAPABILITIES.md                  docs/POLICY.md; then
             echo "::error::Generated files are stale. Run 'npm run gen' and commit the result."
-            git --no-pager diff --stat
+            git -c core.fileMode=false --no-pager diff --stat --                  contracts/dossier.schema.json                  'contracts/examples/*.json'                  docs/CAPABILITIES.md                  docs/POLICY.md
             exit 1
+          fi
+
+      # Anything else the build dirtied is worth knowing about, but it is not a
+      # drift in the docs and must not be reported as one.
+      - name: Report any other working-tree change
+        if: always()
+        run: |
+          if ! git -c core.fileMode=false diff --quiet --exit-code; then
+            echo "::warning::The build left unrelated changes in the working tree:"
+            git -c core.fileMode=false --no-pager diff --stat
           fi
