@@ -1,0 +1,105 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "kubernetes",
+      "op": "kubectl scale statefulset/pg-replica --replicas=1",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "rollback": [
+    {
+      "system": "kubernetes",
+      "op": "kubectl scale statefulset/pg-replica --replicas=3",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "magnitude": {
+    "records": 2,
+    "people": 0,
+    "amount_minor": 0,
+    "undo_window_seconds": 900
+  },
+  "principals": [],
+  "affected_tables": [
+    {
+      "system": "kubernetes",
+      "name": "statefulset/pg-replica",
+      "rows": 3,
+      "operation": "scale to 1"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "BLOCK",
+  "risk_notes": [
+    {
+      "note": "The proof is genuine and the rollback is genuinely proven. It was taken against a three-node pool, and the pool autoscaled to four while this change was queued — so the plan would now remove three nodes rather than two."
+    },
+    {
+      "note": "The drift checker reported drifted:false. AIRLOCK compared the digests itself and disagreed. A claim of safety is never taken on trust."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.1102,
+    "by_model": {
+      "openai/gpt-5.2-mini": 0.1102
+    },
+    "tokens": {
+      "input": 48200,
+      "output": 3100,
+      "total": 51300
+    }
+  },
+  "signatures": [],
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "drift": {
+    "checked_at": "2026-08-24T11:02:00Z",
+    "production_checksum": "sha256:21f968de4405c4c18826c46d78a1ca6e69a963146edcafa57c4f1ca79834b15e",
+    "drifted": false
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_replica_scaledown",
+  "change_class": "INFRA_MUTATION",
+  "request": "Scale the read replica pool from three nodes down to one now that the migration backfill has finished.",
+  "requested_by": "platform@airlock.dev",
+  "created_at": "2026-08-24T06:30:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_77a10",
+    "systems": [
+      "kubernetes",
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "UNDO",
+    "status": "PROVEN",
+    "checksums": {
+      "pre": "sha256:e439d5317be7a213ee8c4a2e587f90ba7e007d26f8bd89485bcee2f5a7949551",
+      "post": "sha256:28cb9259020f391ff878a479044a7d84d234de5abe86af0652a50794f057ed01",
+      "post_rollback": "sha256:e439d5317be7a213ee8c4a2e587f90ba7e007d26f8bd89485bcee2f5a7949551",
+      "match": true
+    },
+    "lock_ms_estimate": 0,
+    "table_rewrite": false,
+    "sandbox_artifact_url": "sandbox://verify/dos_replica_scaledown/topology.json",
+    "verified_at": "2026-08-24T06:44:10Z"
+  }
+}

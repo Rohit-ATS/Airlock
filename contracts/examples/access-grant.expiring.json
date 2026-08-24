@@ -1,0 +1,155 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "iam",
+      "op": "aws iam attach-role-policy --role-name oncall --policy-arn arn:aws:iam::…:policy/prod_reader",
+      "reversible": true,
+      "proven": true
+    },
+    {
+      "system": "postgres",
+      "op": "GRANT SELECT ON ALL TABLES IN SCHEMA public TO prod_reader;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "rollback": [
+    {
+      "system": "postgres",
+      "op": "REVOKE SELECT ON ALL TABLES IN SCHEMA public FROM prod_reader;",
+      "reversible": true,
+      "proven": true
+    },
+    {
+      "system": "iam",
+      "op": "aws iam detach-role-policy --role-name oncall --policy-arn arn:aws:iam::…:policy/prod_reader",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "magnitude": {
+    "records": 215,
+    "people": 1,
+    "amount_minor": 0,
+    "undo_window_seconds": 0
+  },
+  "principals": [
+    {
+      "subject": "oncall@airlock.dev",
+      "grants": [
+        "iam:role/prod_reader",
+        "postgres:SELECT ON ALL TABLES IN SCHEMA public"
+      ],
+      "scope": "airlock-production",
+      "expires_at": "2026-08-24T15:18:00Z",
+      "unlocks": [
+        "Reading every row of customer data in public.*, including email addresses and order history",
+        "Reading query plans and pg_stat_activity, which is the point of the grant"
+      ]
+    }
+  ],
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "public.* (214 tables)",
+      "rows": 214,
+      "operation": "grant SELECT"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "APPLY",
+  "risk_notes": [
+    {
+      "note": "The grant expires four hours after it is applied. AIRLOCK schedules the revoke as part of applying it, so nobody has to remember."
+    },
+    {
+      "note": "Effective permissions were computed against a shadow IAM account rather than read from the policy document, because a policy document and an effective permission are famously not the same thing."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.2216,
+    "by_model": {
+      "anthropic/claude-sonnet-4-6": 0.1801,
+      "openai/gpt-5.2-mini": 0.0415
+    },
+    "tokens": {
+      "input": 96400,
+      "output": 7220,
+      "total": 103620
+    }
+  },
+  "signatures": [],
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_access_oncall",
+  "change_class": "ACCESS_GRANT",
+  "request": "Give the on-call engineer read access to the production database for the length of this incident so they can diagnose the checkout failures.",
+  "requested_by": "ops@airlock.dev",
+  "created_at": "2026-08-24T11:18:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "systems": [
+      "iam",
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "SCOPE",
+    "status": "PROVEN",
+    "scope": {
+      "records": [
+        {
+          "system": "iam",
+          "table": "role_binding",
+          "id": "oncall@airlock.dev -> prod_reader",
+          "action": "grant",
+          "count": 1
+        },
+        {
+          "system": "postgres",
+          "table": "grants",
+          "id": "prod_reader -> public.*",
+          "action": "grant",
+          "count": 214
+        }
+      ],
+      "exclusions": [
+        {
+          "system": "postgres",
+          "table": "payment_methods",
+          "reason": "Cardholder data is out of scope for the on-call role under PCI-DSS 7.2. The grant explicitly excludes it.",
+          "count": 1
+        },
+        {
+          "system": "iam",
+          "table": "role_binding",
+          "reason": "No write binding is created. The role is read-only, so the grant cannot be escalated by using it.",
+          "count": 0
+        }
+      ]
+    },
+    "sandbox_artifact_url": "sandbox://verify/access/effective-permissions.json",
+    "verified_at": "2026-08-24T11:22:00Z"
+  }
+}

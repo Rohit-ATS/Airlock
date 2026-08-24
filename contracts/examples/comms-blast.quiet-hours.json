@@ -1,0 +1,121 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "email",
+      "op": "sendgrid.send(template=pricing-incident-2026-08, recipients=61,400)",
+      "reversible": false,
+      "proven": true
+    }
+  ],
+  "rollback": [],
+  "magnitude": {
+    "records": 61400,
+    "people": 61400,
+    "amount_minor": 0,
+    "undo_window_seconds": null
+  },
+  "principals": [],
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "users",
+      "rows": 61400,
+      "operation": "read only (audience)"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "BLOCK",
+  "risk_notes": [
+    {
+      "note": "There is no unsend. The scope certificate is the only kind of proof available, and the exclusion list is the part that matters: 4,719 people are deliberately not being written to, each for a stated reason."
+    },
+    {
+      "note": "61,400 people is above the 50,000 ceiling for a single automated send. Splitting it does not evade the ceiling — the magnitude counts people, not batches."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.3308,
+    "by_model": {
+      "anthropic/claude-sonnet-4-6": 0.2604,
+      "openai/gpt-5.2-mini": 0.0704
+    },
+    "tokens": {
+      "input": 142800,
+      "output": 9110,
+      "total": 151910
+    }
+  },
+  "signatures": [],
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_incident_email",
+  "change_class": "COMMS_BLAST",
+  "request": "Email every customer who was affected by the 14 August pricing bug to tell them about the refund before they see it on their statement.",
+  "requested_by": "comms@airlock.dev",
+  "created_at": "2026-08-24T10:40:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "systems": [
+      "email",
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "SCOPE",
+    "status": "PROVEN",
+    "scope": {
+      "records": [
+        {
+          "system": "email",
+          "table": "recipients",
+          "id": "affected customers, deduplicated by person",
+          "action": "send",
+          "count": 61400
+        }
+      ],
+      "exclusions": [
+        {
+          "system": "email",
+          "table": "suppression_list",
+          "reason": "Unsubscribed from all non-transactional mail. Sending anyway would be both unlawful and the reason they unsubscribed.",
+          "count": 3902
+        },
+        {
+          "system": "email",
+          "table": "recipients",
+          "reason": "Bounced hard in the last 30 days. Sending to them damages the sending domain reputation for everybody else.",
+          "count": 811
+        },
+        {
+          "system": "postgres",
+          "table": "users",
+          "reason": "Erased under a right-to-erasure request. There is no lawful address to send to and no person to send it about.",
+          "count": 6
+        }
+      ]
+    },
+    "sandbox_artifact_url": "sandbox://verify/dos_incident_email/audience.ndjson",
+    "verified_at": "2026-08-24T10:58:20Z"
+  }
+}

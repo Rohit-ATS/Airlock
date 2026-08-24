@@ -1,0 +1,109 @@
+{
+  "started_by": "webhook",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "postgres",
+      "op": "CREATE INDEX CONCURRENTLY idx_orders_customer_created\n    ON orders (customer_id, created_at);",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "rollback": [
+    {
+      "system": "postgres",
+      "op": "DROP INDEX CONCURRENTLY idx_orders_customer_created;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "magnitude": {
+    "records": 842119,
+    "people": 0,
+    "amount_minor": 0,
+    "undo_window_seconds": 604800
+  },
+  "principals": [],
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "orders",
+      "rows": 842119,
+      "operation": "create index concurrently"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "APPLY",
+  "risk_notes": [],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.1901,
+    "by_model": {
+      "anthropic/claude-sonnet-4-6": 0.1901
+    },
+    "tokens": {
+      "input": 74200,
+      "output": 4010,
+      "total": 78210
+    }
+  },
+  "signatures": [
+    {
+      "approver": "sam.okafor@airlock.dev",
+      "at": "2026-08-21T09:20:00Z",
+      "decision": "approved",
+      "reason": null,
+      "break_glass": false
+    }
+  ],
+  "approval": {
+    "approver": "sam.okafor@airlock.dev",
+    "at": "2026-08-21T09:20:00Z",
+    "role_required": "approver",
+    "decision": "approved",
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": "2026-08-21T09:20:40Z",
+    "post_apply_checksum": null,
+    "applied_by": "sam.okafor@airlock.dev"
+  },
+  "receipt": {
+    "seq": 0,
+    "prev_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "sha256:ba8b1c656b658f7d1d4d149ba70982be3f0713ee12398df9b0da046e5e2df734",
+    "sealed_at": "2026-08-21T09:20:00Z"
+  },
+  "dossier_id": "dos_orders_index",
+  "change_class": "SCHEMA_MIGRATION",
+  "request": "Add a concurrent index on orders(customer_id, created_at) so the dashboard query stops sequential-scanning.",
+  "requested_by": "priya.n@airlock.dev",
+  "created_at": "2026-08-21T09:00:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_2ab41",
+    "systems": [
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "UNDO",
+    "status": "PROVEN",
+    "checksums": {
+      "pre": "sha256:9a2bff3879296735b20305b0c61569c6db811625c6cdc8d8f55cf24909015c57",
+      "post": "sha256:6486a02bb11ad21c0616b0301e374155146f2a1f01fb69f6121124c6b3b074c9",
+      "post_rollback": "sha256:9a2bff3879296735b20305b0c61569c6db811625c6cdc8d8f55cf24909015c57",
+      "match": true
+    },
+    "lock_ms_estimate": 120,
+    "table_rewrite": false,
+    "verified_at": "2026-08-21T09:12:00Z"
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "postgres",
+      "op": "anonymize 4 subjects across 12 tables",
+      "reversible": false,
+      "proven": true
+    }
+  ],
+  "rollback": [],
+  "magnitude": {
+    "records": 168,
+    "people": 4,
+    "amount_minor": 0,
+    "undo_window_seconds": null
+  },
+  "principals": [],
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "12 tables",
+      "rows": 168,
+      "operation": "anonymize"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "APPLY",
+  "risk_notes": [],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.7714,
+    "by_model": {
+      "anthropic/claude-sonnet-4-6": 0.6602,
+      "openai/gpt-5.2-mini": 0.1112
+    },
+    "tokens": {
+      "input": 318400,
+      "output": 20110,
+      "total": 338510
+    }
+  },
+  "signatures": [
+    {
+      "approver": "sam.okafor@airlock.dev",
+      "at": "2026-08-22T13:40:00Z",
+      "decision": "approved",
+      "reason": "Scope checked against all four DSARs.",
+      "break_glass": false
+    },
+    {
+      "approver": "priya.n@airlock.dev",
+      "at": "2026-08-22T14:02:00Z",
+      "decision": "approved",
+      "reason": "Countersigned. Exclusions are correct.",
+      "break_glass": false
+    }
+  ],
+  "approval": {
+    "approver": "priya.n@airlock.dev",
+    "at": "2026-08-22T14:02:00Z",
+    "role_required": "approver",
+    "decision": "approved",
+    "reason": "Countersigned. Exclusions are correct."
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": "2026-08-22T14:02:30Z",
+    "post_apply_checksum": null,
+    "applied_by": "priya.n@airlock.dev"
+  },
+  "receipt": {
+    "seq": 1,
+    "prev_hash": "sha256:ba8b1c656b658f7d1d4d149ba70982be3f0713ee12398df9b0da046e5e2df734",
+    "hash": "sha256:b1f92092422ae09bc96a64c60025e00c35af8417ecd7724e04bac1412416078b",
+    "sealed_at": "2026-08-22T14:02:00Z"
+  },
+  "dossier_id": "dos_gdpr_batch",
+  "change_class": "ERASURE",
+  "request": "Process the four right-to-erasure requests that came in during the week of 10 August.",
+  "requested_by": "legal@airlock.dev",
+  "created_at": "2026-08-22T13:00:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_5f0c2",
+    "systems": [
+      "postgres",
+      "stripe",
+      "object_storage"
+    ]
+  },
+  "certificate": {
+    "kind": "SCOPE",
+    "status": "PROVEN",
+    "scope": {
+      "records": [
+        {
+          "system": "postgres",
+          "table": "users",
+          "id": "4 subjects",
+          "action": "anonymize",
+          "count": 168
+        }
+      ],
+      "exclusions": [
+        {
+          "system": "postgres",
+          "table": "invoices",
+          "reason": "Seven-year statutory retention. Personal fields redacted in place.",
+          "count": 47
+        }
+      ]
+    },
+    "verified_at": "2026-08-22T13:26:00Z"
+  }
+}
