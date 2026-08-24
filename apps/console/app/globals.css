@@ -48,11 +48,35 @@
   --color-hairline-2: #29313d;
   --color-hairline-3: #3a4552;
 
-  /* --- ink: four weights is enough; a fifth becomes noise ---------------- */
+  /* --- ink: four weights is enough; a fifth becomes noise ----------------
+     Every step clears WCAG AA (4.5:1) against every surface above, including
+     --raised-3, which is the lightest thing any of them sits on. The tightest
+     pairing is ink-4 on raised-3 at 4.59:1.
+
+     This scale was rebalanced rather than tuned by eye. An axe-core pass over
+     all three routes found 106 nodes failing contrast — legends, hints and
+     secondary evidence, everywhere — because the old ink-3 (#626d7d, 3.03:1)
+     and ink-4 (#39424f, 1.57:1) had been chosen for the mood they created
+     rather than measured. Lifting only those two would have pushed ink-4 above
+     where ink-3 had been and collapsed four steps into two, so all four moved.
+
+     De-emphasis now comes from weight, size and tracking as much as from
+     lightness. Adjacent steps stay 1.37x-1.64x apart in relative luminance,
+     which is enough to read as distinct without any of them being unreadable.
+     "It is dim on purpose" is not a defence anyone has to accept. */
   --color-ink: #e8ecf2;
-  --color-ink-2: #98a2b2;
-  --color-ink-3: #626d7d;
-  --color-ink-4: #39424f;
+  --color-ink-2: #b4bece;
+  --color-ink-3: #93a0b2;
+  --color-ink-4: #7d8b9e;
+
+  /* The unlit lamp, and nothing else.
+     Deliberately NOT --ink-4. The ink scale is bound by a contrast floor
+     because it carries text; a lamp that is off is a graphic, and it has the
+     opposite requirement — it has to read as unmistakably dark next to a lit
+     one. Tying the two together meant that raising the text scale to pass AA
+     made every unexercised capability look exercised, which is the one thing
+     this panel must never do. */
+  --color-lamp-off: #333c48;
 
   /* --- the single interactive accent ------------------------------------ */
   --color-ice: #4fc3f7;
@@ -135,7 +159,7 @@ body {
   height: 9px;
   flex: none;
   border-radius: 2px;
-  background: var(--color-ink-4);
+  background: var(--color-lamp-off);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 4%);
   transition:
     background 420ms var(--ease-instrument),

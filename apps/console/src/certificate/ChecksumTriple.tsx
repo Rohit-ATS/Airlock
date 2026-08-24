@@ -99,7 +99,7 @@ export function ChecksumTriple({ triple }: { triple: Triple }) {
                   )}
                 />
               ) : (
-                <span className="size-[5px] rounded-full bg-ink-4" />
+                <span className="size-[5px] rounded-full bg-lamp-off" />
               )}
             </div>
 
