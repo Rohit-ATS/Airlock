@@ -1,0 +1,19 @@
+{
+  "name": "@airlock/mcp",
+  "version": "0.1.0",
+  "description": "AIRLOCK as an MCP server: the agent's only route to production, and it is held for a human.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "bin": { "airlock-mcp": "./bin/airlock-mcp.mjs" },
+  "files": ["dist", "bin"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node bin/airlock-mcp.mjs"
+  },
+  "dependencies": { "@airlock/contract": "*" },
+  "devDependencies": { "@types/node": "^24.3.0", "typescript": "^5.9.2" }
+}
