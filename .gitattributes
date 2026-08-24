@@ -1,0 +1,29 @@
+# Normalise line endings.
+#
+# This repository is authored on Windows and built on Linux in CI. Without
+# this, a file committed with CRLF checks out unchanged on the runner, every
+# tool that rewrites it emits LF, and the working tree goes dirty for reasons
+# that have nothing to do with the change under review. That failure mode is
+# expensive precisely because the error it produces points somewhere else.
+* text=auto eol=lf
+
+# Executables. Git on Windows does not record the exec bit, so a file with a
+# shebang goes in as 100644 and npm chmods it to 755 on Linux during install —
+# which is a working-tree change CI then has to explain. Declaring it here
+# keeps the index and the installed tree in agreement on every platform.
+*.sh text eol=lf
+packages/mcp/bin/airlock-mcp.mjs text eol=lf
+
+# Never touched.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Generated. Marked so review diffs collapse them by default on GitHub; they
+# are still checked byte-for-byte by the `gen` step in CI.
+contracts/dossier.schema.json linguist-generated=true
+docs/CAPABILITIES.md linguist-generated=true
+docs/POLICY.md linguist-generated=true
+contracts/examples/*.json linguist-generated=true
