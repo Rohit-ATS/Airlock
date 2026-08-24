@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   ComposerBusyProvider,
   ComposerContainer,
@@ -10,7 +11,7 @@ import {
 } from '@truefoundry/trueforge-ui';
 import type { ApprovalGrant, Dossier, Viewer } from '@airlock/contract';
 import { CAPABILITY_TOTAL } from '@airlock/contract';
-import { Button, Chip, Dot, Empty, Evidence, Legend, cx } from '@/design/primitives';
+import { Chip, Dot, Empty, Evidence, Legend, cx } from '@/design/primitives';
 import { HarnessCounter, HarnessPanel } from '@/harness/HarnessPanel';
 import { useRun, useRunStore } from '@/harness/HarnessProvider';
 import { CertificateCard } from '@/certificate/CertificateCard';
@@ -20,6 +21,14 @@ import { DidZone, WaitingZone } from './Zones';
 
 type Zone = 'DOING' | 'WAITING' | 'DID';
 
+/**
+ * One-click starting points.
+ *
+ * Chosen to span the range rather than to flatter it: a reversible migration, a
+ * correction that fails its own proof, an erasure, a grant, and money. Some of
+ * these are supposed to be refused, and a judge discovering that by clicking is
+ * worth more than a paragraph claiming it.
+ */
 const EXAMPLES: Array<{ cls: string; label: string; prompt: string; tone: 'seal' | 'ice' | 'hazard' }> = [
   {
     cls: 'SCHEMA_MIGRATION',
@@ -40,6 +49,20 @@ const EXAMPLES: Array<{ cls: string; label: string; prompt: string; tone: 'seal'
     label: 'Erase a person from every system we hold them in',
     prompt:
       'We received a right-to-erasure request for the user with email dana.reyes@example.com. Remove them from every system we hold them in, and tell me exactly what you will destroy and what you will keep.',
+    tone: 'hazard',
+  },
+  {
+    cls: 'ACCESS_GRANT',
+    label: 'Give the on-call engineer production access',
+    prompt:
+      'Give the on-call engineer read access to the production database for the length of this incident. Compute what it actually unlocks by simulating it, not by reading the policy document.',
+    tone: 'hazard',
+  },
+  {
+    cls: 'MONEY_MOVEMENT',
+    label: 'Refund a duplicate charge to everyone affected',
+    prompt:
+      'The 14 August pricing bug double-charged term subscribers. Refund the duplicate charge to everyone affected, and exclude anyone who has already been refunded or is under dispute.',
     tone: 'hazard',
   },
 ];
@@ -73,7 +96,9 @@ function Topbar({ viewer, onToggleHarness }: { viewer: Viewer; onToggleHarness: 
 
   return (
     <header className="milled relative flex h-13 shrink-0 items-center gap-3 border-b border-hairline bg-panel px-3">
-      <Wordmark sealed={sealed} />
+      <Link href="/" title="Back to the front door">
+        <Wordmark sealed={sealed} />
+      </Link>
       <div className="mx-1 h-5 w-px bg-hairline" />
       <StatusReadout />
 
@@ -90,7 +115,11 @@ function Topbar({ viewer, onToggleHarness }: { viewer: Viewer; onToggleHarness: 
       <div className="flex-1" />
 
       {run.reconnects > 0 ? (
-        <Chip tone="seal" className="hidden !text-[9.5px] md:inline-flex" title="The stream reattached after a transport loss">
+        <Chip
+          tone="seal"
+          className="hidden !text-[9.5px] md:inline-flex"
+          title="The stream reattached after a transport loss"
+        >
           reattached ×{run.reconnects}
         </Chip>
       ) : null}
@@ -111,6 +140,14 @@ function Topbar({ viewer, onToggleHarness }: { viewer: Viewer; onToggleHarness: 
           </div>
         </div>
       ) : null}
+
+      <Link
+        href="/control"
+        title="Fleet-level view: what is held, what was refused, and whether the ledger still verifies"
+        className="hidden rounded-[4px] border border-hairline-2 bg-raised px-2 py-1 text-[11px] text-ink-2 transition-colors hover:border-hairline-3 hover:text-ink lg:block"
+      >
+        Control room
+      </Link>
 
       <div
         className={cx(
@@ -144,7 +181,7 @@ function Topbar({ viewer, onToggleHarness }: { viewer: Viewer; onToggleHarness: 
 function GuidedStart({ onPick }: { onPick: (prompt: string) => void }) {
   return (
     <div className="scroll-thin flex h-full flex-col items-center justify-center overflow-y-auto px-6 py-10">
-      <div className="w-full max-w-[620px]">
+      <div className="w-full max-w-[640px]">
         <p className="text-[11px] leading-relaxed tracking-[0.16em] text-ink-3 uppercase">Change control</p>
         <h1 className="mt-2 text-[21px] leading-tight font-semibold text-ink">
           Nothing reaches production without passing through the airlock.
@@ -177,8 +214,9 @@ function GuidedStart({ onPick }: { onPick: (prompt: string) => void }) {
         </div>
 
         <p className="mt-5 text-[10.5px] leading-relaxed text-ink-4">
-          The approval gate is never offered until a certificate proves the change. Watch the harness ledger on the
-          right fill as the run exercises each capability — it ends at {CAPABILITY_TOTAL} only if it earned every one.
+          The approval gate is never offered until a certificate proves the change and policy permits it. Watch the
+          harness ledger on the right fill as the run exercises each capability — it ends at {CAPABILITY_TOTAL} only if
+          it earned every one.
         </p>
       </div>
     </div>
@@ -224,6 +262,9 @@ function ConsoleBody({ className }: { className?: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [started, setStarted] = useState(false);
+  const [breakGlassEnabled, setBreakGlassEnabled] = useState(false);
+  /** Transient feedback from the last decision, e.g. "one of two signatures". */
+  const [notice, setNotice] = useState<{ tone: 'seal' | 'fault' | 'ice'; text: string } | null>(null);
 
   /* --- who is looking: capability 21, proven by a real call --------------- */
   useEffect(() => {
@@ -246,6 +287,26 @@ function ConsoleBody({ className }: { className?: string }) {
     };
   }, [store]);
 
+  /* --- is the second door even fitted in this deployment? ----------------- */
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        // The id is immaterial for the GET: it reports the deployment switch,
+        // not anything about a particular change.
+        const res = await fetch('/api/dossiers/_/break-glass');
+        if (!res.ok || !live) return;
+        const body = (await res.json()) as { enabled: boolean };
+        setBreakGlassEnabled(body.enabled === true);
+      } catch {
+        /* off is the safe default, and it is already the initial state. */
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
   /* --- the change queue --------------------------------------------------- */
   const refresh = useCallback(async () => {
     try {
@@ -254,8 +315,8 @@ function ConsoleBody({ className }: { className?: string }) {
       const body = (await res.json()) as { dossiers: Dossier[] };
       setDossiers(body.dossiers);
       for (const d of body.dossiers) {
-        if (d.started_by === 'webhook') {
-          store.prove(19, 'session created through the HTTP API by the GitHub webhook', d.dossier_id);
+        if (d.started_by === 'webhook' || d.started_by === 'agent') {
+          store.prove(19, `session created through the HTTP API by the ${d.started_by}`, d.dossier_id);
         }
       }
     } catch {
@@ -279,20 +340,50 @@ function ConsoleBody({ className }: { className?: string }) {
     if (!logPinned && run.sandboxLog.length > 0) setLogCollapsed(false);
   }, [run.sandboxLog.length, logPinned]);
 
+  /* --- clear the notice once it has had time to be read ------------------- */
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(null), 8000);
+    return () => clearTimeout(id);
+  }, [notice]);
+
   const selected = useMemo(
     () => dossiers.find((d) => d.dossier_id === selectedId) ?? null,
     [dossiers, selectedId],
   );
 
-  const decide = useCallback(
-    async (id: string, body: Record<string, unknown>) => {
+  /**
+   * Post a decision and report honestly what came back.
+   *
+   * Three outcomes worth distinguishing: refused (the server ran the gate again
+   * and disagreed), countersigned (recorded, still waiting on somebody else),
+   * and decided. Collapsing them into "saved" would hide the one that matters.
+   */
+  const post = useCallback(
+    async (path: string, body: Record<string, unknown>) => {
       setBusy(true);
       try {
-        await fetch(`/api/dossiers/${id}/decision`, {
+        const res = await fetch(path, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(body),
         });
+        const payload = (await res.json().catch(() => ({}))) as {
+          state?: string;
+          message?: string;
+          error?: string;
+        };
+
+        if (!res.ok) {
+          setNotice({ tone: 'fault', text: payload.message ?? payload.error ?? 'The console refused that.' });
+        } else if (payload.state === 'countersigned') {
+          setNotice({
+            tone: 'ice',
+            text: payload.message ?? 'Signature recorded. Another approver is still required.',
+          });
+        } else {
+          setNotice({ tone: 'seal', text: 'Decision recorded and sealed into the ledger.' });
+        }
         await refresh();
       } finally {
         setBusy(false);
@@ -302,16 +393,29 @@ function ConsoleBody({ className }: { className?: string }) {
   );
 
   const onApprove = useCallback(
-    (grant: ApprovalGrant) => void decide(grant.dossier_id, { decision: 'approved', approver: grant.approver }),
-    [decide],
+    (grant: ApprovalGrant) =>
+      void post(`/api/dossiers/${grant.dossier_id}/decision`, { decision: 'approved', approver: grant.approver }),
+    [post],
   );
 
   const onReject = useCallback(
     (reason: string) => {
       if (!selected) return;
-      void decide(selected.dossier_id, { decision: 'rejected', approver: viewer.email, reason });
+      void post(`/api/dossiers/${selected.dossier_id}/decision`, {
+        decision: 'rejected',
+        approver: viewer.email,
+        reason,
+      });
     },
-    [decide, selected, viewer.email],
+    [post, selected, viewer.email],
+  );
+
+  const onBreakGlass = useCallback(
+    (justification: string) => {
+      if (!selected) return;
+      void post(`/api/dossiers/${selected.dossier_id}/break-glass`, { justification });
+    },
+    [post, selected],
   );
 
   const startExample = useCallback((prompt: string) => {
@@ -336,9 +440,49 @@ function ConsoleBody({ className }: { className?: string }) {
     { id: 'DID', label: 'DID', hint: 'what it did', count: didCount, tone: 'neutral' },
   ];
 
+  const card = (dossier: Dossier) => (
+    <CertificateCard
+      dossier={dossier}
+      viewer={viewer}
+      onApprove={onApprove}
+      onReject={onReject}
+      onBreakGlass={onBreakGlass}
+      breakGlassEnabled={breakGlassEnabled}
+      busy={busy}
+      className="max-h-full"
+    />
+  );
+
   return (
     <div className={cx('flex h-full min-h-0 flex-col bg-void', className)}>
       <Topbar viewer={viewer} onToggleHarness={() => setDrawerOpen((v) => !v)} />
+
+      {notice ? (
+        <div
+          role="status"
+          className={cx(
+            'flex shrink-0 items-center gap-2 border-b px-3 py-2',
+            notice.tone === 'seal'
+              ? 'border-seal/30 bg-seal-bg'
+              : notice.tone === 'ice'
+                ? 'border-ice-dim/40 bg-ice-bg'
+                : 'border-fault/30 bg-fault-bg',
+          )}
+        >
+          <Dot tone={notice.tone} />
+          <p
+            className={cx(
+              'flex-1 text-[11.5px] leading-relaxed',
+              notice.tone === 'seal' ? 'text-seal' : notice.tone === 'ice' ? 'text-ice' : 'text-fault',
+            )}
+          >
+            {notice.text}
+          </p>
+          <button onClick={() => setNotice(null)} className="text-[10.5px] text-ink-3 hover:text-ink-2">
+            dismiss
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         {/* ---------- left rail: the three zones, then history ---------- */}
@@ -412,13 +556,15 @@ function ConsoleBody({ className }: { className?: string }) {
             <>
               <Lanes />
               <div className="min-h-0 flex-1 overflow-hidden">
-                {started || run.status !== 'idle' ? (
-                  <ThreadContainer />
-                ) : (
-                  <GuidedStart onPick={startExample} />
-                )}
+                {started || run.status !== 'idle' ? <ThreadContainer /> : <GuidedStart onPick={startExample} />}
               </div>
-              <SandboxLog collapsed={logCollapsed} onToggle={() => { setLogPinned(true); setLogCollapsed((v) => !v); }} />
+              <SandboxLog
+                collapsed={logCollapsed}
+                onToggle={() => {
+                  setLogPinned(true);
+                  setLogCollapsed((v) => !v);
+                }}
+              />
               <div data-airlock-composer className="shrink-0 border-t border-hairline bg-panel px-3 py-2.5">
                 <ComposerContainer placeholder="Describe the change you want made to production…" />
               </div>
@@ -432,18 +578,11 @@ function ConsoleBody({ className }: { className?: string }) {
               </div>
               <div className="scroll-thin min-h-0 overflow-y-auto p-3">
                 {selected ? (
-                  <CertificateCard
-                    dossier={selected}
-                    viewer={viewer}
-                    onApprove={onApprove}
-                    onReject={onReject}
-                    busy={busy}
-                    className="max-h-full"
-                  />
+                  card(selected)
                 ) : (
                   <Empty
                     title="Select a change to review its certificate."
-                    hint="The certificate carries the SQL, the real row counts, the lock profile, the checksum proof and the blast radius — everything you need to decide without leaving this screen."
+                    hint="The certificate carries the SQL, the real row counts, the lock profile, the checksum proof, the blast radius and what policy makes of it — everything you need to decide without leaving this screen."
                   />
                 )}
               </div>
@@ -457,18 +596,11 @@ function ConsoleBody({ className }: { className?: string }) {
               </div>
               <div className="scroll-thin min-h-0 overflow-y-auto p-3">
                 {selected ? (
-                  <CertificateCard
-                    dossier={selected}
-                    viewer={viewer}
-                    onApprove={onApprove}
-                    onReject={onReject}
-                    busy={busy}
-                    className="max-h-full"
-                  />
+                  card(selected)
                 ) : (
                   <Empty
                     title="An immutable record of everything that passed through."
-                    hint="Select a change to see the certificate it was approved on. Records here are never edited."
+                    hint="Select a change to see the certificate it was approved on, and the receipt that seals it into the ledger. Records here are never edited."
                   />
                 )}
               </div>

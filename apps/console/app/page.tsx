@@ -1,30 +1,12 @@
-'use client';
-
-import dynamic from 'next/dynamic';
-import { ErrorBoundary } from '@/console/ErrorBoundary';
+import { Landing } from '@/landing/Landing';
 
 /**
- * The console is a live streaming surface with no useful server-rendered form,
- * so it is mounted client-side only. That also keeps the SDK's provider stack
- * out of the server bundle, where `window` does not exist.
+ * The front door.
  *
- * `ssr: false` is only permitted from a client component in the App Router,
- * which is why this file carries the directive.
+ * A server component wrapping a client tree: the landing page is a static
+ * document apart from two live demos, so it renders on the server, ships its
+ * markup immediately, and hydrates the interactive parts afterwards.
  */
-const AirlockShell = dynamic(() => import('@/console/AirlockShell').then((m) => m.AirlockShell), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-dvh items-center justify-center bg-void">
-      <p className="legend">Bringing the airlock online…</p>
-    </div>
-  ),
-});
-
 export default function Page() {
-  const baseUrl = process.env.NEXT_PUBLIC_TRUEFORGE_BASE_URL ?? 'http://localhost:8790';
-  return (
-    <ErrorBoundary>
-      <AirlockShell baseUrl={baseUrl} />
-    </ErrorBoundary>
-  );
+  return <Landing />;
 }
