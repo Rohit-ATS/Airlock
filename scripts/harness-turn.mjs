@@ -61,7 +61,17 @@ if (!sessionId) {
   sessionId = (await created.json()).data.id;
   console.log(`${DIM}session ${sessionId} against ${AGENT}${OFF}\n`);
 } else {
-  console.log(`${DIM}reusing session ${sessionId}${OFF}\n`);
+  /*
+   * The id is deliberately not echoed here.
+   *
+   * A session id is a live handle to a running conversation on the harness —
+   * anyone holding it can read the transcript and post turns into it. When the
+   * script mints one it is worth printing, because that is the only way the
+   * operator learns it. When it arrives in AIRLOCK_SESSION_ID the operator
+   * already has it, so printing it back buys nothing and writes a live handle
+   * into terminal scrollback and any CI log this runs under.
+   */
+  console.log(`${DIM}reusing the session in AIRLOCK_SESSION_ID against ${AGENT}${OFF}\n`);
 }
 
 /* --- the turn ------------------------------------------------------------- */

@@ -111,14 +111,30 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true, dossier_id: dossier.dossier_id, session_id: sessionId }, { status: 202 });
 }
 
+const GITHUB_API = 'https://api.github.com';
+
 /**
- * `owner/name`, and nothing that can leave that shape.
+ * `owner` and `name`, captured separately, and nothing that can leave that shape.
  *
- * GitHub allows only alphanumerics, `-`, `_` and `.` in either half, so this is
- * the real rule rather than a guess at one. Anchored at both ends, with no
- * slash permitted inside either half.
+ * GitHub allows only alphanumerics, `-`, `_` and `.` in either half, so the
+ * character set is the real rule rather than a guess at one. The captures
+ * matter as much as the test: what goes into the URL below is the two matched
+ * groups, never the string that arrived.
  */
-const REPO_SLUG = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+const REPO_SLUG = /^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)$/;
+
+/**
+ * A path segment that is nothing but dots — `.`, `..`, `...`.
+ *
+ * The character class above permits these, and they are the one input in it
+ * that changes the *meaning* of a path rather than its content: `owner/..`
+ * matched, encoded to itself (`encodeURIComponent` leaves `.` alone), and then
+ * `new URL` normalised `/repos/owner/../pulls/7/files` down to
+ * `/repos/pulls/7/files` — a different GitHub endpoint, chosen by the caller.
+ * The origin check could not see it, because the origin never changed. No real
+ * repository is named this, so refusing it costs nothing.
+ */
+const DOTS_ONLY = /^\.+$/;
 
 /** Changed files for a PR. Unauthenticated works for public repos. */
 async function listChangedFiles(repo: string, number: number | undefined): Promise<string[]> {
@@ -127,29 +143,35 @@ async function listChangedFiles(repo: string, number: number | undefined): Promi
   /*
    * `repo` and `number` arrive in the webhook body, which is to say from
    * whoever can reach this route. Interpolating them straight into the API URL
-   * let a caller steer the request off api.github.com entirely — `..%2f..` to
-   * walk the path, a userinfo `@` to change host, a `?` or `#` to reshape the
-   * query. The signature check upstream raises the bar but does not remove the
-   * class: a valid signature is not a promise that the payload is honest.
+   * let a caller steer the request — off api.github.com entirely with a
+   * userinfo `@` or a `?`/`#`, or, more quietly, to a different endpoint on
+   * api.github.com by walking the path with `..`. The signature check upstream
+   * raises the bar but does not remove the class: a valid signature is not a
+   * promise that the payload is honest.
    *
-   * So both are validated before they are used, and the result is checked
-   * against the origin it is supposed to have. A request that would go
-   * anywhere else is not sent.
+   * The defence is to stop treating the string as a URL fragment at all. It is
+   * matched, split into two named things, each checked, and the request is
+   * then built from those — and the finished URL is compared against the exact
+   * one this function is allowed to fetch.
    */
-  if (!REPO_SLUG.test(repo)) return [];
+  const slug = REPO_SLUG.exec(repo);
+  if (!slug) return [];
+  const [, owner, name] = slug;
+  if (DOTS_ONLY.test(owner) || DOTS_ONLY.test(name)) return [];
   if (!Number.isSafeInteger(number) || number <= 0) return [];
 
-  const url = new URL(
-    // Each half is encoded on its own so a `.` or `-` survives while a
-    // separator cannot be smuggled in.
-    `/repos/${repo.split('/').map(encodeURIComponent).join('/')}/pulls/${number}/files`,
-    'https://api.github.com',
-  );
+  const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/pulls/${number}/files`;
+  const url = new URL(path, GITHUB_API);
   url.searchParams.set('per_page', '100');
 
-  // Belt and braces: whatever the two values did above, the request only goes
-  // out if it is still pointed at the GitHub API.
-  if (url.origin !== 'https://api.github.com') return [];
+  /*
+   * The one request this function is permitted to make, spelled out and
+   * compared after `new URL` has done its normalising. Anything that survived
+   * the checks above and still moved the origin or the path lands here and
+   * goes no further. This is the guard that does not depend on having thought
+   * of every trick.
+   */
+  if (url.origin !== GITHUB_API || url.pathname !== path) return [];
 
   const headers: Record<string, string> = { accept: 'application/vnd.github+json' };
   const token = env('GITHUB_TOKEN');
