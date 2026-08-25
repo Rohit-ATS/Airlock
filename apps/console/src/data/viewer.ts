@@ -1,4 +1,5 @@
 import type { Viewer } from '@airlock/contract';
+import { trueforgeBaseUrl } from './env';
 
 /**
  * Who is asking.
@@ -19,7 +20,8 @@ export interface ResolvedViewer extends Viewer {
   type: 'default' | 'oidc-connected';
 }
 
-const BASE_URL = process.env.TRUEFORGE_BASE_URL ?? process.env.NEXT_PUBLIC_TRUEFORGE_BASE_URL ?? 'http://localhost:8790';
+/** Resolved through the shared loader so the repo-root .env is actually read. */
+const BASE_URL = trueforgeBaseUrl();
 
 /** When login is off (local mode), TrueForge reports a single shared admin. */
 const LOCAL_ADMIN: ResolvedViewer = {

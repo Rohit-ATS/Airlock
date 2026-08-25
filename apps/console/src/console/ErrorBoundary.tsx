@@ -53,7 +53,15 @@ export class ErrorBoundary extends Component<
             {stack ? (
               <div>
                 <p className="legend mb-1">Component stack</p>
-                <pre className="scroll-thin evidence max-h-40 overflow-auto rounded-[4px] border border-hairline bg-void p-2 text-[10.5px] leading-relaxed text-ink-3">
+                <pre
+                // A scrollable region needs to be reachable without a mouse. This one
+                // is a stack trace on a fault screen, which is exactly when someone is
+                // least likely to have a working pointer path to it.
+                tabIndex={0}
+                role="region"
+                aria-label="Error stack trace"
+                className="scroll-thin evidence max-h-40 overflow-auto rounded-[4px] border border-hairline bg-void p-2 text-[10.5px] leading-relaxed text-ink-3"
+              >
                   {stack}
                 </pre>
               </div>

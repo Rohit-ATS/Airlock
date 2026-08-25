@@ -27,7 +27,12 @@
     "gen:policy": "node scripts/gen-policy.mjs",
     "check:agents": "node scripts/check-agents.mjs",
     "check:a11y": "node scripts/check-a11y.mjs",
-    "register:agent": "node scripts/register-agent.mjs"
+    "register:agent": "node scripts/register-agent.mjs",
+    "harness:up": "docker compose -f harness/docker-compose.yml up -d",
+    "harness:down": "docker compose -f harness/docker-compose.yml down",
+    "harness:logs": "docker compose -f harness/docker-compose.yml logs -f server",
+    "harness:setup": "node scripts/harness-setup.mjs",
+    "mcp:http": "node packages/mcp/bin/airlock-mcp.mjs --http 8975"
   },
   "overrides": {
     "zustand": "^5.0.15"

@@ -128,7 +128,7 @@ server publishes**, not from anything we declare.
 
 ---
 
-## 4. Six corrections to the AIRLOCK blueprint
+## 4. Eight corrections to the AIRLOCK blueprint
 
 These matter because three planned capabilities rest on API that does not exist.
 
@@ -278,6 +278,48 @@ Reproduced previously with zero AIRLOCK code, mounting `TrueForgeUI` with its
 own built-in layout, so it is not something the custom layout introduces. Turns
 driven through the HTTP API against the same server work perfectly, which is how
 the runs in §11 were done.
+
+### 4.7 The server sends no CORS headers, so the browser cannot call it
+
+`OPTIONS` on any route returns `404 Route not found`, and a plain `GET` with an
+`Origin` header comes back with no `access-control-allow-origin`. A page served
+from `localhost:3000` therefore cannot reach the harness on `localhost:8791` at
+all — every request dies as `net::ERR_FAILED` before it arrives.
+
+The console now proxies the harness at `/harness/*` on its own origin
+(`apps/console/app/harness/[...path]/route.ts`), streaming the body through
+rather than buffering it, because turn events are SSE and a buffered proxy turns
+a live console into a spinner.
+
+This is the right shape regardless of CORS: the harness does not need to be
+reachable from a browser, credentials can be attached server-side, and there is
+one place to look when it is unreachable.
+
+### 4.8 The catalog methods break `useSyncExternalStore`
+
+Related to §1, and the mechanism is worth writing down because the symptom is
+so misleading.
+
+The SDK reads its catalogs — models, connectors, skills, agents, capabilities —
+through `useSyncExternalStore`. React compares snapshots by identity. Every one
+of those methods ends in `response.json()`, which returns a **new array every
+call**, so every snapshot looks new, React re-renders, re-reads, and loops:
+
+```
+Maximum update depth exceeded.
+The result of getSnapshot should be cached to avoid an infinite loop.
+```
+
+The reason this looked like a harmless warning for so long: it only fires when
+those calls *succeed*. While the console was pointed at the wrong port every
+catalog call failed, the stores stayed empty, and nothing churned. Fixing the
+connection turned a warning into a crash.
+
+Worked around in `observedServer.ts` with `withStableCatalogs`, which memoises
+the read-only catalog methods by serialised value and returns the identical
+reference when nothing changed. That stops the loop being fatal. The composer
+still remounts intermittently, so this is a mitigation and not a fix — the fix
+belongs upstream, in whatever calls `getSnapshot`.
 
 
 ## 5. Sessions, turns, events
