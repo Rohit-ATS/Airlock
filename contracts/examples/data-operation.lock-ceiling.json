@@ -34,6 +34,12 @@
     }
   ],
   "blast_radius": [],
+  "resolved_context": {
+    "facts": [],
+    "fingerprint": null,
+    "rechecked_at": null,
+    "recheck_fingerprint": null
+  },
   "questions": [],
   "recommendation": "EXPAND_CONTRACT",
   "risk_notes": [

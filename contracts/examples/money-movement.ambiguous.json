@@ -1,0 +1,149 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "stripe",
+      "op": "POST /v1/refunds charge=ch_3PfDup amount=4800",
+      "reversible": false,
+      "proven": false
+    }
+  ],
+  "rollback": [],
+  "magnitude": {
+    "records": 2,
+    "people": 1,
+    "amount_minor": 4800,
+    "currency": "GBP",
+    "undo_window_seconds": null
+  },
+  "principals": [],
+  "affected_tables": [],
+  "blast_radius": [],
+  "resolved_context": {
+    "facts": [
+      {
+        "field": "account_id",
+        "label": "Stripe account",
+        "status": "AMBIGUOUS",
+        "value": null,
+        "system": "stripe",
+        "locator": "customers?email=d.reyes@example.com",
+        "event_id": "evt_mcp_stripe_2211",
+        "trust": "SYSTEM",
+        "candidates": [
+          "cus_Qk21Ldana (created 2024-03-11)",
+          "cus_R9f0Tdana (created 2025-11-02)"
+        ],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      },
+      {
+        "field": "currency",
+        "label": "Currency",
+        "status": "RESOLVED",
+        "value": "GBP",
+        "system": "stripe",
+        "locator": "acct_1NxAirlock",
+        "event_id": "evt_mcp_stripe_2212",
+        "trust": "SYSTEM",
+        "candidates": [],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      },
+      {
+        "field": "charge_count",
+        "label": "Duplicate charges",
+        "status": "RESOLVED",
+        "value": "2",
+        "system": "stripe",
+        "locator": "charges?status=succeeded",
+        "event_id": "evt_mcp_stripe_2213",
+        "trust": "SYSTEM",
+        "candidates": [],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      }
+    ],
+    "fingerprint": "sha256:cc8a1990e28183013cffb867fd497f4898452cd24b30d786b36246f6195aa66f",
+    "rechecked_at": "2026-08-24T09:06:30Z",
+    "recheck_fingerprint": "sha256:cc8a1990e28183013cffb867fd497f4898452cd24b30d786b36246f6195aa66f"
+  },
+  "questions": [],
+  "recommendation": "BLOCK",
+  "risk_notes": [],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.0611,
+    "by_model": {
+      "openai/gpt-5.2-mini": 0.0611
+    },
+    "tokens": {
+      "input": 21004,
+      "output": 1442,
+      "total": 22446
+    }
+  },
+  "signatures": [],
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_refund_ambiguous",
+  "change_class": "MONEY_MOVEMENT",
+  "request": "Refund the duplicate August charge to d.reyes@example.com.",
+  "requested_by": "finance@airlock.dev",
+  "created_at": "2026-08-24T11:20:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": null,
+    "systems": [
+      "stripe"
+    ]
+  },
+  "certificate": {
+    "kind": "SCOPE",
+    "status": "PROVEN",
+    "scope": {
+      "records": [
+        {
+          "system": "stripe",
+          "table": "charges",
+          "id": "ch_3PfDup",
+          "action": "transfer",
+          "count": 1
+        }
+      ],
+      "exclusions": [
+        {
+          "system": "stripe",
+          "table": "refunds",
+          "reason": "Already refunded on 16 August.",
+          "count": 1
+        }
+      ]
+    },
+    "verified_at": "2026-08-24T11:24:00Z",
+    "context_fingerprint": "sha256:cc8a1990e28183013cffb867fd497f4898452cd24b30d786b36246f6195aa66f"
+  },
+  "skills_used": [
+    {
+      "name": "money-movement",
+      "version": "1.0.0",
+      "digest": "sha256:9295e8e5b60c6fee374d046819f5d3ad8ce8b51e6d15ffcde4826e4cb2d4709b",
+      "description": "Refunds, payouts and adjustments — idempotency, double-payment detection, disputes, and why money never gets an undo certificate. Load before writing or reviewing any MONEY_MOVEMENT change."
+    }
+  ]
+}

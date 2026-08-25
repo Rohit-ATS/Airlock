@@ -12,15 +12,22 @@
  * The practical consequence: a developer cannot render an Approve button for an
  * unproven change even by mistake. There is no value they could pass to it.
  *
- * The gate asks seven questions, in this order, and stops at the first "no":
+ * The gate asks eight questions, in this order, and stops at the first "no":
  *
  *   1. Has this already been decided?        — an audit question
  *   2. Was anything it read steering it?     — prompt injection
- *   3. Is there a finished proof?            — a certificate question
- *   4. Does the proof actually hold?         — recomputed, never trusted
- *   5. Has anyone reviewed the code?        — the other half of the change
- *   6. Is the proof still true of today?     — freshness and drift
- *   7. Is this permitted, by whom, now?      — policy
+ *   3. Do we know what this is even about?   — resolved context
+ *   4. Is there a finished proof?            — a certificate question
+ *   5. Does the proof actually hold?         — recomputed, never trusted
+ *   6. Has anyone reviewed the code?         — the other half of the change
+ *   7. Is the proof still true of today?     — freshness and drift, of both
+ *                                              production and the resolved facts
+ *   8. Is this permitted, by whom, now?      — policy
+ *
+ * Questions 2 and 3 sit ahead of the certificate for the same reason: a proof
+ * is about a set of operations, and neither the proof nor the checksums can
+ * tell you whether an attacker chose those operations or whether anybody
+ * established which rows they point at.
  *
  * Only then does it ask whether *you* may act, because being told "you lack
  * permission" when the real answer is "this change is unprovable" wastes the
@@ -29,6 +36,7 @@
 import type { Certificate, CertificateKind, Dossier } from './dossier.js';
 import { approversFor } from './dossier.js';
 import { reviewBlocks } from './review.js';
+import { contextDrifted, contextRecheckMissing, contextUnresolved } from './resolve.js';
 import {
   DEFAULT_POLICY,
   evaluatePolicy,
@@ -84,6 +92,9 @@ export type SealReason =
   | 'REVIEW_OUTSTANDING'
   | 'PRODUCTION_DRIFTED'
   | 'INJECTION_DETECTED'
+  | 'CONTEXT_UNRESOLVED'
+  | 'CONTEXT_DRIFTED'
+  | 'CONTEXT_UNVERIFIED'
   | 'CERTIFICATE_STALE'
   | 'POLICY_WRONG_CERTIFICATE'
   | 'POLICY_RECORD_CEILING'
@@ -119,6 +130,12 @@ export const SEAL_COPY: Record<SealReason, string> = {
     'Production has changed since this proof was taken. The certificate describes a database that no longer exists.',
   INJECTION_DETECTED:
     'Content this change read was trying to give the agent instructions. Until a person has looked at it, nothing here can be trusted to be the change it claims to be.',
+  CONTEXT_UNRESOLVED:
+    'Something this change needs to know is still ambiguous or missing. A proof about an unidentified subject is a proof of the wrong thing, so the gate does not open until every required fact resolves to exactly one answer.',
+  CONTEXT_DRIFTED:
+    'A fact this change was planned against has changed since the proof was taken. The certificate is about a different set of facts from the ones true right now.',
+  CONTEXT_UNVERIFIED:
+    'This proof pinned the facts it was taken against, and nobody re-checked them before the gate. An absent check is not a passed check.',
   CERTIFICATE_STALE: 'This certificate has expired. Re-run verification against production as it is now.',
   POLICY_WRONG_CERTIFICATE: 'Policy requires a different kind of certificate for this class of change.',
   POLICY_RECORD_CEILING: 'This change touches more records than policy permits without a capacity review.',
@@ -207,13 +224,30 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
    */
   if (hasUnclearedInjection(dossier)) return sealed('INJECTION_DETECTED');
 
-  /* --- 3. is there a finished proof? ------------------------------------- */
+  /* --- 3. do we actually know what this change is about? -----------------
+   *
+   * Same argument as the step above, one layer out. The certificate proves a
+   * set of operations reversible; it cannot tell you those operations were
+   * aimed at the right rows. If the agent never pinned down *which* customer,
+   * *which* account, *which* table, then the proof is impeccable and it is
+   * about something nobody identified.
+   *
+   * This is also the rule that keeps auto-resolution honest. Resolving facts
+   * automatically is only an improvement if a failure to resolve is louder
+   * than asking would have been — otherwise it is a system that quietly
+   * guesses. An unresolved required field seals the door.
+   */
+  if (contextUnresolved(dossier.change_class, dossier.resolved_context)) {
+    return sealed('CONTEXT_UNRESOLVED');
+  }
+
+  /* --- 4. is there a finished proof? ------------------------------------- */
   const cert = dossier.certificate;
   if (!cert) return sealed('NO_CERTIFICATE');
   if (cert.status === 'PENDING') return sealed('CERTIFICATE_PENDING');
   if (cert.status === 'FAILED') return sealed('CERTIFICATE_FAILED');
 
-  /* --- 4. does the proof actually hold? ---------------------------------- */
+  /* --- 5. does the proof actually hold? ---------------------------------- */
   if (cert.kind === 'UNDO') {
     const c = cert.checksums;
     if (!c) return sealed('CHECKSUM_MISSING');
@@ -230,7 +264,7 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
     if (scope.records.length === 0 && scope.exclusions.length === 0) return sealed('SCOPE_UNBOUNDED');
   }
 
-  /* --- 5. has anybody looked at the code the agent wrote? ----------------
+  /* --- 6. has anybody looked at the code the agent wrote? ----------------
    *
    * The migration being reversible is not the whole change. If the agent also
    * wrote the application changes that go with it — the expand/contract edits
@@ -239,10 +273,29 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
    */
   if (reviewBlocks(dossier)) return sealed('REVIEW_OUTSTANDING');
 
-  /* --- 6. is the proof still true of production as it is now? ------------ */
+  /* --- 7. is the proof still true of the world as it is now? -------------
+   *
+   * Two ways it can stop being true, and they are separate questions:
+   * production itself moved, or a fact the change was *planned against* moved.
+   * A refund proven correct against a Stripe account in USD is not proven
+   * correct once that account reports EUR, even though the database is
+   * untouched and every checksum still matches.
+   *
+   * The unverified case is deliberately its own refusal rather than being
+   * folded into "no drift". A proof that pinned its facts and was never
+   * re-checked has not passed the check; it has skipped it, and reporting
+   * a skipped check as a clean one is the failure this whole system exists to
+   * make impossible.
+   */
   if (hasDrifted(dossier)) return sealed('PRODUCTION_DRIFTED');
+  if (contextRecheckMissing(cert.context_fingerprint, dossier.resolved_context)) {
+    return sealed('CONTEXT_UNVERIFIED');
+  }
+  if (contextDrifted(cert.context_fingerprint, dossier.resolved_context?.recheck_fingerprint)) {
+    return sealed('CONTEXT_DRIFTED');
+  }
 
-  /* --- 7. is this permitted at all? -------------------------------------- */
+  /* --- 8. is this permitted at all? -------------------------------------- */
   const changeLevel = verdict.findings.filter((f) => !VIEWER_LEVEL_CODES.has(f.code));
   const firstChangeLevel = changeLevel[0];
   if (firstChangeLevel) return sealed(POLICY_SEAL[firstChangeLevel.code], firstChangeLevel);
@@ -466,6 +519,9 @@ const BLOCKED_LABEL: Record<SealReason, string> = {
   SCOPE_UNBOUNDED: 'BLOCKED — BLAST RADIUS UNBOUNDED',
   PRODUCTION_DRIFTED: 'STALE — PRODUCTION HAS MOVED',
   INJECTION_DETECTED: 'QUARANTINED — THE DATA TRIED TO GIVE ORDERS',
+  CONTEXT_UNRESOLVED: 'ASKING — A FACT IS STILL AMBIGUOUS',
+  CONTEXT_DRIFTED: 'STALE — A RESOLVED FACT HAS MOVED',
+  CONTEXT_UNVERIFIED: 'BLOCKED — THE FACTS WERE NEVER RE-CHECKED',
   CERTIFICATE_STALE: 'EXPIRED — PROOF OUT OF DATE',
   POLICY_WRONG_CERTIFICATE: 'REFUSED — WRONG KIND OF PROOF',
   POLICY_RECORD_CEILING: 'REFUSED — OVER THE RECORD CEILING',

@@ -95,6 +95,73 @@
       "symbol": "plan name fixture"
     }
   ],
+  "resolved_context": {
+    "facts": [
+      {
+        "field": "target_table",
+        "label": "Target table",
+        "status": "RESOLVED",
+        "value": "users",
+        "system": "postgres",
+        "locator": "information_schema.tables",
+        "event_id": "evt_mcp_pg_7741",
+        "trust": "SYSTEM",
+        "candidates": [],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      },
+      {
+        "field": "row_count",
+        "label": "Rows",
+        "status": "RESOLVED",
+        "value": "1,200,000",
+        "system": "postgres",
+        "locator": "users (reltuples)",
+        "event_id": "evt_mcp_pg_7742",
+        "trust": "SYSTEM",
+        "candidates": [],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      },
+      {
+        "field": "source_table",
+        "label": "Backfill source",
+        "status": "RESOLVED",
+        "value": "subscriptions",
+        "system": "postgres",
+        "locator": "subscriptions.plan_tier",
+        "event_id": "evt_mcp_pg_7743",
+        "trust": "SYSTEM",
+        "candidates": [],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      },
+      {
+        "field": "pg_version",
+        "label": "Postgres",
+        "status": "RESOLVED",
+        "value": "16.3",
+        "system": "postgres",
+        "locator": "server_version",
+        "event_id": "evt_mcp_pg_7744",
+        "trust": "SYSTEM",
+        "candidates": [],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      },
+      {
+        "field": "branch_ref",
+        "label": "Shadow branch",
+        "status": "RESOLVED",
+        "value": "br_shadow_4f21a",
+        "system": "postgres",
+        "locator": "supabase.branches",
+        "event_id": "evt_mcp_pg_7745",
+        "trust": "SYSTEM",
+        "candidates": [],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      }
+    ],
+    "fingerprint": "sha256:9809423b2ae721311942a86efa97bdd93be2ec0dcb646245dddd55bdbf5f5cfb",
+    "rechecked_at": "2026-08-24T09:06:30Z",
+    "recheck_fingerprint": "sha256:9809423b2ae721311942a86efa97bdd93be2ec0dcb646245dddd55bdbf5f5cfb"
+  },
   "questions": [],
   "recommendation": "APPLY",
   "risk_notes": [
@@ -163,7 +230,8 @@
     "lock_ms_estimate": 4210,
     "table_rewrite": false,
     "sandbox_artifact_url": "sandbox://verify/dos_tier_migration/report.json",
-    "verified_at": "2026-08-24T09:06:11Z"
+    "verified_at": "2026-08-24T09:06:11Z",
+    "context_fingerprint": "sha256:9809423b2ae721311942a86efa97bdd93be2ec0dcb646245dddd55bdbf5f5cfb"
   },
   "skills_used": [
     {

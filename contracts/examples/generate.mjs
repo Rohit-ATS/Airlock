@@ -44,6 +44,37 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // Stamped from the real manifest, so a fixture cannot claim a version or digest
 // the pack does not actually have.
 const { stampSkill } = await import('../../packages/contract/dist/skills.js');
+const { resolutionFingerprint } = await import('../../packages/contract/dist/resolve.js');
+
+/**
+ * One resolved fact, with the defaults every entry shares.
+ *
+ * Written as a helper rather than repeated inline because the interesting part
+ * of a fact is its locator, and a wall of boilerplate around each one buries
+ * exactly the field a reader should be checking.
+ */
+const fact = (field, label, value, system, locator, extra = {}) => ({
+  field,
+  label,
+  status: 'RESOLVED',
+  value,
+  system,
+  locator,
+  event_id: null,
+  trust: 'SYSTEM',
+  candidates: [],
+  resolved_at: '2026-08-24T09:04:00Z',
+  ...extra,
+});
+
+/** The resolved set plus both fingerprints, for the ordinary case where they agree. */
+async function resolved(facts) {
+  const fingerprint = await resolutionFingerprint(facts);
+  return {
+    context: { facts, fingerprint, rechecked_at: '2026-08-24T09:06:30Z', recheck_fingerprint: fingerprint },
+    fingerprint,
+  };
+}
 const under = (...names) => names.map(stampSkill);
 const h = (s) => 'sha256:' + createHash('sha256').update(s).digest('hex');
 
@@ -63,6 +94,7 @@ const dossier = (d) => ({
   principals: [],
   affected_tables: [],
   blast_radius: [],
+  resolved_context: { facts: [], fingerprint: null, rechecked_at: null, recheck_fingerprint: null },
   questions: [],
   recommendation: null,
   risk_notes: [],
@@ -81,6 +113,19 @@ const dossier = (d) => ({
 /* ========================================================================== */
 
 const tierPre = h('users@1200000rows@pre-migration');
+
+// Five facts the agent went and got rather than asking Priya to type them.
+// The row counts are the interesting ones: they are what every ceiling in
+// policy is evaluated against, and on a dossier without resolution they are
+// simply asserted by the agent in its own prose.
+const tierFacts = [
+  fact('target_table', 'Target table', 'users', 'postgres', 'information_schema.tables', { event_id: 'evt_mcp_pg_7741' }),
+  fact('row_count', 'Rows', '1,200,000', 'postgres', 'users (reltuples)', { event_id: 'evt_mcp_pg_7742' }),
+  fact('source_table', 'Backfill source', 'subscriptions', 'postgres', 'subscriptions.plan_tier', { event_id: 'evt_mcp_pg_7743' }),
+  fact('pg_version', 'Postgres', '16.3', 'postgres', 'server_version', { event_id: 'evt_mcp_pg_7744' }),
+  fact('branch_ref', 'Shadow branch', 'br_shadow_4f21a', 'postgres', 'supabase.branches', { event_id: 'evt_mcp_pg_7745' }),
+];
+const tierResolved = await resolved(tierFacts);
 
 const tierMigration = dossier({
   dossier_id: 'dos_tier_migration',
@@ -123,7 +168,9 @@ const tierMigration = dossier({
     table_rewrite: false,
     sandbox_artifact_url: 'sandbox://verify/dos_tier_migration/report.json',
     verified_at: '2026-08-24T09:06:11Z',
+    context_fingerprint: tierResolved.fingerprint,
   },
+  resolved_context: tierResolved.context,
   drift: { checked_at: '2026-08-24T09:06:40Z', production_checksum: tierPre, drifted: false },
   skills_used: under('postgres-safety', 'expand-contract'),
   affected_tables: [
@@ -1246,6 +1293,111 @@ history.forEach((d, seq) => {
   prev = d.receipt.hash;
 });
 
+
+/* ========================================================================== */
+/* The two refusals that only exist because facts are resolved rather than    */
+/* typed. Both are impeccable proofs of the wrong thing.                      */
+/* ========================================================================== */
+
+/*
+ * One email, two customers.
+ *
+ * This is the case that justifies the whole mechanism. A refund is a SCOPE
+ * change; its proof will happily enumerate exactly what it touches. But which
+ * account it touches was never established — the lookup came back with two —
+ * and a proof that is precise about the wrong customer is worse than no proof,
+ * because it reads as diligence.
+ *
+ * A form would have made a human type one of these and moved on. The gate
+ * refuses instead, and shows both candidates so the question a person is
+ * eventually asked is a choice rather than an empty box.
+ */
+const ambiguousFacts = [
+  fact('account_id', 'Stripe account', null, 'stripe', 'customers?email=d.reyes@example.com', {
+    status: 'AMBIGUOUS',
+    candidates: ['cus_Qk21Ldana (created 2024-03-11)', 'cus_R9f0Tdana (created 2025-11-02)'],
+    event_id: 'evt_mcp_stripe_2211',
+  }),
+  fact('currency', 'Currency', 'GBP', 'stripe', 'acct_1NxAirlock', { event_id: 'evt_mcp_stripe_2212' }),
+  fact('charge_count', 'Duplicate charges', '2', 'stripe', 'charges?status=succeeded', { event_id: 'evt_mcp_stripe_2213' }),
+];
+const ambiguousResolved = await resolved(ambiguousFacts);
+
+const ambiguousRefund = dossier({
+  dossier_id: 'dos_refund_ambiguous',
+  change_class: 'MONEY_MOVEMENT',
+  request: 'Refund the duplicate August charge to d.reyes@example.com.',
+  requested_by: 'finance@airlock.dev',
+  created_at: '2026-08-24T11:20:00Z',
+  target: { project_ref: 'airlock-demo', branch_ref: null, systems: ['stripe'] },
+  magnitude: { records: 2, people: 1, amount_minor: 4_800, currency: 'GBP', undo_window_seconds: null },
+  forward: [{ system: 'stripe', op: 'POST /v1/refunds charge=ch_3PfDup amount=4800', reversible: false, proven: false }],
+  rollback: [],
+  certificate: {
+    kind: 'SCOPE',
+    status: 'PROVEN',
+    scope: {
+      records: [{ system: 'stripe', table: 'charges', id: 'ch_3PfDup', action: 'transfer', count: 1 }],
+      exclusions: [{ system: 'stripe', table: 'refunds', reason: 'Already refunded on 16 August.', count: 1 }],
+    },
+    verified_at: '2026-08-24T11:24:00Z',
+    context_fingerprint: ambiguousResolved.fingerprint,
+  },
+  resolved_context: ambiguousResolved.context,
+  skills_used: under('money-movement'),
+  recommendation: 'BLOCK',
+  cost: { usd: 0.0611, by_model: { 'openai/gpt-5.2-mini': 0.0611 }, tokens: { input: 21_004, output: 1_442, total: 22_446 } },
+});
+
+/*
+ * The currency moved between the proof and the door.
+ *
+ * Everything about this change is still true except the one fact it was
+ * planned against: the account reported USD when the scope was computed and
+ * reports EUR now. No checksum notices, because no row changed — the drift is
+ * in a system the certificate never checksummed. Only the pin catches it.
+ */
+const driftPinned = await resolutionFingerprint([
+  fact('account_id', 'Stripe account', 'acct_1NxAirlock', 'stripe', 'acct_1NxAirlock'),
+  fact('currency', 'Currency', 'USD', 'stripe', 'acct_1NxAirlock'),
+]);
+const driftNowFacts = [
+  fact('account_id', 'Stripe account', 'acct_1NxAirlock', 'stripe', 'acct_1NxAirlock', { event_id: 'evt_mcp_stripe_3310' }),
+  fact('currency', 'Currency', 'EUR', 'stripe', 'acct_1NxAirlock', { event_id: 'evt_mcp_stripe_3311' }),
+];
+const driftNow = await resolutionFingerprint(driftNowFacts);
+
+const contextDriftedRefund = dossier({
+  dossier_id: 'dos_payout_context_drift',
+  change_class: 'MONEY_MOVEMENT',
+  request: 'Pay out the August marketplace balance to the seller account.',
+  requested_by: 'finance@airlock.dev',
+  created_at: '2026-08-24T12:02:00Z',
+  target: { project_ref: 'airlock-demo', branch_ref: null, systems: ['stripe'] },
+  magnitude: { records: 1, people: 1, amount_minor: 812_00, currency: 'USD', undo_window_seconds: null },
+  forward: [{ system: 'stripe', op: 'POST /v1/payouts amount=81200 currency=usd', reversible: false, proven: false }],
+  rollback: [],
+  certificate: {
+    kind: 'SCOPE',
+    status: 'PROVEN',
+    scope: {
+      records: [{ system: 'stripe', table: 'payouts', id: 'po_pending_aug', action: 'transfer', count: 1 }],
+      exclusions: [{ system: 'stripe', table: 'payouts', reason: 'July balance was paid out on 1 August.', count: 1 }],
+    },
+    verified_at: '2026-08-24T12:05:00Z',
+    context_fingerprint: driftPinned,
+  },
+  resolved_context: {
+    facts: driftNowFacts,
+    fingerprint: driftPinned,
+    rechecked_at: '2026-08-24T12:31:00Z',
+    recheck_fingerprint: driftNow,
+  },
+  skills_used: under('money-movement'),
+  recommendation: 'BLOCK',
+  cost: { usd: 0.0522, by_model: { 'openai/gpt-5.2-mini': 0.0522 }, tokens: { input: 18_221, output: 1_105, total: 19_326 } },
+});
+
 const files = [
   ['schema-migration.proven.json', tierMigration],
   ['data-operation.failed.json', currencyFix],
@@ -1257,6 +1409,8 @@ const files = [
   ['infra-mutation.drifted.json', scaledown],
   ['data-operation.lock-ceiling.json', slowBackfill],
   ['data-operation.injection.json', poisoned],
+  ['money-movement.ambiguous.json', ambiguousRefund],
+  ['money-movement.context-drifted.json', contextDriftedRefund],
   ['schema-migration.reviewed.json', reviewed],
   ['history.schema-migration.applied.json', indexApplied],
   ['history.erasure.applied.json', gdprApplied],

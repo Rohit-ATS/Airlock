@@ -65,6 +65,12 @@
       "symbol": "plan name fixture"
     }
   ],
+  "resolved_context": {
+    "facts": [],
+    "fingerprint": null,
+    "rechecked_at": null,
+    "recheck_fingerprint": null
+  },
   "questions": [],
   "recommendation": "APPLY",
   "risk_notes": [

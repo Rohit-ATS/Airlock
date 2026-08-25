@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import { INJECTION_KINDS, UNTRUSTED_SOURCES } from './quarantine.js';
 import { REVIEW_PROVIDERS, REVIEW_SEVERITIES } from './review.js';
+import { RESOLUTION_STATUSES, RESOLUTION_TRUST } from './resolve.js';
 import type { InjectionFinding } from './quarantine.js';
 
 /**
@@ -206,6 +207,16 @@ export const Certificate = z.object({
   /** Why a certificate failed. Rendered verbatim; never summarised away. */
   failure_reason: z.string().optional(),
   verified_at: z.string().optional(),
+  /**
+   * The fingerprint of the resolved facts this proof was taken against.
+   *
+   * Pinning it here is what makes auto-resolution part of what the certificate
+   * certifies rather than a convenience that happened nearby. The proof is not
+   * "this migration is reversible", it is "this migration, against *these*
+   * facts, is reversible" — and if a fact moves before the gate opens, the
+   * second sentence stops being true while the first still looks fine.
+   */
+  context_fingerprint: z.string().optional(),
 });
 export type Certificate = z.infer<typeof Certificate>;
 
@@ -500,6 +511,34 @@ export const CodeReview = z.object({
 export type CodeReview = z.infer<typeof CodeReview>;
 
 /**
+ * One fact the agent resolved rather than asked a human for.
+ *
+ * The logic — what each change class requires, how the set is fingerprinted,
+ * and what counts as drift — is in resolve.ts. This is only the shape.
+ */
+export const ResolvedFactSchema = z.object({
+  field: z.string().min(1),
+  label: z.string().min(1),
+  status: z.enum(RESOLUTION_STATUSES),
+  value: z.string().nullable().default(null),
+  system: z.string().min(1),
+  locator: z.string().min(1),
+  event_id: z.string().nullable().default(null),
+  trust: z.enum(RESOLUTION_TRUST).default('SYSTEM'),
+  candidates: z.array(z.string()).default([]),
+  resolved_at: z.string().nullable().default(null),
+});
+
+export const ResolvedContextSchema = z.object({
+  facts: z.array(ResolvedFactSchema).default([]),
+  /** Taken when the facts were resolved, and pinned into the certificate. */
+  fingerprint: z.string().nullable().default(null),
+  rechecked_at: z.string().nullable().default(null),
+  /** Taken again just before the gate. The gate compares, it never recomputes. */
+  recheck_fingerprint: z.string().nullable().default(null),
+});
+
+/**
  * Which guidance the agent was operating under.
  *
  * "Approved under postgres-safety" is worth very little. Skills are prose that
@@ -576,6 +615,16 @@ export const Dossier = z.object({
 
   affected_tables: z.array(AffectedTable).default([]),
   blast_radius: z.array(BlastRadiusHit).default([]),
+  /**
+   * What the agent looked up instead of asking a human for. See resolve.ts for
+   * why the two fingerprints in here are load-bearing rather than decorative.
+   */
+  resolved_context: ResolvedContextSchema.default({
+    facts: [],
+    fingerprint: null,
+    rechecked_at: null,
+    recheck_fingerprint: null,
+  }),
   questions: z.array(DossierQuestion).default([]),
   recommendation: z.enum(RECOMMENDATIONS).nullable().default(null),
   risk_notes: z

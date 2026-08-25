@@ -20,6 +20,7 @@ import { Button, Chip, Divider, Evidence, Legend, Panel, Readout, cx } from '@/d
 import { ProvenanceInspector, ProvenanceProvider, Traced } from '@/provenance/Provenance';
 import { UndoWindow } from '@/undo/UndoWindow';
 import { QuarantineBlock } from '@/quarantine/QuarantineBlock';
+import { ResolvedContextBlock } from '@/certificate/ResolvedContextBlock';
 import { ReviewBlock } from '@/review/ReviewBlock';
 import { ChecksumTriple } from './ChecksumTriple';
 
@@ -1001,6 +1002,10 @@ export function CertificateCard({
           busy={busy}
         />
 
+        {/* Immediately after the request, because it answers the first question
+            a reader has about it: which rows, which account, which person. The
+            gate asks the same question in the same place — step 3, ahead of the
+            certificate. */}
         <div>
           <Legend className="mb-1.5">Request</Legend>
           <p className="text-[12.5px] leading-relaxed text-ink">{dossier.request}</p>
@@ -1014,6 +1019,8 @@ export function CertificateCard({
             ) : null}
           </p>
         </div>
+
+        <ResolvedContextBlock dossier={dossier} />
 
         {cert?.failure_reason ? (
           <div className="rounded-[5px] border border-fault/35 bg-fault-bg/40 px-3 py-2.5">

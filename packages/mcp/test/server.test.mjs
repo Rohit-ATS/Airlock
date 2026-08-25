@@ -72,7 +72,7 @@ test('nothing but the protocol is written to stdout', async () => {
   const { responses, stderr } = await converse([INIT]);
   assert.equal(responses.length, 1, 'exactly one response, no stray output');
   // The readiness line must go to stderr, or it would corrupt the stream.
-  assert.match(stderr, /ready — 10 tools/);
+  assert.match(stderr, /ready — 11 tools/);
 });
 
 test('exactly one tool is destructive, and it is the approval request', async () => {
@@ -87,7 +87,7 @@ test('exactly one tool is destructive, and it is the approval request', async ()
   );
 
   // Every one of these writes to the *dossier* and none to production. The
-  // list is pinned so adding a fourth is a deliberate act with a test change
+  // list is pinned so adding one more is a deliberate act with a test change
   // attached, rather than something that happens quietly on a Thursday.
   const writes = tools.filter((t) => t.annotations?.readOnlyHint !== true);
   assert.deepEqual(writes.map((t) => t.name).sort(), [
@@ -97,6 +97,7 @@ test('exactly one tool is destructive, and it is the approval request', async ()
     'airlock_open_change',
     'airlock_report_untrusted',
     'airlock_request_approval',
+    'airlock_resolve_context',
   ]);
 });
 
