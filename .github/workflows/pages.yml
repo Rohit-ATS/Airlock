@@ -45,7 +45,7 @@ jobs:
           NEXT_PUBLIC_TRUEFORGE_BASE_URL: ''
         run: npm run build --workspace @airlock/console
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
         if: github.event_name != 'pull_request'
         with:
           enablement: true
