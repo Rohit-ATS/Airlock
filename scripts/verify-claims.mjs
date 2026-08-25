@@ -188,6 +188,14 @@ const CLAIMS = [
   },
   {
     group: 'Real databases',
+    claim: 'A strategy that never executed against real rows cannot issue an UNDO certificate. SCHEMA_ONLY is downgraded, not caveated.',
+    file: 'packages/contract/src/shadow.ts',
+    anchor: 'export function strategyCanProveRollback',
+    run: 'node --test packages/contract/test/shadow.test.mjs',
+    sees: 'An UNDO under SCHEMA_ONLY is sealed STRATEGY_CANNOT_PROVE, even with three matching checksums.',
+  },
+  {
+    group: 'Real databases',
     claim: 'A superuser credential is refused rather than warned about, and the refusal carries the SQL for a correctly scoped read-only role.',
     file: 'packages/contract/src/connection.ts',
     anchor: 'export function superuserRefusal',
