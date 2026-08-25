@@ -200,5 +200,6 @@ than finding it on screen.
 certificate card, the gate, the policy engine, the tamper-evident ledger, the MCP server, the
 agent definitions and skill packs, the contract, the webhook and roles.
 
-**Damir** — the verification engine, shadow branch lifecycle, scope computation across systems,
-the seed dataset.
+**Damir Mertl** — the verification engine and seed data: the shadow verifier, checksum proof
+flow, generated dossiers and automated verifier checks; next, the hosted shadow branch lifecycle
+and scope computation across the systems the demo connects.
