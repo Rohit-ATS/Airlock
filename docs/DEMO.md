@@ -78,7 +78,7 @@ The chain breaks, record #2 greys out, and the verdict flips to `TAMPERING DETEC
 
 Open `/console`. Go straight to **WAITING**.
 
-Eight changes. Click through four, fast:
+Nine changes waiting. Click through four, fast:
 
 | Change | What to say |
 | --- | --- |
@@ -87,7 +87,26 @@ Eight changes. Click through four, fast:
 | `dos_refund_stripe` | £41,904 against a £25,000 ceiling. Proven, and refused. |
 | `dos_erasure_dana` | One signature already held. **Countersign — 1 of 2.** A quorum counts people, not clicks. |
 
-Approve `dos_tier_migration`. It moves to **DID** with a receipt attached.
+Approve `dos_tier_migration`. It moves to **DID** with a receipt attached — **and a countdown
+starts.**
+
+> Thirty minutes to take it back. Not because undo is easy, but because this change already
+> proved its own rollback against a shadow copy before it was allowed to ask. That inverse is
+> still known-good, and this is how long AIRLOCK is willing to vouch for it.
+
+If there is time, press it. If not, open `dos_plan_column` in **DID** instead — applied,
+health-checked *clean*, and taken back anyway eleven minutes later because finance's nightly
+report read the column that was dropped.
+
+> That is the case a health check can never catch. Every checksum agreed. It was still the
+> wrong change, and only a person was ever going to know that.
+
+Then click the **4.21 s lock estimate** on any certificate.
+
+> Every figure here says where it came from. This one was measured, in the sandbox, and that is
+> the log line that produced it. Click the record count instead and it says *the agent asserted
+> this, and nothing checked it* — because a number a system merely believes should not render
+> identically to one it measured.
 
 ### 2:20 — 2:40 · The control room
 
@@ -103,9 +122,9 @@ ledger panel, re-verified in the browser, with the head hash.
 
 Back to `/console`. Point at the Harness Panel.
 
-> Twenty-two capabilities. Each lights only when a real harness event proves it — the only
+> Twenty-three capabilities. Each lights only when a real harness event proves it — the only
 > writer is a passthrough tap on the event stream. A run that does not exercise one ends below
-> twenty-two, and that is the correct outcome.
+> twenty-three, and that is the correct outcome.
 
 Close on the agent spec:
 
@@ -140,6 +159,29 @@ Every one of these is a fixture in the seeded queue. None of them are staged for
 | `dos_refund_stripe` | `POLICY_AMOUNT_CEILING` | £41,904 against a £25,000 ceiling |
 | `dos_incident_email` | `POLICY_PEOPLE_CEILING` | 61,400 people against a 50,000 ceiling |
 | `dos_replica_scaledown` | `PRODUCTION_DRIFTED` | Pool autoscaled from 3 to 4 while the change queued |
+| `dos_orders_backfill` | `POLICY_LOCK_CEILING` | 9.48 s lock against a 2.00 s ceiling — proven, and still refused |
+
+### The undo window, and the four ways it refuses
+
+Same discipline: each is a seeded record, and `undo.test.mjs` pins the rule behind it.
+
+```bash
+curl -s localhost:3000/api/dossiers/dos_plan_column/undo | jq -r .state    # ALREADY_UNDONE
+curl -s localhost:3000/api/dossiers/dos_gdpr_batch/undo  | jq -r .state    # UNPROVEN
+curl -s localhost:3000/api/dossiers/dos_orders_index/undo | jq -r .state   # CLOSED
+curl -s localhost:3000/api/dossiers/dos_email_unique/undo | jq -r .state   # SUPERSEDED
+```
+
+| State | Why, in one line |
+| --- | --- |
+| `UNPROVEN` | An erasure has no inverse to keep warm. It was never undoable and never claimed to be. |
+| `CLOSED` | Applied three days ago. The proof describes a database that has since moved on. |
+| `SUPERSEDED` | The health check already reverted it automatically. Nothing left to take back. |
+| `ALREADY_UNDONE` | Somebody took it back inside the window, and the record says who and why. |
+
+The one worth saying out loud on camera: **the window is judged on the server.** Approve a
+change, wait, then press undo after it closes — refused, with the closing time quoted back,
+even though the countdown on screen was still drawing a moment earlier.
 
 ## Attacking it from the terminal, on camera
 
