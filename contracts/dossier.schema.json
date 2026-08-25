@@ -343,6 +343,9 @@
         },
         "verified_at": {
           "type": "string"
+        },
+        "context_fingerprint": {
+          "type": "string"
         }
       },
       "required": [
@@ -512,6 +515,138 @@
           "file",
           "line"
         ]
+      }
+    },
+    "resolved_context": {
+      "default": {
+        "facts": [],
+        "fingerprint": null,
+        "rechecked_at": null,
+        "recheck_fingerprint": null
+      },
+      "type": "object",
+      "properties": {
+        "facts": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "RESOLVED",
+                  "AMBIGUOUS",
+                  "UNRESOLVED"
+                ]
+              },
+              "value": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "system": {
+                "type": "string",
+                "minLength": 1
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "event_id": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "trust": {
+                "default": "SYSTEM",
+                "type": "string",
+                "enum": [
+                  "SYSTEM",
+                  "USER_WRITABLE"
+                ]
+              },
+              "candidates": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "resolved_at": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "field",
+              "label",
+              "status",
+              "system",
+              "locator"
+            ]
+          }
+        },
+        "fingerprint": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rechecked_at": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recheck_fingerprint": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       }
     },
     "questions": {

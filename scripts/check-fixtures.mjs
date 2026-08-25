@@ -40,6 +40,12 @@ const EXPECTED = {
   dos_replica_scaledown: 'PRODUCTION_DRIFTED',
   dos_orders_backfill: 'POLICY_LOCK_CEILING',
   dos_bio_reclassify: 'INJECTION_DETECTED',
+  // Two customers matched one email. The SCOPE proof is impeccable and it is
+  // about a customer nobody identified, so the gate refuses ahead of it.
+  dos_refund_ambiguous: 'CONTEXT_UNRESOLVED',
+  // The account reported USD when the scope was computed and reports EUR now.
+  // No row changed, so no checksum notices; only the pinned fingerprint does.
+  dos_payout_context_drift: 'CONTEXT_DRIFTED',
   // The closed loop: code written, reviewed by Qodo, blocking findings addressed.
   dos_plan_name_retire: 'OPEN:final',
   dos_orders_index: 'ALREADY_APPLIED',

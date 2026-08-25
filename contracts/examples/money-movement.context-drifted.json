@@ -1,0 +1,134 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "stripe",
+      "op": "POST /v1/payouts amount=81200 currency=usd",
+      "reversible": false,
+      "proven": false
+    }
+  ],
+  "rollback": [],
+  "magnitude": {
+    "records": 1,
+    "people": 1,
+    "amount_minor": 81200,
+    "currency": "USD",
+    "undo_window_seconds": null
+  },
+  "principals": [],
+  "affected_tables": [],
+  "blast_radius": [],
+  "resolved_context": {
+    "facts": [
+      {
+        "field": "account_id",
+        "label": "Stripe account",
+        "status": "RESOLVED",
+        "value": "acct_1NxAirlock",
+        "system": "stripe",
+        "locator": "acct_1NxAirlock",
+        "event_id": "evt_mcp_stripe_3310",
+        "trust": "SYSTEM",
+        "candidates": [],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      },
+      {
+        "field": "currency",
+        "label": "Currency",
+        "status": "RESOLVED",
+        "value": "EUR",
+        "system": "stripe",
+        "locator": "acct_1NxAirlock",
+        "event_id": "evt_mcp_stripe_3311",
+        "trust": "SYSTEM",
+        "candidates": [],
+        "resolved_at": "2026-08-24T09:04:00Z"
+      }
+    ],
+    "fingerprint": "sha256:f7587a1aad91c59df154bee2fdd2b2d0ccb73d6f385c239e67d7148e55b1d03d",
+    "rechecked_at": "2026-08-24T12:31:00Z",
+    "recheck_fingerprint": "sha256:41e847128a2a7838aa186c0025a13532a2b5fb0f5ac050985f0e52e0d65b3b77"
+  },
+  "questions": [],
+  "recommendation": "BLOCK",
+  "risk_notes": [],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.0522,
+    "by_model": {
+      "openai/gpt-5.2-mini": 0.0522
+    },
+    "tokens": {
+      "input": 18221,
+      "output": 1105,
+      "total": 19326
+    }
+  },
+  "signatures": [],
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_payout_context_drift",
+  "change_class": "MONEY_MOVEMENT",
+  "request": "Pay out the August marketplace balance to the seller account.",
+  "requested_by": "finance@airlock.dev",
+  "created_at": "2026-08-24T12:02:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": null,
+    "systems": [
+      "stripe"
+    ]
+  },
+  "certificate": {
+    "kind": "SCOPE",
+    "status": "PROVEN",
+    "scope": {
+      "records": [
+        {
+          "system": "stripe",
+          "table": "payouts",
+          "id": "po_pending_aug",
+          "action": "transfer",
+          "count": 1
+        }
+      ],
+      "exclusions": [
+        {
+          "system": "stripe",
+          "table": "payouts",
+          "reason": "July balance was paid out on 1 August.",
+          "count": 1
+        }
+      ]
+    },
+    "verified_at": "2026-08-24T12:05:00Z",
+    "context_fingerprint": "sha256:f7587a1aad91c59df154bee2fdd2b2d0ccb73d6f385c239e67d7148e55b1d03d"
+  },
+  "skills_used": [
+    {
+      "name": "money-movement",
+      "version": "1.0.0",
+      "digest": "sha256:9295e8e5b60c6fee374d046819f5d3ad8ce8b51e6d15ffcde4826e4cb2d4709b",
+      "description": "Refunds, payouts and adjustments — idempotency, double-payment detection, disputes, and why money never gets an undo certificate. Load before writing or reviewing any MONEY_MOVEMENT change."
+    }
+  ]
+}

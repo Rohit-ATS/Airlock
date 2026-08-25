@@ -63,6 +63,12 @@
     }
   ],
   "blast_radius": [],
+  "resolved_context": {
+    "facts": [],
+    "fingerprint": null,
+    "rechecked_at": null,
+    "recheck_fingerprint": null
+  },
   "questions": [
     {
       "asked": "Invoices for this user carry a seven-year statutory retention obligation. Redact the personal fields and keep the financial record, or destroy the invoices entirely?",

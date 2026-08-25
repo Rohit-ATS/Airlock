@@ -151,13 +151,13 @@ left to be discovered:
   `npm test` also builds it, if you run that first.
 
 The console seeds itself from [`contracts/examples/`](contracts/examples) on first read, so you
-land on a live approval queue with **sixteen real changes** — four ready to approve, seven
-sealed for seven different reasons, and five decided records in a hash chain, one of which was
+land on a live approval queue with **eighteen real changes** — four ready to approve, nine
+sealed for nine different reasons, and five decided records in a hash chain, one of which was
 applied, health-checked clean, and taken back anyway. The ledger is written to
 `apps/console/.airlock/` — the console's working directory — so delete that to start over, or
 set `AIRLOCK_NO_SEED=1` to start empty.
 
-> Those sixteen are **console fixtures**. They exercise the certificate card, the queue, the
+> Those eighteen are **console fixtures**. They exercise the certificate card, the queue, the
 > policy engine and the ledger. They are not evidence about anybody's database, and the
 > undecided ones are re-based to the current time when they are seeded, because a certificate
 > has a freshness window and a permanently-expired demo demonstrates nothing.
@@ -186,8 +186,8 @@ it and the command that demonstrates it.
 ```bash
 npm test
 ```
-> `206 tests, 0 fail` · `16 fixtures check out.` · `4 agent spec(s) check out.` ·
-> `airlock.policy.yaml checks out` · `24 claims, every one anchored to a line that exists.`
+> `228 tests, 0 fail` · `18 fixtures check out.` · `4 agent spec(s) check out.` ·
+> `airlock.policy.yaml checks out` · `28 claims, every one anchored to a line that exists.`
 >
 > Included in that: `gate.test.mjs` asserts no non-`PROVEN` certificate opens the gate under
 > any combination of class, status and viewer, and building the contract asserts the
@@ -229,19 +229,19 @@ reading the code rather than typed in and left to rot.
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| An approval for an unproven change cannot be constructed: `ApprovalGrant` carries a module-private symbol only `openGate` can mint. | [`gate.ts:48`](packages/contract/src/gate.ts#L48) | `npm run build --workspace @airlock/contract` | Compiles. Weaken the type and the build fails — see the next row. |
+| An approval for an unproven change cannot be constructed: `ApprovalGrant` carries a module-private symbol only `openGate` can mint. | [`gate.ts:56`](packages/contract/src/gate.ts#L56) | `npm run build --workspace @airlock/contract` | Compiles. Weaken the type and the build fails — see the next row. |
 | Six attempts to forge a grant are asserted as compile errors. Weaken the type and `tsc` fails on the now-unused `@ts-expect-error`. | [`gate.typetest.ts:27`](packages/contract/src/gate.typetest.ts#L27) | `npm run build --workspace @airlock/contract` | Six `@ts-expect-error` lines, each a forgery the compiler rejects. |
-| A detected injection seals the gate **before** the certificate is examined — step 2 of 7, ahead of proof integrity. | [`gate.ts:208`](packages/contract/src/gate.ts#L208) | `node --test packages/contract/test/quarantine.test.mjs` | The ordering is pinned by test, not left to code review. |
-| The verifier's own `match` flag is never trusted. AIRLOCK recomputes `pre === post_rollback` itself. | [`gate.ts:221`](packages/contract/src/gate.ts#L221) | `node --test packages/contract/test/gate.test.mjs` | A dossier claiming `match:true` over differing checksums is still sealed. |
-| A claim of danger is believed; a claim of safety is recomputed. Drift seals the gate even when the drift checker reported everything fine. | [`gate.ts:306`](packages/contract/src/gate.ts#L306) | `node --test packages/contract/test/policy.test.mjs` | `drifted:false` with a production checksum that does not match still seals. |
-| Break-glass is not an approval: `BreakGlassOverride` carries a different private symbol, and no function accepts both. | [`gate.ts:349`](packages/contract/src/gate.ts#L349) | `node --test packages/contract/test/policy.test.mjs` | Two of the six compile-error forgeries are exactly this swap. |
+| A detected injection seals the gate **before** the certificate is examined — step 2 of 8, ahead of proof integrity. | [`gate.ts:225`](packages/contract/src/gate.ts#L225) | `node --test packages/contract/test/quarantine.test.mjs` | The ordering is pinned by test, not left to code review. |
+| The verifier's own `match` flag is never trusted. AIRLOCK recomputes `pre === post_rollback` itself. | [`gate.ts:255`](packages/contract/src/gate.ts#L255) | `node --test packages/contract/test/gate.test.mjs` | A dossier claiming `match:true` over differing checksums is still sealed. |
+| A claim of danger is believed; a claim of safety is recomputed. Drift seals the gate even when the drift checker reported everything fine. | [`gate.ts:359`](packages/contract/src/gate.ts#L359) | `node --test packages/contract/test/policy.test.mjs` | `drifted:false` with a production checksum that does not match still seals. |
+| Break-glass is not an approval: `BreakGlassOverride` carries a different private symbol, and no function accepts both. | [`gate.ts:402`](packages/contract/src/gate.ts#L402) | `node --test packages/contract/test/policy.test.mjs` | Two of the six compile-error forgeries are exactly this swap. |
 | The same rule runs server-side. Approving over HTTP with no browser involved is refused identically. | [`dossierStore.ts:302`](apps/console/src/data/dossierStore.ts#L302) | `curl -s -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision -H 'Content-Type: application/json' -d '{"decision":"approved"}'` | `{"error":"CERTIFICATE_FAILED"}` and HTTP 403. |
 
 **Policy**
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| A quorum counts people, not clicks — signatures collapse by identity, so one approver signing twice is one approver. | [`dossier.ts:644`](packages/contract/src/dossier.ts#L644) | `node --test packages/contract/test/policy.test.mjs` | Two signatures from one identity leave the change still waiting. |
+| A quorum counts people, not clicks — signatures collapse by identity, so one approver signing twice is one approver. | [`dossier.ts:693`](packages/contract/src/dossier.ts#L693) | `node --test packages/contract/test/policy.test.mjs` | Two signatures from one identity leave the change still waiting. |
 | No standing production access: every access grant must carry an expiry, so the default state is that nobody holds the keys. | [`policy.ts:85`](packages/contract/src/policy.ts#L85) | `npm run check:fixtures` | `access-grant.standing.json` is refused for `GRANT_WITHOUT_EXPIRY`. |
 | The shipped `airlock.policy.yaml` is byte-identical to the compiled default, so the documented policy and the enforced one cannot disagree. | [`check-policy.mjs:53`](scripts/check-policy.mjs#L53) | `npm run check:policy` | `airlock.policy.yaml checks out — 7 classes, identical to the shipped default.` |
 
@@ -256,8 +256,12 @@ reading the code rather than typed in and left to rot.
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| There is no tool that applies a change to production. Nine tools ship; exactly one is destructive, and the harness holds it for a human. | [`tools.ts:724`](packages/mcp/src/tools.ts#L724) | `node --test packages/mcp/test/server.test.mjs` | The tool list is asserted whole — a tenth tool fails the test. |
+| There is no tool that applies a change to production. Eleven tools ship; exactly one is destructive, and the harness holds it for a human. | [`tools.ts:855`](packages/mcp/src/tools.ts#L855) | `node --test packages/mcp/test/server.test.mjs` | The tool list is asserted whole — a twelfth tool fails the test. |
 | The agent may open a pull request and may not merge one. `merge_pull_request` is on a deny-list checked independently of the allow-list. | [`check-agents.mjs:73`](scripts/check-agents.mjs#L73) | `npm run check:agents` | Four specs check out; `airlock-scout` reports no path to production at all. |
+| The agent looks facts up instead of asking. A fact lives in a system of record; only judgement is put to a human. | [`tools.ts:577`](packages/mcp/src/tools.ts#L577) | `node --test packages/contract/test/resolve.test.mjs` | Eleven tools; this is the one that records what was resolved and where from. |
+| An ambiguous fact seals the gate ahead of the certificate, and is asked with its candidates listed rather than as an empty box. | [`gate.ts:241`](packages/contract/src/gate.ts#L241) | `npm run check:fixtures` | `dos_refund_ambiguous` — a flawless SCOPE proof, refused because two customers matched one email. |
+| Resolved facts are fingerprinted into the certificate and re-checked before the gate, so a fact that moved seals the door. | [`resolve.ts:239`](packages/contract/src/resolve.ts#L239) | `npm run check:fixtures` | `dos_payout_context_drift` — no row changed, no checksum noticed, the pin caught it. |
+| A pinned proof nobody re-checked is refused rather than waved through: an absent check is not a passed check. | [`resolve.ts:276`](packages/contract/src/resolve.ts#L276) | `node --test packages/contract/test/resolve.test.mjs` | CONTEXT_UNVERIFIED, kept distinct from CONTEXT_DRIFTED so neither hides inside the other. |
 | Untrusted excerpts are neutralised before storage, so a finding cannot carry the injection into the next prompt that summarises it. | [`quarantine.ts:277`](packages/contract/src/quarantine.ts#L277) | `node --test packages/contract/test/quarantine.test.mjs` | The stored excerpt is defanged; the raw payload is never persisted. |
 
 **Evidence**
@@ -566,7 +570,7 @@ The defence is structural, and the detector is the alarm on top. In that order:
 That ordering is the argument worth defending. A certificate proves a set of operations is
 reversible; it says nothing about *who chose those operations*. If an attacker steered the
 choice through a poisoned row, the proof is impeccable and it is proving the wrong thing. So
-injection is checked at step 2 of seven, ahead of proof integrity, and that is pinned as a test.
+injection is checked at step 2 of eight, ahead of proof integrity, and that is pinned as a test.
 
 Two details that cost something:
 
@@ -582,6 +586,65 @@ Try it: `dos_bio_reclassify` in the seeded queue is a flawless proof — rollbac
 byte-identical, 41 ms lock, inside every ceiling — refused because two of the rows it read were
 issuing orders. Its findings are produced by running the real scanner over the real payload at
 generation time, so the fixture cannot claim a detection the detector does not make.
+
+### Look up every fact. Ask only what a human can answer.
+
+A fact lives in a system of record. The currency on a Stripe account, a customer's country
+code, a row's `created_at`, a table's row count. There is exactly one right answer and a
+machine can go and get it. **An agent that asks a person for one of these is not integrated —
+it has made a person be the integration and called the result an agent.**
+
+A decision lives nowhere. Should statutory invoices survive the erasure? Is this the right
+cohort? Do you approve? No connector holds these, and inferring them is the precise failure
+AIRLOCK exists to prevent.
+
+So the rule is: resolve everything resolvable, and ask exactly one class of question. That
+makes the questions **louder**, not fewer. When a country code and a statutory retention
+judgement arrive as the same kind of event, neither reads as important. Delete the first and
+the second becomes unmistakable — the only thing the system ever stops for is judgement.
+
+The card shows every resolved value with the address it came from. Not "Stripe" but
+`acct_1Nx…`; not "the database" but `users.country_code`. A logo is not provenance.
+
+```
+target table    users              ← postgres · information_schema.tables
+rows            1,200,000          ← postgres · users (reltuples)
+postgres        16.3               ← postgres · server_version
+stripe account  ⚠ 2 matches        → asking · cus_Qk21… · cus_R9f0…
+```
+
+**This is a safety feature before it is a convenience, and that is the part worth building.**
+Auto-filled facts feeding an irreversible action is exactly where time-of-check/time-of-use
+bites, and a value read out of a user-writable column is attacker-controlled input arriving at
+an agent holding production credentials. So resolved context is not a layer beside the safety
+model, it is inside it:
+
+- **Every resolved value is fingerprinted into the certificate.** The proof is not "this
+  payout is correctly scoped", it is "this payout, *against these facts*, is correctly scoped".
+- **The set is re-resolved before the gate opens and the fingerprints compared** — the same
+  shape as the production drift check. `dos_payout_context_drift` in the seeded queue is a
+  perfect SCOPE proof on an account that reported USD when the scope was computed and reports
+  EUR now. No row changed, so no checksum notices. Only the pin does.
+- **An ambiguous fact seals the gate at step 3, ahead of the certificate**, for the same reason
+  injection is checked at step 2: a proof is about a set of operations and cannot tell you
+  anybody established which rows they point at. `dos_refund_ambiguous` is a flawless proof
+  refused because two customers matched one email — and the question a human eventually gets
+  shows both candidates, rather than an empty field.
+- **A pinned proof nobody re-checked is refused, not assumed fine.** `CONTEXT_UNVERIFIED` is
+  deliberately a different refusal from `CONTEXT_DRIFTED`, so "we did not look" can never
+  render as "we looked and it was fine".
+- **A value from a user-writable source goes through the existing injection scanner**, not a
+  second one. Two detectors drift apart, and then a payload caught on one path sails through
+  the other while the coverage looks doubled.
+
+The fingerprint deliberately ignores *when* a fact was resolved and *which* event produced it.
+Include those and every re-check reports drift, the alarm fires constantly, and it is switched
+off within a day. An alarm that always fires is one nobody hears.
+
+Resolution is opt-in per dossier and total once opted in — the same shape as the code review
+gate, which only blocks a change that actually carries code. A verifier that predates this
+feature produces an empty set and is governed by its certificate alone; a dossier that resolves
+one fact must resolve every field its class requires.
 
 ### The agent writes code, and something else reviews it
 
@@ -820,7 +883,7 @@ computed-style probe — which is to say, by measuring rather than by looking.
 ## Tests
 
 ```bash
-npm test        # 206 tests, 16 fixtures, 4 agent specs, 1 policy file, 24 claims
+npm test        # 228 tests, 18 fixtures, 4 agent specs, 1 policy file, 28 claims
 ```
 
 Those four numbers are **checked, not typed**. `verify-claims.mjs` runs the suite, counts the
@@ -828,7 +891,7 @@ files and compares them against this line, so adding a test and forgetting the R
 build. A reader who counts 206 against a README promising 201 has been handed a reason to
 disbelieve the other twenty-three claims, and that is a lot of damage for a stale integer.
 
-Thirteen suites, and each pins a property rather than an implementation:
+Fourteen suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |
@@ -843,6 +906,7 @@ Thirteen suites, and each pins a property rather than an implementation:
 | `provenance.test.mjs` | An unsourced claim says it is unsourced, and a figure the agent merely asserted never acquires a link to a harness event that did not produce it |
 | `quarantine.test.mjs` | An injection finding seals the gate *ahead of* the certificate, because a proof whose subject an attacker chose is proving the wrong thing; and a stored excerpt is neutralised, never the raw payload |
 | `review.test.mjs` | A migration with unreviewed code does not open the gate; a fix that predates the finding is not a fix; nits never block |
+| `resolve.test.mjs` | An ambiguous fact seals the gate ahead of the certificate; a fact that moved between the proof and the door seals it; a pinned proof nobody re-checked is refused rather than assumed fine; and re-resolving the same fact a minute later is not drift |
 | `ddl.test.mjs` | A column drop or rename is classified destructive; adding a required column is only cautionary *with* a default, and destructive without one; every destructive finding carries an expand/contract alternative rather than a refusal |
 | `mcp/server.test.mjs` | Exactly one tool is destructive and it is the one held for approval; there is no tool that applies a change |
 

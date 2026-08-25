@@ -59,6 +59,12 @@
       "symbol": "monthly_revenue"
     }
   ],
+  "resolved_context": {
+    "facts": [],
+    "fingerprint": null,
+    "rechecked_at": null,
+    "recheck_fingerprint": null
+  },
   "questions": [],
   "recommendation": "BLOCK",
   "risk_notes": [

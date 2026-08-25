@@ -57,7 +57,7 @@ const CLAIMS = [
   },
   {
     group: 'The gate',
-    claim: 'A detected injection seals the gate **before** the certificate is examined — step 2 of 7, ahead of proof integrity.',
+    claim: 'A detected injection seals the gate **before** the certificate is examined — step 2 of 8, ahead of proof integrity.',
     file: 'packages/contract/src/gate.ts',
     anchor: "if (hasUnclearedInjection(dossier)) return sealed('INJECTION_DETECTED');",
     run: 'node --test packages/contract/test/quarantine.test.mjs',
@@ -140,11 +140,11 @@ const CLAIMS = [
 
   {
     group: 'The agent',
-    claim: 'There is no tool that applies a change to production. Nine tools ship; exactly one is destructive, and the harness holds it for a human.',
+    claim: 'There is no tool that applies a change to production. Eleven tools ship; exactly one is destructive, and the harness holds it for a human.',
     file: 'packages/mcp/src/tools.ts',
     anchor: "name: 'airlock_request_approval',",
     run: 'node --test packages/mcp/test/server.test.mjs',
-    sees: 'The tool list is asserted whole — a tenth tool fails the test.',
+    sees: 'The tool list is asserted whole — a twelfth tool fails the test.',
   },
   {
     group: 'The agent',
@@ -153,6 +153,38 @@ const CLAIMS = [
     anchor: "'merge_pull_request',",
     run: 'npm run check:agents',
     sees: 'Four specs check out; `airlock-scout` reports no path to production at all.',
+  },
+  {
+    group: 'The agent',
+    claim: 'The agent looks facts up instead of asking. A fact lives in a system of record; only judgement is put to a human.',
+    file: 'packages/mcp/src/tools.ts',
+    anchor: "name: 'airlock_resolve_context',",
+    run: 'node --test packages/contract/test/resolve.test.mjs',
+    sees: 'Eleven tools; this is the one that records what was resolved and where from.',
+  },
+  {
+    group: 'The agent',
+    claim: 'An ambiguous fact seals the gate ahead of the certificate, and is asked with its candidates listed rather than as an empty box.',
+    file: 'packages/contract/src/gate.ts',
+    anchor: "return sealed('CONTEXT_UNRESOLVED');",
+    run: 'npm run check:fixtures',
+    sees: '`dos_refund_ambiguous` — a flawless SCOPE proof, refused because two customers matched one email.',
+  },
+  {
+    group: 'The agent',
+    claim: 'Resolved facts are fingerprinted into the certificate and re-checked before the gate, so a fact that moved seals the door.',
+    file: 'packages/contract/src/resolve.ts',
+    anchor: 'export function canonicalResolution',
+    run: 'npm run check:fixtures',
+    sees: '`dos_payout_context_drift` — no row changed, no checksum noticed, the pin caught it.',
+  },
+  {
+    group: 'The agent',
+    claim: 'A pinned proof nobody re-checked is refused rather than waved through: an absent check is not a passed check.',
+    file: 'packages/contract/src/resolve.ts',
+    anchor: 'export function contextRecheckMissing',
+    run: 'node --test packages/contract/test/resolve.test.mjs',
+    sees: 'CONTEXT_UNVERIFIED, kept distinct from CONTEXT_DRIFTED so neither hides inside the other.',
   },
   {
     group: 'The agent',
