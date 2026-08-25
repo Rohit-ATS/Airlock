@@ -20,6 +20,40 @@
 @import 'tailwindcss';
 @import '@truefoundry/trueforge-ui/styles.css';
 
+/* ---------------------------------------------------------------------------
+   The second thing that stylesheet does to its host — also load-bearing.
+
+   `styles.css` re-exports its theme as a block of self-referential custom
+   properties:
+
+       --color-black: var(--color-black);
+       --color-white: var(--color-white);
+       --color-gray-500: var(--color-gray-500);   …and so on
+
+   A custom property that references itself is a cycle, and a cycle makes the
+   property compute to the guaranteed-invalid value. Every `var(--color-white)`
+   downstream then resolves to nothing and its declaration is dropped. Because
+   this lands after our `@theme`, it poisons the variable even when we define it
+   perfectly well ourselves.
+
+   So `bg-white` painted nothing and `text-white` coloured nothing, while the
+   class sat in the markup and the rule sat in the stylesheet looking correct.
+   Two floating "paper" chips on the landing page rendered fully transparent,
+   and white-on-signal text stayed dark ink at 3.6:1 against a 4.5:1 bar. Found
+   by axe-core and a computed-style probe, not by eye — a control that is
+   invisible looks exactly like a control that was never added.
+
+   Re-declared here at `:root:root`, which outranks the plain `:root` the SDK
+   writes to, so specificity settles it rather than import order. Only the two
+   the app actually reaches for; the greys are left alone deliberately, because
+   a token nobody uses should stay broken loudly rather than be quietly propped
+   up in a file that would then have to be maintained.
+   --------------------------------------------------------------------------- */
+:root:root {
+  --color-white: #ffffff;
+  --color-black: #000000;
+}
+
 /* ===========================================================================
    AIRLOCK — "Instrument"
 
@@ -530,166 +564,191 @@ body {
   transition: width 700ms var(--ease-instrument);
 }
 
+
 /* ===========================================================================
-   THE FRONT DOOR — "Clean room"
+   THE FRONT DOOR
 
-   The console is a dark instrument panel. The landing page is the room the
-   instrument lives in: light, warm, and deliberately the opposite temperature,
-   because the argument the page makes is about care rather than alarm.
+   Full bleed. No cards, no rounded plates, no boxes inside boxes. Sections run
+   edge to edge and are separated by a single hairline, so the page reads as one
+   continuous document rather than a stack of tiles.
 
-   Every token here is scoped under `.lp`, so nothing below can reach the
-   console, the control room, or the SDK's own surfaces. The two palettes never
-   meet except where a live demo is deliberately embedded as a dark panel — see
-   `.lp-instrument` at the end.
+   Three things carry the design and nothing else is allowed to:
 
-   One rule inherited from the product and honoured here: --hazard still means
-   irreversible and nothing else. The page's warmth comes from --lp-signal,
-   which is a separate token for a separate job. A landing page that spent the
-   alarm colour on a "Get started" button would be undermining the one piece of
-   vocabulary the product cannot afford to blur.
+     1. SCALE. The display face runs to 11vw and the body sits at 15px. That
+        gap is the whole hierarchy — when the contrast between the largest and
+        smallest thing on screen is big enough, you stop needing borders to
+        separate anything.
+     2. WHITESPACE. Sections breathe at 10-14rem of vertical padding. Crowding
+        is what makes a page feel cheap, and it is the easiest thing to fix.
+     3. HAIRLINES. One pixel at 12% ink. Never a border-radius on a container,
+        never a drop shadow, never a filled card.
+
+   Dark bands invert the whole thing for the two places the real product runs,
+   so the live demos read as instruments set into the page rather than as
+   another section about them.
+
+   Scoped under `.lp`, so none of it can reach the console or the control room.
+   And --hazard is still reserved: it means irreversible, and a landing page
+   that spent the alarm colour on a button would blur the one piece of
+   vocabulary the product cannot afford to blur. The warmth here is --lp-signal.
    =========================================================================== */
 
-.lp {
-  /* --- ground ----------------------------------------------------------- */
-  --lp-backdrop: #cfcecb; /* behind the card, visible as a margin */
-  --lp-paper: #e6e5e1; /* the card itself */
-  --lp-paper-2: #dcdbd7; /* recessed panels within it */
-  --lp-paper-3: #d2d0cc; /* the darkest surface any text sits on */
+@layer base {
+  .lp {
+    --lp-paper: #f4f3f0;
+    --lp-paper-2: #eae8e4;
+    --lp-void: #0a0b0d;
+    --lp-void-2: #121417;
 
-  /* --- ink: four steps, every one AA on the DARKEST surface -------------
-     Sized against --lp-paper-3 rather than against --lp-paper, which is the
-     mistake the first version made: the scale was tuned against the plate and
-     then used on the recessed panels too, and axe found 21 nodes at 4.28:1.
-     A palette checked against the surface you had in mind is not checked.
+    /* Ink on paper. Every step clears AA on --lp-paper-2, which is the darkest
+     light surface anything sits on. Verified by scripts/check-a11y.mjs. */
+    --lp-ink: #0d0e11;
+    --lp-ink-2: #34383f;
+    --lp-ink-3: #4c525a;
+    --lp-ink-4: #5d636c;
 
-     The floor is what sets the scale: ink-4 has to clear 4.5:1 on paper-3, and
-     that leaves only so much room above it. So the step from ink-3 to ink-4 is
-     1.23x rather than the console's 1.37x, and the difference between them is
-     carried by weight and size as much as by lightness. Worst pair on the page
-     is 4.52:1, verified by scripts/check-a11y.mjs. */
-  --lp-ink: #14161a;
-  --lp-ink-2: #2f353c;
-  --lp-ink-3: #474d55;
-  --lp-ink-4: #545a63;
+    /* Ink on the dark bands. */
+    --lp-pale: #f0efec;
+    --lp-pale-2: #a8adb6;
+    --lp-pale-3: #868c96;
 
-  --lp-line: #c3c1bc;
-  --lp-line-2: #adaba5;
+    --lp-line: rgb(13 14 17 / 13%);
+    --lp-line-2: rgb(13 14 17 / 26%);
+    --lp-line-dark: rgb(240 239 236 / 15%);
 
-  /* --- the one warm accent, and it is NOT the alarm colour --------------- */
-  --lp-signal: #d9641d; /* fills and large shapes only, never small text */
-  --lp-signal-ink: #8f3d0c; /* the same hue, darkened until small text is AA */
-  --lp-signal-wash: #f0d9c6;
+    /* Darkened from #cf5216, which sat in a dead zone: white on it was 4.31
+     and ink on it was 4.48, so a filled chip carrying small text failed
+     whichever way you turned it. At #b8460f white clears 5.36. */
+    --lp-signal: #b8460f;
+    --lp-signal-ink: #96380a; /* the same hue, darkened until small text is AA */
+    --lp-signal-pale: #ff8a4c; /* for use on the dark bands only */
 
-  /* --- the instrument, quoted inside the room --------------------------- */
-  --lp-void: #0b0d11;
-
-  --lp-radius: 26px;
-
-  background: var(--lp-backdrop);
-  color: var(--lp-ink);
-}
-
-/* The card. Everything on the page lives inside this rounded plate. */
-.lp-plate {
-  background: var(--lp-paper);
-  border-radius: var(--lp-radius);
+    background: var(--lp-paper);
+    color: var(--lp-ink);
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
 /* ---------------------------------------------------------------------------
    Display type.
 
-   The reference sets its headline in a heavy grotesk with the lines indented
-   unequally, so the block reads as one shape rather than four rows. Tracking is
-   negative and tightens as the size grows, which is what stops a very large
-   heavy face from looking spaced out.
+   Weight 800 with aggressive negative tracking. A very large heavy face looks
+   loose at default tracking — the letters need pulling together as they grow,
+   which is why this tightens rather than staying constant.
    --------------------------------------------------------------------------- */
 
 .lp-display {
   font-family: var(--font-sans);
   font-weight: 800;
-  line-height: 0.84;
-  letter-spacing: -0.045em;
+  line-height: 0.82;
+  letter-spacing: -0.05em;
   text-transform: uppercase;
-  color: var(--lp-ink);
+  text-wrap: balance;
 }
 
-.lp-eyebrow {
+.lp-serif-em {
+  font-style: italic;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+.lp-label {
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.16em;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--lp-ink-3);
 }
 
-/* The pill nav group in the reference. */
-.lp-nav {
-  background: color-mix(in oklab, var(--lp-paper-3) 82%, transparent);
-  border: 1px solid var(--lp-line);
-  border-radius: 999px;
-  backdrop-filter: blur(10px);
+.lp-lede {
+  font-size: clamp(1rem, 1.35vw, 1.2rem);
+  line-height: 1.6;
+  color: var(--lp-ink-2);
+  text-wrap: pretty;
 }
-.lp-nav a,
-.lp-nav button {
-  border-radius: 999px;
-  transition:
-    background 220ms var(--ease-instrument),
-    color 220ms var(--ease-instrument);
-}
-.lp-nav [data-active='true'] {
-  background: color-mix(in oklab, var(--lp-ink) 10%, transparent);
-  color: var(--lp-ink);
+
+/* A section rule. The only separator on the page. */
+.lp-hr {
+  height: 1px;
+  background: var(--lp-line);
+  border: 0;
 }
 
 /* ---------------------------------------------------------------------------
-   The giant wordmark sitting behind the hero object.
+   The full-bleed wordmark band.
 
-   White, low contrast against the paper, and deliberately clipped by the
-   object in front of it — it is a texture, not a label, and it must never
-   compete with the headline for the first read.
+   Edge to edge, clipped by the viewport, sitting on the hairline between two
+   sections. It is architecture rather than a logo — the page's one moment of
+   pure graphic weight.
    --------------------------------------------------------------------------- */
 
 .lp-wordmark rect {
-  fill: #fff;
+  fill: currentColor;
 }
 
 /* ---------------------------------------------------------------------------
-   Orbiting evidence.
+   Motion.
 
-   The reference floats objects around its centrepiece. Here they are the
-   artefacts the product actually produces — a checksum, a seal, a receipt —
-   drifting on long, offset cycles so no two ever line up into a pattern.
+   Reveals are one-way and short. A page that re-animates every time an element
+   re-enters the viewport is a page that will not sit still while you read it.
    --------------------------------------------------------------------------- */
 
-@keyframes lp-drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) rotate(var(--lp-tilt, 0deg));
-  }
-  50% {
-    transform: translate3d(0, -14px, 0) rotate(calc(var(--lp-tilt, 0deg) * -1));
-  }
+.lp-rise {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition:
+    opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-rise[data-shown='true'] {
+  opacity: 1;
+  transform: none;
 }
 
-.lp-chip {
-  animation: lp-drift var(--lp-dur, 7s) ease-in-out infinite;
+@keyframes lp-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -12px, 0);
+  }
+}
+.lp-float {
+  animation: lp-float var(--lp-dur, 9s) ease-in-out infinite;
   animation-delay: var(--lp-delay, 0s);
 }
 
-/* A dark instrument quoted inside the light room. */
-.lp-instrument {
-  background: var(--lp-void);
-  border-radius: 18px;
-  color: var(--color-ink);
+/* A link that underlines from the left on hover, rather than switching on. */
+.lp-link {
+  position: relative;
+  display: inline-block;
 }
-
-/* Hairline used as a rule between stacked rows. */
-.lp-rule {
+.lp-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
   height: 1px;
-  background: var(--lp-line);
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-link:hover::after {
+  transform: scaleX(1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-chip {
-    animation: none !important;
+  .lp-rise {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .lp-float {
+    animation: none;
   }
 }
