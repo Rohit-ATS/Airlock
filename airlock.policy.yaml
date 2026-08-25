@@ -1,0 +1,143 @@
+# AIRLOCK policy.
+#
+# This file is read at runtime and validated before it goes anywhere near the
+# gate. Edit it, restart the console, and the rules change — no rebuild, no
+# TypeScript. If it is missing, the shipped default in
+# packages/contract/src/policy.ts applies instead; if it is present but invalid,
+# the console says so loudly and falls back to that default rather than running
+# with a policy nobody checked.
+#
+# That validation matters more than it looks. A typo'd key does not tighten a
+# rule, it *removes* one — `max_peple: 1000` is an absent ceiling with a
+# spelling mistake, and nobody would notice until an erasure went through that
+# should not have. Unknown keys are therefore a hard error.
+#
+# The certificate answers "is this change what it claims to be?".
+# This file answers "is it allowed, by whom, and right now?"
+
+version: '1'
+name: airlock-default
+
+# Applied to every class, then overridden per class below.
+defaults:
+  requires: ANY
+  quorum: 1
+  freshness_seconds: 3600
+  max_records: null
+  max_people: null
+  max_amount_minor: null
+  max_lock_ms: null
+  require_expiry: false
+  allow_self_approval: false
+  blackout: []
+  break_glass: false
+  note: One approver, who is not the requester, on a certificate less than an hour old.
+
+classes:
+  SCHEMA_MIGRATION:
+    requires: UNDO
+    freshness_seconds: 1800
+    # Beyond five seconds every query against the table is queueing behind you.
+    max_lock_ms: 5000
+    break_glass: true
+    note: >-
+      Structural change must be proven reversible. A schema change with no proven
+      rollback is not a migration, it is a bet.
+
+  DATA_OPERATION:
+    requires: UNDO
+    freshness_seconds: 1800
+    max_records: 5000000
+    # Tighter than a migration: a bulk update holds its lock for the whole write.
+    max_lock_ms: 2000
+    break_glass: true
+    note: >-
+      Above five million rows the batch strategy stops being an implementation
+      detail and becomes a capacity decision.
+
+  ERASURE:
+    requires: SCOPE
+    quorum: 2
+    freshness_seconds: 900
+    max_people: 1000
+    break_glass: false
+    note: >-
+      Two people, because there is no rollback. No break-glass, because there is
+      no erasure emergency that fifteen minutes of care makes worse.
+
+  ACCESS_GRANT:
+    requires: SCOPE
+    quorum: 2
+    freshness_seconds: 600
+    require_expiry: true
+    break_glass: true
+    note: >-
+      Standing production access is not grantable through AIRLOCK. Every grant
+      carries an expiry, so the default state of the system is that nobody has it.
+
+  MONEY_MOVEMENT:
+    requires: SCOPE
+    quorum: 2
+    freshness_seconds: 600
+    max_amount_minor: 2500000
+    break_glass: false
+    note: >-
+      Two signatures and a hard ceiling of GBP 25,000. Above the ceiling AIRLOCK
+      is the wrong tool and a human treasury process is the right one.
+
+  COMMS_BLAST:
+    requires: SCOPE
+    quorum: 2
+    freshness_seconds: 900
+    max_people: 50000
+    break_glass: false
+    blackout:
+      - days: [0, 1, 2, 3, 4, 5, 6]
+        from: '21:00'
+        to: '08:00'
+        tz: Europe/London
+        reason: >-
+          Quiet hours. An automated system may not wake fifty thousand people up,
+          however correct the message is.
+    note: >-
+      The only class where the blast radius is measured in human attention. Quiet
+      hours are enforced, not advised.
+
+  INFRA_MUTATION:
+    requires: ANY
+    quorum: 2
+    freshness_seconds: 900
+    break_glass: true
+    blackout:
+      - days: [5]
+        from: '16:00'
+        to: '23:59'
+        tz: Europe/London
+        reason: >-
+          Friday change freeze. Nothing structural goes in without a full working
+          day to watch it.
+      - days: [6, 0]
+        from: '00:00'
+        to: '23:59'
+        tz: Europe/London
+        reason: >-
+          Weekend change freeze. Nothing structural goes in without a full working
+          day to watch it.
+      - days: [1]
+        from: '00:00'
+        to: '08:00'
+        tz: Europe/London
+        reason: >-
+          Weekend change freeze. Nothing structural goes in without a full working
+          day to watch it.
+    note: >-
+      Frozen from Friday afternoon to Monday morning. Break-glass exists here
+      because production outages do not read the policy.
+
+# Deliberately absent: there is no change freeze on ERASURE, MONEY_MOVEMENT,
+# ACCESS_GRANT, SCHEMA_MIGRATION or DATA_OPERATION.
+#
+# A freeze that blocks a right-to-erasure request trades a legal problem for an
+# operational one, and one that blocks an access grant locks the on-call engineer
+# out during the incident the freeze exists to prevent. The test suite asserts
+# this, so it cannot be quietly reversed.

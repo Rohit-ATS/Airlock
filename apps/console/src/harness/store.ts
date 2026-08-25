@@ -47,6 +47,14 @@ export interface RunState {
   lastEventAt: string | null;
   /** Incremented on every stream reattach, which is what failover looks like. */
   reconnects: number;
+  /**
+   * True between a human pressing ABORT and the harness confirming it.
+   *
+   * A cancel has to cross to whichever replica is doing the work, so there is a
+   * real gap here. Showing it is the difference between a control that feels
+   * broken and one that is visibly working.
+   */
+  aborting: boolean;
 }
 
 function emptyRun(): RunState {
@@ -67,6 +75,7 @@ function emptyRun(): RunState {
     pausedOn: null,
     lastEventAt: null,
     reconnects: 0,
+    aborting: false,
   };
 }
 
@@ -112,6 +121,11 @@ export class RunStore {
 
   noteStreamClose(error?: unknown) {
     if (error) this.commit({ status: 'error' });
+  }
+
+  /** A human pressed ABORT; the harness has not confirmed yet. */
+  noteAborting() {
+    this.commit({ aborting: true });
   }
 
   /**
@@ -293,12 +307,14 @@ export class RunStore {
                 : this.state.pausedOn;
         } else if (status === 'cancelled') {
           next.status = 'cancelled';
+          next.aborting = false;
         } else if (status === 'error') {
           next.status = 'error';
         } else {
           next.status = 'done';
           next.pausedOn = null;
         }
+        next.aborting = false;
         // Any still-open lane is finished when the turn is.
         next.lanes = (next.lanes ?? this.state.lanes).map((l) =>
           l.status === 'running' ? { ...l, status: 'done', endedAt: at } : l,

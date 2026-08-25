@@ -84,6 +84,7 @@ export type SealReason =
   | 'POLICY_RECORD_CEILING'
   | 'POLICY_PEOPLE_CEILING'
   | 'POLICY_AMOUNT_CEILING'
+  | 'POLICY_LOCK_CEILING'
   | 'POLICY_BLACKOUT'
   | 'GRANT_WITHOUT_EXPIRY'
   | 'SELF_APPROVAL'
@@ -114,6 +115,7 @@ export const SEAL_COPY: Record<SealReason, string> = {
   POLICY_RECORD_CEILING: 'This change touches more records than policy permits without a capacity review.',
   POLICY_PEOPLE_CEILING: 'This change affects more people than policy permits for this class.',
   POLICY_AMOUNT_CEILING: 'This moves more money than AIRLOCK is authorised to move.',
+  POLICY_LOCK_CEILING: 'This operation holds a lock for longer than policy permits.',
   POLICY_BLACKOUT: 'A change freeze is in effect for this class of change.',
   GRANT_WITHOUT_EXPIRY: 'Policy forbids access that does not expire. Every grant must carry an expiry.',
   SELF_APPROVAL: 'You cannot approve a change you asked for, and you cannot sign one twice.',
@@ -153,6 +155,7 @@ const POLICY_SEAL: Record<PolicyCode, SealReason> = {
   RECORD_CEILING: 'POLICY_RECORD_CEILING',
   PEOPLE_CEILING: 'POLICY_PEOPLE_CEILING',
   AMOUNT_CEILING: 'POLICY_AMOUNT_CEILING',
+  LOCK_CEILING: 'POLICY_LOCK_CEILING',
   GRANT_WITHOUT_EXPIRY: 'GRANT_WITHOUT_EXPIRY',
   BLACKOUT_WINDOW: 'POLICY_BLACKOUT',
   SELF_APPROVAL: 'SELF_APPROVAL',
@@ -413,6 +416,7 @@ const BLOCKED_LABEL: Record<SealReason, string> = {
   POLICY_RECORD_CEILING: 'REFUSED — OVER THE RECORD CEILING',
   POLICY_PEOPLE_CEILING: 'REFUSED — OVER THE PEOPLE CEILING',
   POLICY_AMOUNT_CEILING: 'REFUSED — OVER THE AMOUNT CEILING',
+  POLICY_LOCK_CEILING: 'REFUSED — THE LOCK IS TOO LONG',
   POLICY_BLACKOUT: 'REFUSED — CHANGE FREEZE IN EFFECT',
   GRANT_WITHOUT_EXPIRY: 'REFUSED — THE GRANT NEVER EXPIRES',
   SELF_APPROVAL: 'HELD — SEPARATION OF DUTIES',

@@ -3,7 +3,7 @@
 > **Generated file.** Edit `packages/contract/src/capabilities.ts` and run
 > `node scripts/gen-capabilities.mjs`. Do not edit this by hand.
 
-AIRLOCK claims **22 TrueForge capabilities**. Each one is load-bearing — remove it and the
+AIRLOCK claims **23 TrueForge capabilities**. Each one is load-bearing — remove it and the
 product stops working — and each one lights on the Harness Panel only when a real
 signal proves it.
 
@@ -50,13 +50,14 @@ Three proof modes, strongest first:
 | 20 | **Chat UI SDK, rethemed** | The AIRLOCK console is @truefoundry/trueforge-ui with a custom layout mounted inside its own provider stack — not a lookalike built beside it. | `config` | `TrueForgeUI mounted with a custom layout and theme tokens` | The product itself |
 | 21 | **Hosted mode + OIDC roles** | Separation of duties: a requester proposes a change, only an approver can open the gate. | `runtime` | `GET /api/v1/auth/me returns an oidc-connected role` | Role badge; a requester has no Approve control |
 | 22 | **AI Gateway** | Budgets, RBAC and unified traces across every model call. Explicitly not required by the hackathon, which is exactly why it is here. | `config` | `model provider base URL resolves to a gateway` | Gateway row in the run header |
+| 23 | **Cross-replica cancellation** | Approval stops a change before it starts. Until now nothing stopped one already running. ABORT cancels the turn mid-flight — and because TrueForge peers cancellations between executors over Redis, it lands even when the request reaches a different replica from the one doing the work. Without it, a long verification against a live shadow branch cannot be called off once it has begun. | `stream` | `turn.done with state.status = cancelled` | The ABORT control on a running turn |
 
 ## Grouping on the panel
 
 - **TOOLS** — Remote MCP servers, MCP OAuth (in-chat), Multiple MCP servers, Web search
 - **EXECUTION** — Sandbox as a tool, Code Mode, Subagents, Per-task model routing
 - **CONTEXT** — Skills (SKILL.md), Deferred tool loading, Large-result offloading, Context compaction
-- **CONTROL** — Least-privilege tool scoping, Human approval checkpoint, Ask-user questions
+- **CONTROL** — Least-privilege tool scoping, Human approval checkpoint, Ask-user questions, Cross-replica cancellation
 - **SURFACE** — Generative UI, Chat UI SDK, rethemed
 - **PLATFORM** — Session persistence, Replica failover, HTTP API + SDK, Hosted mode + OIDC roles, AI Gateway
 
