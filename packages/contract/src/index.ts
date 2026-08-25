@@ -9,3 +9,4 @@ export * from './recovery.js';
 export * from './undo.js';
 export * from './budget.js';
 export * from './provenance.js';
+export * from './quarantine.js';

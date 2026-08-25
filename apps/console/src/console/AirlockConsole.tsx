@@ -521,6 +521,21 @@ function ConsoleBody({ className }: { className?: string }) {
     [post, selected],
   );
 
+  /**
+   * Dismiss injection findings.
+   *
+   * Posted rather than decided here: the server checks the role and the reason
+   * length itself, so a client that skips the textarea gets the same refusal
+   * the UI would have given it.
+   */
+  const onClearInjection = useCallback(
+    (reason: string) => {
+      if (!selected) return;
+      void post(`/api/dossiers/${selected.dossier_id}/clear-injection`, { reason });
+    },
+    [post, selected],
+  );
+
   const startExample = useCallback((prompt: string) => {
     setStarted(true);
     // Hand the prompt to the composer the SDK owns, rather than posting a turn
@@ -551,6 +566,7 @@ function ConsoleBody({ className }: { className?: string }) {
       onReject={onReject}
       onBreakGlass={onBreakGlass}
       onUndo={onUndo}
+      onClearInjection={onClearInjection}
       breakGlassEnabled={breakGlassEnabled}
       busy={busy}
       className="max-h-full"

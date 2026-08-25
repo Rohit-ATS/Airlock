@@ -19,6 +19,7 @@ import {
 import { Button, Chip, Divider, Evidence, Legend, Panel, Readout, cx } from '@/design/primitives';
 import { ProvenanceInspector, ProvenanceProvider, Traced } from '@/provenance/Provenance';
 import { UndoWindow } from '@/undo/UndoWindow';
+import { QuarantineBlock } from '@/quarantine/QuarantineBlock';
 import { ChecksumTriple } from './ChecksumTriple';
 
 /**
@@ -943,6 +944,7 @@ export function CertificateCard({
   onReject,
   onBreakGlass,
   onUndo,
+  onClearInjection,
   breakGlassEnabled = false,
   busy,
   className,
@@ -953,6 +955,7 @@ export function CertificateCard({
   onReject: (reason: string) => void;
   onBreakGlass?: (justification: string) => void;
   onUndo?: (reason: string) => void;
+  onClearInjection?: (reason: string) => void;
   breakGlassEnabled?: boolean;
   busy?: boolean;
   className?: string;
@@ -986,6 +989,16 @@ export function CertificateCard({
 
       <div className="scroll-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-3.5 py-3.5">
         <VerdictBanner dossier={dossier} decision={decision} />
+
+        {/* Directly under the verdict, because the gate checks this before it
+            even looks at the certificate: a proof whose subject was chosen by
+            an attacker is impeccable and proving the wrong thing. */}
+        <QuarantineBlock
+          dossier={dossier}
+          canClear={viewer.role === 'approver'}
+          onClear={(reason) => onClearInjection?.(reason)}
+          busy={busy}
+        />
 
         <div>
           <Legend className="mb-1.5">Request</Legend>

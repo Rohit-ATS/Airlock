@@ -1081,6 +1081,107 @@
         }
       }
     },
+    "untrusted": {
+      "default": {
+        "scanned": 0,
+        "findings": [],
+        "cleared_at": null,
+        "cleared_by": null,
+        "cleared_reason": null
+      },
+      "type": "object",
+      "properties": {
+        "scanned": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "findings": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": [
+                  "db_row",
+                  "code_comment",
+                  "pr_body",
+                  "review_comment",
+                  "web_page",
+                  "issue",
+                  "commit_message",
+                  "tool_output"
+                ]
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "INSTRUCTION_OVERRIDE",
+                  "ROLE_OVERRIDE",
+                  "TOOL_COERCION",
+                  "EXFILTRATION",
+                  "OBFUSCATION"
+                ]
+              },
+              "rule": {
+                "type": "string",
+                "minLength": 1
+              },
+              "excerpt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source",
+              "locator",
+              "kind",
+              "rule",
+              "excerpt"
+            ]
+          }
+        },
+        "cleared_at": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cleared_by": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cleared_reason": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "receipt": {
       "default": null,
       "anyOf": [
