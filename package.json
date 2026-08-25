@@ -30,6 +30,7 @@
     "seed:sqlite": "node scripts/seed-sqlite.mjs",
     "verify:sqlite": "npm run build --workspace @airlock/contract && node scripts/verify-sqlite-migration.mjs",
     "verify:sqlite:failed": "npm run build --workspace @airlock/contract && node scripts/verify-sqlite-migration.mjs --break-rollback",
+    "verify:sqlite:scope": "npm run build --workspace @airlock/contract && node scripts/verify-sqlite-erasure-scope.mjs",
     "register:agent": "node scripts/register-agent.mjs",
     "harness:up": "docker compose -f harness/docker-compose.yml up -d",
     "harness:down": "docker compose -f harness/docker-compose.yml down",

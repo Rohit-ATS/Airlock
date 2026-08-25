@@ -67,6 +67,7 @@ npm run build --workspace @airlock/contract
 npm run seed:sqlite -- --reset
 npm run verify:sqlite -- --emit-only
 npm run verify:sqlite:failed -- --emit-only
+npm run verify:sqlite:scope -- --emit-only
 npm run dev --workspace @airlock/console
 ```
 
@@ -98,6 +99,8 @@ The SQLite seed already supports the Day 1 proof:
 
 - `users`: 50k rows by default, configurable with `AIRLOCK_SEED_ROWS`;
 - `subscriptions`: enough rows to backfill `users.tier`;
+- `sessions`, `audit_log`, `invoices` and `user_uploads`: enough linked records
+  to compute a local erasure scope before hosted connectors exist;
 - realistic `plan_name`, `legacy_plan_name` and `plan_tier` values;
 - indexes that make lock/backfill behaviour visible.
 
@@ -114,7 +117,8 @@ After the schema migration works:
    restores the wrong values so the checksum proof fails;
 2. erasure scope computation: enumerate records across SQLite first, then map the same
    scope shape to Postgres/Supabase and add Stripe, object storage and Slack test
-   connectors;
+   connectors. Started with `npm run verify:sqlite:scope -- --emit-only`, which
+   computes a PROVEN Scope Certificate with records and retention exclusions;
 3. artifact output: write large diffs as files and put only the summary into the dossier;
 4. drift re-check: recompute production checksum just before asking for approval.
 
