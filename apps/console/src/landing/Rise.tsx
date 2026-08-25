@@ -1,147 +1,69 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { cx } from '@/design/primitives';
-import { Mark } from '@/console/Mark';
 import { Hatch } from './Hatch';
 import { Wordmark } from './Wordmark';
 
 /**
- * The front-door chrome: nav, hero, and the furniture around them.
+ * The front door: chrome, hero, and the shared furniture.
  *
- * The layout follows a specific editorial idea — a single rounded plate on a
- * warm ground, a floating pill nav, a headline whose lines are indented
- * unequally so the block reads as one shape, a centrepiece with artefacts
- * drifting around it, and a giant machine wordmark behind everything.
+ * Full bleed throughout. No cards, no rounded plates, no boxes inside boxes —
+ * sections run edge to edge and are separated by a single hairline, so the page
+ * reads as one continuous document instead of a stack of tiles.
  *
- * What is adapted rather than copied is the *content* of each slot. The
- * reference floats decorative 3D props; this floats the artefacts the product
- * actually emits — a checksum triple, a seal, a receipt hash. The reference's
- * headline sells a service; this one states the rule the whole system is built
- * on. Same architecture, and every slot earns its place.
+ * The hierarchy is carried by scale and whitespace rather than by borders. When
+ * the largest thing on screen is 11vw and the smallest is 11px, you stop
+ * needing a box to tell the reader which is which.
  */
 
 /* -------------------------------------------------------------------------- */
-/* Navigation                                                                  */
+/* Reveal                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const NAV = [
-  { href: '#rule', label: 'The rule' },
-  { href: '#gate', label: 'Try the gate' },
-  { href: '#proof', label: 'Proof' },
-  { href: '#policy', label: 'Policy' },
-  { href: '#ledger', label: 'Ledger' },
-];
-
-export function RiseNav() {
-  const [active, setActive] = useState<string>('');
+/** One-way. An element that re-animates on every scroll-by never sits still. */
+export function Rise({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
 
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]?.target.id) setActive(`#${visible[0].target.id}`);
-      },
-      { rootMargin: '-20% 0px -65% 0px' },
-    );
-    for (const item of NAV) {
-      const el = document.getElementById(item.href.slice(1));
-      if (el) observer.observe(el);
+    const el = ref.current;
+    if (!el) return;
+    // Without IntersectionObserver, content must still be readable.
+    if (typeof IntersectionObserver === 'undefined') {
+      setShown(true);
+      return;
     }
-    return () => observer.disconnect();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setShown(true);
+            io.disconnect();
+          }
+        }
+      },
+      { rootMargin: '0px 0px -10% 0px', threshold: 0.06 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 px-3 pt-3 sm:px-5 sm:pt-5">
-      <div className="mx-auto flex max-w-[1500px] items-center gap-4">
-        <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="AIRLOCK — home">
-          <span className="grid size-9 place-items-center rounded-[9px] bg-[var(--lp-ink)]">
-            <Mark size={17} />
-          </span>
-          <span className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--lp-ink)]">AIRLOCK</span>
-        </Link>
-
-        <nav className="lp-nav mx-auto hidden items-center gap-0.5 p-1 lg:flex" aria-label="Sections">
-          {NAV.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              data-active={active === item.href ? 'true' : undefined}
-              className="px-3.5 py-2 text-[13px] text-[var(--lp-ink-2)] hover:text-[var(--lp-ink)]"
-            >
-              {item.label}
-            </a>
-          ))}
-          <span className="mx-1.5 h-4 w-px bg-[var(--lp-line-2)]" aria-hidden />
-          <a
-            href="https://github.com/Rohit-ATS/Airlock"
-            target="_blank"
-            rel="noreferrer"
-            className="px-3.5 py-2 text-[13px] text-[var(--lp-ink-2)] hover:text-[var(--lp-ink)]"
-          >
-            Source
-          </a>
-        </nav>
-
-        <Link
-          href="/console"
-          className="ml-auto shrink-0 rounded-full bg-[var(--lp-ink)] px-5 py-3 text-[13px] font-medium text-white transition-transform hover:scale-[1.02] lg:ml-0"
-        >
-          Open the console
-        </Link>
-      </div>
-    </header>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Orbiting evidence                                                           */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The artefacts the product emits, drifting around the hatch.
- *
- * Long cycles at offset delays, so they never settle into a visible pattern.
- * Each one is a real thing the system produces rather than an ornament — which
- * is the difference between decoration and an illustration of the argument.
- */
-function Chip({
-  children,
-  className,
-  tone = 'paper',
-  dur = 7,
-  delay = 0,
-  tilt = 0,
-}: {
-  children: ReactNode;
-  className?: string;
-  tone?: 'paper' | 'signal' | 'ink' | 'seal';
-  dur?: number;
-  delay?: number;
-  tilt?: number;
-}) {
-  const tones = {
-    paper: 'bg-white text-[var(--lp-ink)] shadow-[0_10px_30px_-14px_rgba(0,0,0,.45)]',
-    signal: 'bg-[var(--lp-signal)] text-white shadow-[0_12px_34px_-12px_rgba(217,100,29,.7)]',
-    ink: 'bg-[var(--lp-void)] text-[#e8ecf2] shadow-[0_14px_36px_-16px_rgba(0,0,0,.75)]',
-    seal: 'bg-[#0b3729] text-[#35d6a4] shadow-[0_12px_34px_-14px_rgba(0,0,0,.6)]',
-  } as const;
-
-  return (
     <div
-      className={cx('lp-chip absolute rounded-[12px] px-3 py-2', tones[tone], className)}
-      style={
-        {
-          '--lp-dur': `${dur}s`,
-          '--lp-delay': `${delay}s`,
-          '--lp-tilt': `${tilt}deg`,
-        } as React.CSSProperties
-      }
-      aria-hidden
+      ref={ref}
+      className={cx('lp-rise', className)}
+      data-shown={shown ? 'true' : 'false'}
+      style={delay ? { transitionDelay: `${delay}ms` } : undefined}
     >
       {children}
     </div>
@@ -149,181 +71,275 @@ function Chip({
 }
 
 /* -------------------------------------------------------------------------- */
+/* Navigation                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const NAV = [
+  { href: '#rule', label: 'The rule' },
+  { href: '#gate', label: 'The gate' },
+  { href: '#proof', label: 'Proof' },
+  { href: '#policy', label: 'Policy' },
+  { href: '#ledger', label: 'Ledger' },
+];
+
+export function Nav() {
+  const [solid, setSolid] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setSolid(window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <header
+      className={cx(
+        'fixed inset-x-0 top-0 z-50 transition-colors duration-500',
+        solid ? 'border-b border-[var(--lp-line)] bg-[var(--lp-paper)]/92 backdrop-blur-xl' : 'border-b border-transparent',
+      )}
+    >
+      <div className="flex h-[68px] items-center gap-10 px-6 sm:px-10">
+        <Link href="/" className="lp-display shrink-0 text-[19px] tracking-[-0.03em]" aria-label="AIRLOCK — home">
+          AIRLOCK
+        </Link>
+
+        <nav className="hidden items-center gap-8 md:flex" aria-label="Sections">
+          {NAV.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className="lp-link text-[13.5px] text-[var(--lp-ink-2)] transition-colors hover:text-[var(--lp-ink)]"
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-7">
+          <a
+            href="https://github.com/Rohit-ATS/Airlock"
+            target="_blank"
+            rel="noreferrer"
+            className="lp-link hidden text-[13.5px] text-[var(--lp-ink-2)] transition-colors hover:text-[var(--lp-ink)] sm:inline-block"
+          >
+            Source
+          </a>
+          <Link
+            href="/console"
+            className="group flex items-center gap-2.5 text-[13.5px] font-medium text-[var(--lp-ink)]"
+          >
+            Open the console
+            <span className="grid size-8 place-items-center rounded-full bg-[var(--lp-ink)] text-[var(--lp-paper)] transition-transform duration-300 group-hover:translate-x-0.5">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                <path d="M2 6h8m0 0L6.5 2.5M10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Hero                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export function RiseHero() {
+function Orbit({
+  children,
+  className,
+  dur = 9,
+  delay = 0,
+  tone = 'paper',
+}: {
+  children: ReactNode;
+  className?: string;
+  dur?: number;
+  delay?: number;
+  tone?: 'paper' | 'ink' | 'signal';
+}) {
+  const tones = {
+    paper: 'bg-white text-[var(--lp-ink)] ring-1 ring-[var(--lp-line)]',
+    ink: 'bg-[var(--lp-void)] text-[var(--lp-pale)]',
+    // Explicit hex rather than `text-white`: the console's @theme block
+    // replaces Tailwind's default palette, so that utility is never emitted
+    // and the text silently inherited the page's ink at 3.6:1 on the fill.
+    signal: 'bg-[var(--lp-signal)] text-[#ffffff]',
+  } as const;
   return (
-    <section className="relative px-3 pb-6 sm:px-5">
-      <div className="lp-plate relative mx-auto max-w-[1500px] overflow-hidden px-5 pt-10 pb-8 sm:px-9 sm:pt-14 md:pb-10">
-        {/* ---- top row: counter, headline, stat ------------------------- */}
-        <div className="relative z-20 grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-          <div className="flex gap-4 sm:gap-6">
-            <span className="lp-eyebrow mt-3 hidden shrink-0 sm:block">[01/07]</span>
+    <div
+      className={cx('lp-float absolute px-4 py-3', tones[tone], className)}
+      style={{ ['--lp-dur' as string]: `${dur}s`, ['--lp-delay' as string]: `${delay}s` }}
+      aria-hidden
+    >
+      {children}
+    </div>
+  );
+}
 
-            {/* The lines are indented unequally on purpose: the block reads as
-                one shape rather than four stacked rows. */}
-            <h1 className="lp-display text-[clamp(2.6rem,7.4vw,6.6rem)]">
-              <span className="block pl-[6%]">PROVE IT</span>
-              <span className="block">BY DOING IT</span>
-              <span className="block pl-[12%]">AND UNDOING IT</span>
-              <span className="block">BEFORE YOU ASK</span>
+export function Hero() {
+  return (
+    <section className="relative overflow-hidden pt-[68px]">
+      <div className="relative px-6 pt-16 pb-10 sm:px-10 md:pt-24">
+        {/* --- headline ---------------------------------------------------- */}
+        <Rise>
+          <div className="flex items-start gap-6">
+            <span className="lp-label mt-4 hidden shrink-0 sm:block">01 / 07</span>
+            <h1 className="lp-display max-w-[15ch] text-[clamp(3rem,10.5vw,10.5rem)]">
+              Prove it
+              <span className="lp-serif-em block text-[0.62em] text-[var(--lp-signal-ink)]">by doing it,</span>
+              then undoing it
             </h1>
           </div>
+        </Rise>
 
-          <div className="max-w-[300px] lg:pt-3 lg:text-right">
-            <div className="flex items-baseline gap-2 lg:justify-end">
-              <span className="text-[var(--lp-signal-ink)]" aria-hidden>
-                ⌦
-              </span>
-              <span className="evidence text-[clamp(2rem,4.4vw,3rem)] leading-none font-bold tracking-[-0.03em] text-[var(--lp-ink)]">
+        {/* --- the stage --------------------------------------------------- */}
+        <div className="relative mt-6 md:mt-2">
+          <div className="pointer-events-none relative mx-auto aspect-square w-[min(64vw,540px)]">
+            <Hatch sealed className="h-full w-full" />
+          </div>
+
+          <Orbit tone="ink" className="top-[8%] left-[2%] hidden sm:block" dur={10}>
+            <span className="lp-label !text-[9px] !text-[var(--lp-pale-3)]">pre</span>
+            <span className="evidence mt-1 block text-[12px]">sha256:0234ab62…</span>
+          </Orbit>
+
+          <Orbit tone="paper" className="top-[20%] right-[3%] hidden md:block" dur={11} delay={1.4}>
+            <span className="lp-label !text-[9px]">post-rollback</span>
+            <span className="evidence mt-1 block text-[12px] text-[#0b6349]">identical ✓</span>
+          </Orbit>
+
+          <Orbit tone="signal" className="bottom-[22%] left-[6%] hidden md:block" dur={9.5} delay={0.7}>
+            <span className="block text-[10px] tracking-[0.14em] text-[#ffffff] uppercase">lock held</span>
+            <span className="evidence mt-0.5 block text-[19px] leading-none font-semibold text-[#ffffff]">4.21s</span>
+          </Orbit>
+
+          <Orbit tone="paper" className="right-[8%] bottom-[14%] hidden lg:block" dur={12} delay={2.1}>
+            <span className="lp-label !text-[9px]">quorum</span>
+            <span className="evidence mt-1 block text-[13px] font-semibold">2 people</span>
+          </Orbit>
+        </div>
+
+        {/* --- supporting row ---------------------------------------------- */}
+        <Rise delay={120}>
+          <div className="mt-4 grid gap-10 md:grid-cols-[1.1fr_auto] md:items-end">
+            <div>
+              <p className="lp-lede max-w-[52ch]">
+                A change-control console for irreversible production work. The agent applies your migration to a shadow
+                copy, rolls it back, and proves the data returned byte-identical — and only then is it allowed to ask
+                you anything.
+              </p>
+              <div className="mt-9 flex flex-wrap items-center gap-x-8 gap-y-4">
+                <Link
+                  href="/console"
+                  className="group inline-flex items-center gap-3 bg-[var(--lp-ink)] px-8 py-4.5 text-[14px] font-medium text-[var(--lp-paper)] transition-colors hover:bg-[var(--lp-signal)]"
+                >
+                  Open the console
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden className="transition-transform duration-300 group-hover:translate-x-1">
+                    <path d="M2 6h8m0 0L6.5 2.5M10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </Link>
+                <a href="#gate" className="lp-link text-[14px] font-medium text-[var(--lp-ink-2)] hover:text-[var(--lp-ink)]">
+                  Try to break the gate
+                </a>
+              </div>
+            </div>
+
+            <div className="md:text-right">
+              <div className="evidence text-[clamp(3.4rem,7vw,5.6rem)] leading-[0.8] font-bold tracking-[-0.05em]">
                 0
-              </span>
-              <span className="text-[15px] font-semibold tracking-[0.02em] text-[var(--lp-ink-2)]">UNPROVEN</span>
-            </div>
-            <p className="mt-3 text-[13.5px] leading-relaxed text-[var(--lp-ink-3)]">
-              Changes approved without a certificate, across every run. Not a target — the number the type system
-              makes unreachable.
-            </p>
-          </div>
-        </div>
-
-        {/* ---- the stage: wordmark, hatch, drifting evidence ------------- */}
-        <div className="relative mt-4 h-[clamp(320px,44vw,560px)] md:mt-0">
-          {/* Behind everything, clipped by the hatch. */}
-          <Wordmark
-            className="pointer-events-none absolute inset-x-0 top-[38%] mx-auto h-[26%] w-[94%] select-none"
-            opacity={0.9}
-          />
-
-          <div className="absolute inset-0 grid place-items-center">
-            <div className="relative aspect-square h-full max-h-[520px]">
-              <Hatch sealed className="drop-shadow-[0_28px_60px_rgba(0,0,0,0.22)]" />
+              </div>
+              <div className="lp-label mt-3">unproven changes approved</div>
+              <p className="mt-3 max-w-[30ch] text-[13px] leading-relaxed text-[var(--lp-ink-3)] md:ml-auto">
+                Not a target. The number the type system makes unreachable.
+              </p>
             </div>
           </div>
+        </Rise>
+      </div>
 
-          {/* Real artefacts, drifting. */}
-          <Chip tone="ink" className="top-[6%] left-[4%] hidden sm:block" dur={8} tilt={-4}>
-            <span className="evidence block text-[10px] text-[#7d8b9e]">pre</span>
-            <span className="evidence block text-[11px]">sha256:0234ab62…</span>
-          </Chip>
-
-          <Chip tone="seal" className="top-[20%] right-[5%] hidden md:block" dur={9} delay={1.2} tilt={5}>
-            <span className="evidence block text-[10px] text-[#7fecc9]">post-rollback</span>
-            <span className="evidence block text-[11px]">= pre ✓</span>
-          </Chip>
-
-          <Chip tone="signal" className="bottom-[26%] left-[8%] hidden md:block" dur={7.5} delay={0.6} tilt={6}>
-            <span className="block text-[10px] leading-none text-white">lock held</span>
-            <span className="evidence block text-[15px] leading-tight font-semibold">4.21 s</span>
-          </Chip>
-
-          <Chip tone="paper" className="right-[10%] bottom-[16%] hidden lg:block" dur={8.5} delay={1.8} tilt={-6}>
-            <span className="block text-[10px] leading-none text-[var(--lp-ink-3)]">receipt #004</span>
-            <span className="evidence block text-[11px]">b871960aedb7…</span>
-          </Chip>
-
-          <Chip tone="paper" className="top-[46%] left-[1%] hidden xl:block" dur={10} delay={2.4} tilt={8}>
-            <span className="block text-[10px] leading-none text-[var(--lp-ink-3)]">quorum</span>
-            <span className="evidence block text-[13px] font-semibold">2 people</span>
-          </Chip>
-        </div>
-
-        {/* ---- bottom row ----------------------------------------------- */}
-        <div className="relative z-20 grid gap-8 md:grid-cols-2 md:items-end">
-          <div>
-            <p className="max-w-[46ch] text-[15px] leading-relaxed text-[var(--lp-ink-2)]">
-              A change-control console for irreversible production work. The agent applies your migration to a shadow
-              copy, rolls it back, and proves the data returned byte-identical — and only then is it allowed to ask you
-              anything.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href="/console"
-                className="rounded-[12px] bg-[var(--lp-signal)] px-7 py-4 text-[14px] font-semibold text-white shadow-[0_14px_30px_-14px_rgba(217,100,29,.9)] transition-transform hover:scale-[1.02]"
-              >
-                Open the console
-              </Link>
-              <a
-                href="#gate"
-                className="rounded-[12px] border border-[var(--lp-line-2)] bg-[var(--lp-paper-2)] px-7 py-4 text-[14px] font-semibold text-[var(--lp-ink)] transition-colors hover:bg-[var(--lp-paper-3)]"
-              >
-                Try to break the gate
-              </a>
-            </div>
-          </div>
-
-          <p className="max-w-[42ch] text-[14px] leading-relaxed text-[var(--lp-ink-3)] md:justify-self-end md:text-right">
-            Built on TrueForge for the Agent Harness Hackathon. Seven classes of change, twenty-three harness
-            capabilities, and a ledger you can verify in your own browser.
-          </p>
-        </div>
-
-        {/* ---- scroll cue on a soft rise -------------------------------- */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 hidden justify-center md:flex">
-          <div className="relative w-[420px] max-w-full">
-            <div
-              className="h-14 rounded-t-[100%] bg-[var(--lp-paper-2)]"
-              aria-hidden
-            />
-            <a
-              href="#rule"
-              className="pointer-events-auto absolute inset-x-0 bottom-1 flex flex-col items-center gap-1 text-[11px] leading-tight text-[var(--lp-ink-3)] transition-colors hover:text-[var(--lp-ink)]"
-            >
-              <svg width="15" height="21" viewBox="0 0 15 21" fill="none" aria-hidden>
-                <rect x="0.75" y="0.75" width="13.5" height="19.5" rx="6.75" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="6.5" y="5" width="2" height="4" rx="1" fill="currentColor" />
-              </svg>
-              <span className="text-center">
-                Scroll to
-                <br />
-                explore more
-              </span>
-            </a>
-          </div>
-        </div>
+      {/* --- the wordmark band, edge to edge --------------------------------- */}
+      <div className="mt-10 border-y border-[var(--lp-line)] py-8 md:mt-16">
+        <Wordmark className="h-[clamp(3rem,11vw,9rem)] w-full px-6 text-[var(--lp-ink)] sm:px-10" opacity={1} />
       </div>
     </section>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/* A section shell reused down the page                                        */
+/* Section shell                                                               */
 /* -------------------------------------------------------------------------- */
 
-export function Plate({
+/**
+ * A full-bleed section with a sticky label in the left column.
+ *
+ * The label stays with you as the content scrolls, which is what lets the page
+ * drop every heading box: you always know where you are without a card telling
+ * you.
+ */
+export function Band({
   id,
   index,
   label,
   title,
-  standfirst,
+  lede,
   children,
+  dark,
   className,
 }: {
   id?: string;
   index?: string;
   label?: string;
   title?: ReactNode;
-  standfirst?: ReactNode;
+  lede?: ReactNode;
   children?: ReactNode;
+  dark?: boolean;
   className?: string;
 }) {
   return (
-    <section id={id} className="px-3 pb-6 sm:px-5">
-      <div className={cx('lp-plate mx-auto max-w-[1500px] px-5 py-12 sm:px-9 md:py-16', className)}>
-        {(index || label) && (
-          <div className="flex items-baseline gap-3">
-            {index ? <span className="lp-eyebrow">[{index}]</span> : null}
-            {label ? <span className="lp-eyebrow text-[var(--lp-signal-ink)]">{label}</span> : null}
-          </div>
-        )}
-        {title ? (
-          <h2 className="lp-display mt-4 max-w-[20ch] text-[clamp(1.9rem,4.2vw,3.4rem)]">{title}</h2>
-        ) : null}
-        {standfirst ? (
-          <div className="mt-5 max-w-[68ch] text-[15px] leading-relaxed text-[var(--lp-ink-2)]">{standfirst}</div>
-        ) : null}
-        {children ? <div className="mt-10">{children}</div> : null}
+    <section
+      id={id}
+      className={cx(
+        'border-t px-6 py-24 sm:px-10 md:py-36',
+        dark
+          ? 'border-[var(--lp-line-dark)] bg-[var(--lp-void)] text-[var(--lp-pale)]'
+          : 'border-[var(--lp-line)]',
+        className,
+      )}
+    >
+      <div className="grid gap-y-12 lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-x-16">
+        <div className="lg:sticky lg:top-28 lg:self-start">
+          {index ? (
+            <div className={cx('lp-label', dark && '!text-[var(--lp-pale-3)]')}>{index}</div>
+          ) : null}
+          {label ? (
+            <div className={cx('mt-2 text-[13px] font-medium', dark ? 'text-[var(--lp-pale-2)]' : 'text-[var(--lp-ink-2)]')}>
+              {label}
+            </div>
+          ) : null}
+        </div>
+
+        <div>
+          {title ? (
+            <Rise>
+              <h2
+                className={cx(
+                  'lp-display max-w-[17ch] text-[clamp(2.1rem,5.4vw,4.6rem)]',
+                  dark && 'text-[var(--lp-pale)]',
+                )}
+              >
+                {title}
+              </h2>
+            </Rise>
+          ) : null}
+          {lede ? (
+            <Rise delay={80}>
+              <div className={cx('lp-lede mt-8 max-w-[62ch]', dark && '!text-[var(--lp-pale-2)]')}>{lede}</div>
+            </Rise>
+          ) : null}
+          {children ? <div className={title || lede ? 'mt-16' : ''}>{children}</div> : null}
+        </div>
       </div>
     </section>
   );
