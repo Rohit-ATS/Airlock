@@ -40,6 +40,8 @@ const EXPECTED = {
   dos_replica_scaledown: 'PRODUCTION_DRIFTED',
   dos_orders_backfill: 'POLICY_LOCK_CEILING',
   dos_bio_reclassify: 'INJECTION_DETECTED',
+  // The closed loop: code written, reviewed by Qodo, blocking findings addressed.
+  dos_plan_name_retire: 'OPEN:final',
   dos_orders_index: 'ALREADY_APPLIED',
   // Applied, health-checked clean, and taken back anyway inside the window. The
   // gate is closed for the ordinary reason — it already went in — and the undo

@@ -32,6 +32,52 @@ const WRITE_SELECTORS = ['@all', '@write', '@destructive'];
 /** Connectors that point at real systems. `airlock` is our own gate, not a system. */
 const isProductionConnector = (name) => name !== 'airlock';
 
+/**
+ * Named write tools a production connector may carry, by connector.
+ *
+ * This exists for exactly one reason: the Qodo review loop. A schema migration
+ * is only half a change, so the agent writes the application changes that go
+ * with it and opens a pull request for an independent reviewer to read.
+ *
+ * That requires write access to GitHub, and granting `@write` would have been
+ * the easy way to get it — and would have handed the agent `merge_pull_request`
+ * at the same time, which is a second route to production straight past every
+ * control in this repository.
+ *
+ * So the grant is enumerated instead, and it is enumerated around a principle:
+ * **the agent may propose and may not apply.** Opening a PR is a proposal that
+ * lands in front of a human, which is exactly where a change dossier lands. It
+ * is the same rule as the gate, one layer out.
+ */
+const NAMED_WRITE_ALLOWANCE = {
+  github: [
+    'create_branch',
+    'create_or_update_file',
+    'push_files',
+    'create_pull_request',
+    'update_pull_request',
+    'add_issue_comment',
+    'create_pending_pull_request_review',
+    'submit_pending_pull_request_review',
+  ],
+};
+
+/**
+ * Tools that must never appear, on any connector, whatever the allow-list says.
+ *
+ * The deny-list is checked first and independently, so an allow-list entry can
+ * never accidentally re-admit one of these — a belt-and-braces arrangement for
+ * the handful of verbs that would end the "no path to production" claim.
+ */
+const FORBIDDEN_TOOLS = [
+  'merge_pull_request',
+  'delete_branch',
+  'delete_file',
+  'delete_repository',
+  'force_push',
+  'create_release',
+];
+
 const failures = [];
 const note = (file, message) => failures.push(`${file}: ${message}`);
 
@@ -72,6 +118,30 @@ for (const file of files) {
     }
     if (enabled.length === 0) {
       note(file, `connector "${server.name}" has no enable_tools, so its scope is whatever the default happens to be`);
+    }
+
+    // Checked first and independently of the allow-list, so an allow-list entry
+    // can never accidentally re-admit a verb that ends the guarantee.
+    const forbidden = enabled.filter((t) => FORBIDDEN_TOOLS.includes(t));
+    if (forbidden.length > 0) {
+      note(
+        file,
+        `connector "${server.name}" enables ${forbidden.join(', ')}. The agent may propose and may not apply — ` +
+          'merging a pull request is applying, and would be a second route to production.',
+      );
+    }
+
+    // Any named tool beyond @read-only has to be on the connector's allow-list.
+    const allowed = NAMED_WRITE_ALLOWANCE[server.name] ?? [];
+    const unexpected = enabled.filter(
+      (t) => !t.startsWith('@') && !allowed.includes(t) && !FORBIDDEN_TOOLS.includes(t),
+    );
+    if (unexpected.length > 0) {
+      note(
+        file,
+        `connector "${server.name}" enables ${unexpected.join(', ')}, which is not on its allow-list. ` +
+          'Add it to NAMED_WRITE_ALLOWANCE deliberately, or remove it.',
+      );
     }
   }
 

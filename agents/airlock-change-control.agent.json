@@ -38,12 +38,19 @@
         "name": "github",
         "comment_enable_tools": "The blast-radius scan reads code. It never writes.",
         "enable_tools": [
-          "@read-only"
+          "@read-only",
+          "create_branch",
+          "create_or_update_file",
+          "push_files",
+          "create_pull_request",
+          "update_pull_request",
+          "add_issue_comment"
         ],
         "require_approval_for_tools": [
           "@all"
         ],
-        "preload": false
+        "preload": false,
+        "comment": "Propose-only. The agent writes the expand/contract changes the blast radius implies and opens a pull request for an independent reviewer. It cannot merge one — merging is applying, and applying is what the human does. scripts/check-agents.mjs asserts merge_pull_request never appears here."
       },
       {
         "name": "exa",
@@ -118,6 +125,9 @@
       },
       {
         "name": "infra-safety"
+      },
+      {
+        "name": "code-review-loop"
       }
     ],
     "config": {

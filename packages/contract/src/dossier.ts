@@ -13,6 +13,7 @@
  */
 import { z } from 'zod';
 import { INJECTION_KINDS, UNTRUSTED_SOURCES } from './quarantine.js';
+import { REVIEW_PROVIDERS, REVIEW_SEVERITIES } from './review.js';
 import type { InjectionFinding } from './quarantine.js';
 
 /**
@@ -440,6 +441,64 @@ export const Untrusted = z.object({
 });
 export type Untrusted = z.infer<typeof Untrusted>;
 
+/**
+ * The code the agent wrote to go with the change.
+ *
+ * A schema migration is only half a change: dropping `users.plan_name` is not
+ * finished when the column is gone, it is finished when the fourteen places
+ * that read it no longer do. AIRLOCK already computes that blast radius, so it
+ * already knows exactly what has to change.
+ *
+ * The agent may **open** a pull request and may not **merge** one — the same
+ * shape as the airlock itself, propose and never apply. That is what lets this
+ * exist without adding a route to production.
+ */
+export const CodeChanges = z.object({
+  repo: z.string().min(1),
+  branch: z.string().min(1),
+  pr_url: z.string().optional(),
+  pr_number: z.number().int().positive().optional(),
+  files_changed: z.number().int().nonnegative().default(0),
+  /** Head of the PR branch when the certificate was assembled. */
+  head_sha: z.string().optional(),
+});
+export type CodeChanges = z.infer<typeof CodeChanges>;
+
+export const ReviewFinding = z.object({
+  id: z.string().min(1),
+  severity: z.enum(REVIEW_SEVERITIES),
+  title: z.string().min(1),
+  file: z.string().optional(),
+  line: z.number().int().nonnegative().optional(),
+  /** When it was raised. A fix that predates the complaint fixes something else. */
+  raised_at: z.string(),
+  addressed_by: z.string().optional(),
+  addressed_at: z.string().optional(),
+  /** A human decided it does not apply. Both fields required together. */
+  waived_reason: z.string().optional(),
+  waived_by: z.string().optional(),
+});
+export type ReviewFinding = z.infer<typeof ReviewFinding>;
+
+/**
+ * What an independent reviewer said about the agent's own code.
+ *
+ * Not the agent reviewing itself with a second prompt — a different system,
+ * with different training and no stake in the change looking finished.
+ *
+ * `status` here is the reviewer's claim. The gate calls `reviewStatus()` and
+ * recomputes it, for the same reason it recomputes `checksums.match`.
+ */
+export const CodeReview = z.object({
+  provider: z.enum(REVIEW_PROVIDERS),
+  status: z.enum(['NOT_REQUIRED', 'NOT_REQUESTED', 'PENDING', 'CLEAN', 'ADDRESSED', 'OUTSTANDING']),
+  reviewed_at: z.string().optional(),
+  findings: z.array(ReviewFinding).default([]),
+  /** The reviewer's own summary line, verbatim. */
+  summary: z.string().optional(),
+});
+export type CodeReview = z.infer<typeof CodeReview>;
+
 export const Audit = z.object({
   applied_at: z.string().nullable().default(null),
   post_apply_checksum: Sha256.nullable().default(null),
@@ -536,6 +595,9 @@ export const Dossier = z.object({
     cleared_by: null,
     cleared_reason: null,
   }),
+  /** Absent when the change needs no code — most erasures, every refund. */
+  code_changes: CodeChanges.nullable().default(null),
+  code_review: CodeReview.nullable().default(null),
   receipt: Receipt.nullable().default(null),
 });
 

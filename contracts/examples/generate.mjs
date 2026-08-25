@@ -1078,6 +1078,131 @@ const poisoned = dossier({
 });
 
 /* ========================================================================== */
+/* 16. The closed loop: the agent wrote code, and something else reviewed it   */
+/* ========================================================================== */
+
+/**
+ * The change that finishes the job.
+ *
+ * `dos_tier_migration` proves a migration reversible and stops there, leaving
+ * five call sites for a human to deal with afterwards. This one does the other
+ * half: the agent read its own blast radius, wrote the expand/contract changes
+ * across all fourteen references, opened a pull request, and an independent
+ * reviewer read the agent's code before the certificate was allowed to
+ * complete.
+ *
+ * Three findings came back. Two were fixed by later commits — and AIRLOCK
+ * checks that the commit is genuinely later than the finding, rather than
+ * believing a `resolved` flag. One was a nit about naming, which does not
+ * block, because a system that refuses to ship a migration over a naming
+ * preference is a system whose reviews get skipped.
+ *
+ * The line on the approval card is the point:
+ *   "Code changes prepared · reviewed by Qodo · 2 findings addressed"
+ */
+const reviewedPre = h('users@1200000rows@pre-plan-name-removal');
+
+const reviewed = dossier({
+  dossier_id: 'dos_plan_name_retire',
+  change_class: 'SCHEMA_MIGRATION',
+  request:
+    'Retire users.plan_name now that tier has been backfilled — including every place in the application that still reads it.',
+  requested_by: 'priya.n@airlock.dev',
+  created_at: '2026-08-24T15:20:00Z',
+  target: { project_ref: 'airlock-demo', branch_ref: 'br_shadow_b8d41', systems: ['postgres'] },
+  magnitude: { records: 1_200_000, people: 0, amount_minor: 0, undo_window_seconds: 1800 },
+  forward: [{ system: 'postgres', op: 'ALTER TABLE users DROP COLUMN plan_name;', reversible: true, proven: true }],
+  rollback: [
+    {
+      system: 'postgres',
+      op: 'ALTER TABLE users ADD COLUMN plan_name text;\nUPDATE users u SET plan_name = s.legacy_plan_name\n  FROM subscriptions s WHERE s.user_id = u.id;',
+      reversible: true,
+      proven: true,
+    },
+  ],
+  certificate: {
+    kind: 'UNDO',
+    status: 'PROVEN',
+    checksums: {
+      pre: reviewedPre,
+      post: h('users@1200000rows@post-plan-name-removal'),
+      post_rollback: reviewedPre,
+      match: true,
+    },
+    lock_ms_estimate: 380,
+    table_rewrite: false,
+    verified_at: '2026-08-24T15:31:00Z',
+  },
+  drift: { checked_at: '2026-08-24T15:31:20Z', production_checksum: reviewedPre, drifted: false },
+  affected_tables: [{ system: 'postgres', name: 'users', rows: 1_200_000, operation: 'drop column' }],
+  blast_radius: [
+    { repo: 'airlock/app', file: 'src/billing/plan.ts', line: 42, symbol: 'resolvePlanName' },
+    { repo: 'airlock/app', file: 'src/billing/plan.ts', line: 118, symbol: 'serializeUser' },
+    { repo: 'airlock/app', file: 'src/api/users/route.ts', line: 57, symbol: 'GET' },
+    { repo: 'airlock/app', file: 'src/emails/welcome.tsx', line: 23, symbol: 'WelcomeEmail' },
+    { repo: 'airlock/app', file: 'tests/billing.spec.ts', line: 88, symbol: 'plan name fixture' },
+  ],
+  code_changes: {
+    repo: 'airlock/app',
+    branch: 'airlock/retire-plan-name',
+    pr_url: 'https://github.com/airlock/app/pull/412',
+    pr_number: 412,
+    files_changed: 9,
+    head_sha: 'c7f1a0e',
+  },
+  code_review: {
+    provider: 'qodo',
+    status: 'ADDRESSED',
+    reviewed_at: '2026-08-24T15:44:00Z',
+    summary:
+      'Three findings. Two concern the transition window where the column still exists and the code assumes it does not.',
+    findings: [
+      {
+        id: 'Q-1',
+        severity: 'blocker',
+        title:
+          'serializeUser drops plan_name unconditionally, so a rollback of the migration leaves the API returning a field the client no longer receives.',
+        file: 'src/billing/plan.ts',
+        line: 118,
+        raised_at: '2026-08-24T15:44:00Z',
+        addressed_by: 'c7f1a0e',
+        addressed_at: '2026-08-24T15:52:00Z',
+      },
+      {
+        id: 'Q-2',
+        severity: 'major',
+        title:
+          'WelcomeEmail reads plan_name with no fallback. Between deploy and migration it renders an empty plan name to real recipients.',
+        file: 'src/emails/welcome.tsx',
+        line: 23,
+        raised_at: '2026-08-24T15:44:00Z',
+        addressed_by: 'c7f1a0e',
+        addressed_at: '2026-08-24T15:52:00Z',
+      },
+      {
+        id: 'Q-3',
+        severity: 'nit',
+        title: 'resolvePlanName could be renamed resolveTier now that it no longer resolves a plan name.',
+        file: 'src/billing/plan.ts',
+        line: 42,
+        raised_at: '2026-08-24T15:44:00Z',
+      },
+    ],
+  },
+  recommendation: 'APPLY',
+  risk_notes: [
+    {
+      note: 'Both blocking findings were the same mistake wearing two hats: application code written as though the migration had already run. That is the failure mode expand/contract exists to prevent, and it is the one an independent reviewer catches most reliably.',
+    },
+  ],
+  cost: {
+    usd: 0.3944,
+    by_model: { 'openai/gpt-4.1': 0.3421, 'openai/gpt-4.1-mini': 0.0523 },
+    tokens: { input: 162_800, output: 14_220, total: 177_020 },
+  },
+});
+
+/* ========================================================================== */
 /* Seal the decided records into a hash chain, then write everything out       */
 /* ========================================================================== */
 
@@ -1128,6 +1253,7 @@ const files = [
   ['infra-mutation.drifted.json', scaledown],
   ['data-operation.lock-ceiling.json', slowBackfill],
   ['data-operation.injection.json', poisoned],
+  ['schema-migration.reviewed.json', reviewed],
   ['history.schema-migration.applied.json', indexApplied],
   ['history.erasure.applied.json', gdprApplied],
   ['history.schema-migration.taken-back.json', takenBack],
