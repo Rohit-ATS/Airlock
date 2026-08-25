@@ -106,11 +106,12 @@ npm run dev --workspace @airlock/console
 | [`/control`](http://localhost:3000/control) | The control room: posture, refusals, ledger integrity |
 
 The console seeds itself from [`contracts/examples/`](contracts/examples) on first run, so you
-land on a live approval queue with **eleven real changes** — two ready to approve, six sealed
-for six different reasons, and three decided records sealed into a hash chain — without a
-database, an API key, or a signup.
+land on a live approval queue with **fourteen real changes** — three ready to approve, six
+sealed for six different reasons, and five decided records sealed into a hash chain, one of
+which was applied, health-checked clean, and taken back anyway — without a database, an API
+key, or a signup.
 
-> Those eleven are **console fixtures**. They exercise the certificate card, the queue, the
+> Those fourteen are **console fixtures**. They exercise the certificate card, the queue, the
 > policy engine and the ledger. They are not evidence about anybody's database, and the
 > undecided ones are re-based to the current time when they are seeded, because a certificate
 > has a freshness window and a permanently-expired demo demonstrates nothing.
@@ -240,7 +241,7 @@ re-verifies the ledger **in the browser** rather than trusting a server that say
 
 ### The Harness Panel
 
-A persistent rail listing all 22 TrueForge capabilities. Each is dim until a **real harness
+A persistent rail listing all 23 TrueForge capabilities. Each is dim until a **real harness
 event** proves it, then lights with a timestamp and a link to the step that proved it.
 
 **A lamp cannot be lit from application code.** The only writer is
@@ -267,6 +268,82 @@ codebase, the exclusion list, run cost by model, the receipt, and the decision.
 The checksum triple is the argument made visible: lines 1 and 3 are bracketed together, line 2
 is deliberately de-emphasised because it is *expected* to differ, and on a mismatch the exact
 character where the hashes diverge is highlighted rather than printing a red X.
+
+### Every figure says where it came from
+
+A dossier is dense with numbers, and on most dashboards they render identically — same weight,
+same colour, same implied authority. Those numbers are emphatically **not** equally well
+founded. A checksum was *measured*, by a sandbox, at a recorded instant. A record count was
+very often simply *asserted* by the agent in the text of its own dossier.
+
+So every figure carries a grade, and pressing it opens the provenance:
+
+| Grade | Meaning |
+| --- | --- |
+| `MEASURED` | A harness event produced it, and that event is linked |
+| `COMPUTED` | AIRLOCK derived it from fields you can inspect |
+| `DECLARED` | The agent asserted it. Nothing independent checked it |
+| `UNSOURCED` | Nothing in the record backs this figure |
+
+Press the lock estimate and you land on the sandbox log line that produced it — the log line
+and the capability lamp carry the same TrueForge event id, so the join is real rather than
+approximate. Press a record count on a change with no scope certificate and you are told, in
+as many words, that the agent asserted it.
+
+The rule that makes this worth having is the one the lamps follow: **an unsourced claim says
+it is unsourced.** It would be trivial to default everything to "derived from the dossier" and
+have every number look accounted for. A provenance system that never says *nothing backs this*
+is decoration with extra steps.
+
+### The undo window
+
+`post_apply` is AIRLOCK noticing a change went wrong. This is a **human** noticing — the far
+more common case, because most bad changes are perfectly healthy by every checksum and simply
+turn out to be the wrong idea. A migration that applies cleanly and quietly breaks a finance
+report is not a failed change; it is a correct change nobody wanted, and no health check will
+ever catch it.
+
+What makes a one-press undo on a production database responsible rather than reckless is that
+the proof has a second life: the inverse was already executed against a shadow copy and
+checksummed back to byte-identical before the change was applied. The window is how long
+AIRLOCK is willing to vouch for that — 30 minutes for a schema migration, 15 for a bulk data
+operation, 10 for infrastructure.
+
+Three refusals are load-bearing, and each is a case where a less careful system offers the
+button anyway:
+
+- **No proven inverse, no undo.** The same rule as auto-rollback. A SCOPE certificate never
+  earns one — you cannot un-send forty thousand emails, and a control implying you can is
+  worse than no control.
+- **The window is measured on the server**, from `audit.applied_at`. A countdown in a browser
+  can be paused by a sleeping laptop. A press that arrives late is refused with the closing
+  time quoted back, however much time the display appeared to have.
+- **An undo that does not restore is recorded as an undo that did not work.** Production is
+  re-checksummed against the pre-migration digest afterwards; success is never inferred from
+  the absence of an error.
+
+Recording an undo cannot break the hash chain, because `undo` sits outside the sealed body for
+the same reason `post_apply` does: a receipt seals a decision and the evidence it was taken
+on, and what happened twenty minutes later is a new fact about the world, not a revision of
+that decision. Detached receipts carry it as an explicitly **unsealed** annotation, and
+`verifyDetached` names what it did not verify rather than leaving the reader to notice.
+
+### The budget cap
+
+Every other control governs what a change may do to production. This one governs what the
+agent may do to your invoice — a different kind of irreversible: nobody has ever been refunded
+for a verification loop that ran all night against a shadow branch because a retry never
+terminated.
+
+It is deliberately **not a new kill switch**. Reaching the ceiling pulls exactly the lever a
+human pulls when they press ABORT — the same `cancelSession` call, peered by the harness to
+whichever executor is doing the work. A budget that closed the stream in one browser tab while
+the run continued on a server would not be a budget, it would be a blindfold.
+
+The binding ceiling is the one *furthest consumed*, not the first declared, so a run cannot
+sail past its token cap while the console reassures everybody about dollars. `enforce: false`
+is a real setting for a team introducing a cap, and the console renders a budget that cannot
+stop anything differently from one that can.
 
 ### Break-glass
 
@@ -334,7 +411,7 @@ differently rather than faked. Full detail in [docs/TRUEFORGE-NOTES.md](docs/TRU
 Three capability detectors depend on signals we could not confirm from the docs — the Code Mode
 tool name, the large-result offload marker, and whether a compaction event is emitted. They are
 listed as unverified. If a real run does not prove them, those lamps stay dark and the
-denominator drops. **An honest 19/19 beats a padded 22/22 that a judge disproves by clicking
+denominator drops. **An honest 20/20 beats a padded 23/23 that a judge disproves by clicking
 one lamp.**
 
 ### Two upstream bugs found
@@ -354,10 +431,10 @@ one lamp.**
 ## Tests
 
 ```bash
-npm test        # 106 tests, 11 fixtures, 4 agent specs
+npm test        # 165 tests, 14 fixtures, 4 agent specs
 ```
 
-Four suites, and each pins a property rather than an implementation:
+Seven suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |
@@ -366,6 +443,10 @@ Four suites, and each pins a property rather than an implementation:
 | `receipt.test.mjs` | Editing, reordering or deleting a sealed record is detected, at the record where it happened |
 | `harness.test.mjs` | Nothing but a real harness event lights a lamp — noise, repeated connectors, and prose that merely *mentions* a chart light nothing |
 | `observer.test.mjs` | The tap is a faithful passthrough: same chunks, same objects, same order, none added, none lost — even when a detector throws or the transport dies mid-stream. Then a realistic turn stream is driven through it into the real ledger, and the lamps that come out are checked both ways: the thirteen it earned, and the five that must stay dark |
+| `recovery.test.mjs` | A bad health check reverts only where the inverse was proven; an unproven one raises an alarm and touches nothing; silence is never read as health |
+| `undo.test.mjs` | No arrangement of policy, window and clock produces an available undo without a fully proven inverse; the window is measured from when the change landed; an unmeasured undo is never recorded as successful |
+| `budget.test.mjs` | The binding ceiling is the one furthest consumed, not the first declared, so a run cannot sail past its token cap while the console reassures everybody about dollars |
+| `provenance.test.mjs` | An unsourced claim says it is unsourced, and a figure the agent merely asserted never acquires a link to a harness event that did not produce it |
 | `mcp/server.test.mjs` | Exactly one tool is destructive and it is the one held for approval; there is no tool that applies a change |
 
 Plus two structural checks that run in CI:
