@@ -1,0 +1,99 @@
+/**
+ * Configure the harness sandbox.
+ *
+ *   DAYTONA_API_KEY=dtn_… npm run harness:sandbox
+ *
+ * The sandbox is not optional for this project. It is one of the three things
+ * the hackathon says a judge has to actually see — a real tool reached, code run
+ * in a sandbox, and a pause before something irreversible — and for AIRLOCK it
+ * is load-bearing rather than a box to tick: the shadow branch, the forward
+ * run, the rollback and all three checksums happen there. No sandbox, no
+ * certificate. No certificate, no gate.
+ *
+ * TrueForge 0.1.4 supports exactly one provider. The server validates
+ * `manifest.type` against the literal string "daytona" and rejects everything
+ * else, so there is no local or Docker-backed fallback to reach for. That is
+ * worth writing down because it is not obvious from the outside: the API looks
+ * pluggable, and it is not.
+ *
+ * Getting a key is free and takes about a minute at https://app.daytona.io —
+ * sign in, Keys, Create Key. Put it in the repo-root .env as DAYTONA_API_KEY and
+ * run this. It is read from there rather than passed on the command line so it
+ * does not end up in a shell history or a screen recording.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const BASE = process.env.TRUEFORGE_BASE_URL ?? 'http://localhost:8791';
+
+/** Real process environment wins, so a one-off override still works. */
+function apiKey() {
+  if (process.env.DAYTONA_API_KEY) return process.env.DAYTONA_API_KEY.trim();
+  try {
+    const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
+    const m = /^DAYTONA_API_KEY=(.+)$/m.exec(env);
+    return m ? m[1].trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+const key = apiKey();
+if (!key) {
+  console.error('No DAYTONA_API_KEY found, in the environment or in .env.\n');
+  console.error('The sandbox is where every checksum in this project is produced, so');
+  console.error('without it the agent can plan a migration and can never prove one.\n');
+  console.error('  1. https://app.daytona.io  ->  sign in  ->  Keys  ->  Create Key');
+  console.error('  2. add DAYTONA_API_KEY=dtn_… to .env in the repo root');
+  console.error('  3. npm run harness:sandbox\n');
+  console.error('The free tier is enough for a demo. .env is gitignored.');
+  process.exit(2);
+}
+
+const manifest = {
+  type: 'daytona',
+  auth: { api_key: key },
+  // A verification run is a forward migration, a rollback and three checksums
+  // over a shadow copy. Two minutes is generous for the demo dataset and still
+  // short enough that a hung sandbox fails rather than bills.
+  exec_timeout_ms: 120_000,
+  auto_stop_interval_in_minutes: 15,
+  auto_archive_interval_in_minutes: 60,
+  auto_delete_interval_in_minutes: 1440,
+};
+
+const res = await fetch(new URL('/api/v1/settings/sandbox-providers', BASE), {
+  method: 'PUT',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ manifest }),
+});
+
+const body = await res.text();
+if (!res.ok) {
+  console.error(`The harness refused the sandbox configuration (${res.status}):`);
+  console.error(body.slice(0, 600));
+  process.exit(1);
+}
+
+console.log(`Sandbox provider configured on ${BASE}.`);
+
+// Ask the server what it thinks rather than trusting the write. This is the
+// same rule the gate applies to a verifier's own `match` flag: a claim of
+// success from the thing that just acted is not evidence.
+const check = await fetch(new URL('/api/v1/capabilities', BASE));
+const caps = await check.json().catch(() => null);
+const enabled = caps?.data?.sandbox?.enabled === true;
+
+console.log(`  sandbox  ${enabled ? 'enabled' : 'still reporting disabled'}`);
+console.log(`  skills   ${caps?.data?.skill?.enabled ? 'available' : (caps?.data?.skill?.reason ?? 'unavailable')}`);
+
+if (!enabled) {
+  console.error('\nThe key was accepted but the server still reports no sandbox.');
+  console.error('Check the key is valid and not expired: npm run harness:logs');
+  process.exit(1);
+}
+
+console.log('\nRe-register the agents so they pick up the sandbox and the skill packs:');
+console.log('  npm run harness:setup');

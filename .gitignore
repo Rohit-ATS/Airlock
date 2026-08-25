@@ -23,10 +23,16 @@ data/*.sqlite-*
 # A local TrueForge checkout, if you clone one here to run the harness.
 trueforge/
 
-# Local harness env (contains no secrets, but is machine-specific).
+# Local harness env. This one DOES carry a model API key — the container gets
+# its environment from here, and env_file in a compose file is relative to the
+# compose file, so it cannot read the repo-root .env.
 harness/.env
 
 # Benchmark runs are reproducible and large; the generated docs/BENCHMARK.md is
 # the committed artefact. Keep one representative run so the doc has a source.
 benchmark/results/*.json
 !benchmark/results/reference.json
+
+# Isolated copy used to serve the console on a stable port,
+# out of reach of anything that rebuilds apps/console/.next.
+.console-serve/
