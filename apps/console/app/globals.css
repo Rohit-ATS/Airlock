@@ -552,22 +552,32 @@ body {
 .lp {
   /* --- ground ----------------------------------------------------------- */
   --lp-backdrop: #cfcecb; /* behind the card, visible as a margin */
-  --lp-paper: #e2e1dd; /* the card itself */
-  --lp-paper-2: #d7d6d2; /* recessed panels within it */
-  --lp-paper-3: #cbc9c5;
+  --lp-paper: #e6e5e1; /* the card itself */
+  --lp-paper-2: #dcdbd7; /* recessed panels within it */
+  --lp-paper-3: #d2d0cc; /* the darkest surface any text sits on */
 
-  /* --- ink: four steps, all AA on --lp-paper and darker ----------------- */
+  /* --- ink: four steps, every one AA on the DARKEST surface -------------
+     Sized against --lp-paper-3 rather than against --lp-paper, which is the
+     mistake the first version made: the scale was tuned against the plate and
+     then used on the recessed panels too, and axe found 21 nodes at 4.28:1.
+     A palette checked against the surface you had in mind is not checked.
+
+     The floor is what sets the scale: ink-4 has to clear 4.5:1 on paper-3, and
+     that leaves only so much room above it. So the step from ink-3 to ink-4 is
+     1.23x rather than the console's 1.37x, and the difference between them is
+     carried by weight and size as much as by lightness. Worst pair on the page
+     is 4.52:1, verified by scripts/check-a11y.mjs. */
   --lp-ink: #14161a;
-  --lp-ink-2: #3b4048;
-  --lp-ink-3: #5b616b;
-  --lp-ink-4: #767c86;
+  --lp-ink-2: #2f353c;
+  --lp-ink-3: #474d55;
+  --lp-ink-4: #545a63;
 
-  --lp-line: #bfbdb8;
-  --lp-line-2: #a9a7a1;
+  --lp-line: #c3c1bc;
+  --lp-line-2: #adaba5;
 
   /* --- the one warm accent, and it is NOT the alarm colour --------------- */
-  --lp-signal: #d9641d;
-  --lp-signal-ink: #8f3d0c; /* signal, darkened until it is AA on paper */
+  --lp-signal: #d9641d; /* fills and large shapes only, never small text */
+  --lp-signal-ink: #8f3d0c; /* the same hue, darkened until small text is AA */
   --lp-signal-wash: #f0d9c6;
 
   /* --- the instrument, quoted inside the room --------------------------- */
