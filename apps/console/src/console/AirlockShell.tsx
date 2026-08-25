@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { TrueForgeUI } from '@truefoundry/trueforge-ui';
 import type { SemanticTokens } from '@truefoundry/trueforge-ui';
+import { DEFAULT_POLICY, type BudgetPolicy, type StopCause } from '@airlock/contract';
 import { RunStore } from '@/harness/store';
 import { HarnessProvider } from '@/harness/HarnessProvider';
 import { createAirlockServer } from '@/server/observedServer';
@@ -96,7 +97,15 @@ const THEME = {
   classNames: { markdown: 'aui-markdown' },
 } as const;
 
-export function AirlockShell({ baseUrl, agentName }: { baseUrl: string; agentName: string }) {
+export function AirlockShell({
+  baseUrl,
+  agentName,
+  budget = DEFAULT_POLICY.budget,
+}: {
+  baseUrl: string;
+  agentName: string;
+  budget?: BudgetPolicy;
+}) {
   // One store for the lifetime of the page; the observer writes into it from
   // outside React, and components read it through useSyncExternalStore.
   const storeRef = useRef<RunStore>(null);
@@ -139,10 +148,10 @@ export function AirlockShell({ baseUrl, agentName }: { baseUrl: string; agentNam
    */
   const controls = useMemo(
     () => ({
-      abort: async () => {
+      abort: async (cause: StopCause = 'human') => {
         const { sessionId } = store.getSnapshot();
         if (!sessionId) return;
-        store.noteAborting();
+        store.noteAborting(cause);
         try {
           await server.cancelSession({ sessionId });
         } catch (error) {
@@ -156,6 +165,22 @@ export function AirlockShell({ baseUrl, agentName }: { baseUrl: string; agentNam
     }),
     [server, store],
   );
+
+  /**
+   * The budget cap.
+   *
+   * Deliberately routed through the same `abort` the red button calls, rather
+   * than given a stop path of its own. A ceiling that closed the stream in this
+   * tab while the run continued on an executor would not be a budget, it would
+   * be a blindfold — and two different ways to stop a run is one more than
+   * anybody can keep correct.
+   */
+  useEffect(() => {
+    store.configureBudget(budget, (verdict) => {
+      console.warn(`[airlock] BUDGET CAP — ${verdict.message}`);
+      void controls.abort('budget');
+    });
+  }, [store, budget, controls]);
 
   return (
     <HarnessProvider store={store} controls={controls}>

@@ -891,6 +891,96 @@ const slowBackfill = dossier({
 });
 
 /* ========================================================================== */
+/* 14. Applied, healthy, and taken back anyway                                 */
+/* ========================================================================== */
+
+/**
+ * The case the undo window exists for, and the one a health check can never
+ * catch.
+ *
+ * Every checksum agreed. The post-apply digest matched what the certificate
+ * predicted exactly, so `post_apply.healthy` is true and no alarm fired. The
+ * change was still wrong: finance's nightly report read the column that was
+ * dropped, and nobody found out until it ran.
+ *
+ * This is not a failed change. It is a correct change nobody wanted, which is
+ * the far more common way production goes bad — and the only thing that made a
+ * one-press reversal responsible eleven minutes later is that the inverse had
+ * already been executed against a shadow copy and checksummed back to
+ * byte-identical before the change was ever applied.
+ */
+const planColumnPre = h('users@412880rows@pre-drop-plan-name');
+
+const takenBack = dossier({
+  dossier_id: 'dos_plan_column',
+  change_class: 'SCHEMA_MIGRATION',
+  request: 'Drop the deprecated plan_name column from users now that every service reads tier instead.',
+  requested_by: 'marco.b@airlock.dev',
+  created_at: '2026-08-23T10:00:00Z',
+  target: { project_ref: 'airlock-demo', branch_ref: 'br_shadow_9d33a', systems: ['postgres'] },
+  magnitude: { records: 412_880, people: 0, amount_minor: 0, undo_window_seconds: null },
+  forward: [{ system: 'postgres', op: 'ALTER TABLE users DROP COLUMN plan_name;', reversible: true, proven: true }],
+  rollback: [
+    {
+      system: 'postgres',
+      op: 'ALTER TABLE users ADD COLUMN plan_name text;\nUPDATE users SET plan_name = plan_name_for(tier);',
+      reversible: true,
+      proven: true,
+    },
+  ],
+  certificate: {
+    kind: 'UNDO',
+    status: 'PROVEN',
+    checksums: {
+      pre: planColumnPre,
+      post: h('users@412880rows@post-drop-plan-name'),
+      post_rollback: planColumnPre,
+      match: true,
+    },
+    lock_ms_estimate: 340,
+    table_rewrite: false,
+    verified_at: '2026-08-23T10:06:00Z',
+  },
+  affected_tables: [{ system: 'postgres', name: 'users', rows: 412_880, operation: 'drop column' }],
+  recommendation: 'APPLY',
+  signatures: [
+    { approver: 'sam.okafor@airlock.dev', at: '2026-08-23T10:12:00Z', decision: 'approved', reason: null, break_glass: false },
+  ],
+  approval: {
+    approver: 'sam.okafor@airlock.dev',
+    at: '2026-08-23T10:12:00Z',
+    role_required: 'approver',
+    decision: 'approved',
+    reason: null,
+  },
+  audit: { applied_at: '2026-08-23T10:12:00Z', post_apply_checksum: null, applied_by: 'sam.okafor@airlock.dev' },
+  // Healthy. The change did exactly what the certificate said it would.
+  post_apply: {
+    checked_at: '2026-08-23T10:12:18Z',
+    observed_checksum: h('users@412880rows@post-drop-plan-name'),
+    expected_checksum: h('users@412880rows@post-drop-plan-name'),
+    healthy: true,
+    rolled_back_at: null,
+    rollback_reason: null,
+    duration_ms: null,
+  },
+  // And taken back anyway, eleven and a half minutes into a thirty-minute window.
+  undo: {
+    expires_at: '2026-08-23T10:42:00Z',
+    undone_at: '2026-08-23T10:23:30Z',
+    undone_by: 'sam.okafor@airlock.dev',
+    reason: 'Finance nightly reads plan_name. Putting it back until they cut over.',
+    restored_checksum: planColumnPre,
+    restored: true,
+  },
+  cost: {
+    usd: 0.0874,
+    by_model: { 'openai/gpt-4.1-mini': 0.0874 },
+    tokens: { input: 39_100, output: 2_240, total: 41_340 },
+  },
+});
+
+/* ========================================================================== */
 /* Seal the decided records into a hash chain, then write everything out       */
 /* ========================================================================== */
 
@@ -916,7 +1006,7 @@ function bodyOf(d) {
 }
 
 /** History, in the order it happened. The chain commits to that order. */
-const history = [indexApplied, gdprApplied, bucketRejected, selfReverted];
+const history = [indexApplied, gdprApplied, takenBack, bucketRejected, selfReverted];
 
 let prev = GENESIS_HASH;
 history.forEach((d, seq) => {
@@ -942,6 +1032,7 @@ const files = [
   ['data-operation.lock-ceiling.json', slowBackfill],
   ['history.schema-migration.applied.json', indexApplied],
   ['history.erasure.applied.json', gdprApplied],
+  ['history.schema-migration.taken-back.json', takenBack],
   ['history.infra-mutation.rejected.json', bucketRejected],
   ['history.schema-migration.self-reverted.json', selfReverted],
 ];

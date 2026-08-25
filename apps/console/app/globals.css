@@ -296,6 +296,25 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+   Provenance. Pressing a figure on the certificate scrolls the sandbox log to
+   the line that produced it — this is how the reader knows which one arrived.
+   --------------------------------------------------------------------------- */
+
+@keyframes step-flash {
+  0% {
+    background: color-mix(in oklab, var(--color-ice) 26%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.log-line[data-flash='true'] {
+  animation: step-flash 1.4s var(--ease-instrument) forwards;
+  box-shadow: inset 2px 0 0 0 var(--color-ice);
+}
+
+/* ---------------------------------------------------------------------------
    Reduced motion. An instrument panel still has to be readable when the user
    has asked the machine to hold still.
    --------------------------------------------------------------------------- */
@@ -313,6 +332,10 @@ body {
     box-shadow:
       inset 0 0 0 1px rgb(255 255 255 / 30%),
       0 0 0 1px var(--lamp-color, var(--color-ice));
+  }
+  .log-line[data-flash='true'] {
+    /* The flash is how you find the line. Without motion it has to persist. */
+    background: color-mix(in oklab, var(--color-ice) 20%, transparent);
   }
 }
 
