@@ -191,4 +191,4 @@ if (!result.ok) {
 
 say('');
 say(`Registered ${name}. Create a session against it with:`);
-say(`  POST ${BASE}/api/v1/sessions   {"agent_name":"${name}"}`);
+say(`  POST ${BASE}/api/v1/sessions   {"agent":{"name":"${name}"}}`);
