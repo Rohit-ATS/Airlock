@@ -565,190 +565,150 @@ body {
 }
 
 
+
 /* ===========================================================================
    THE FRONT DOOR
 
-   Full bleed. No cards, no rounded plates, no boxes inside boxes. Sections run
-   edge to edge and are separated by a single hairline, so the page reads as one
-   continuous document rather than a stack of tiles.
+   Laid out to the reference: a rounded plate inset on a slightly darker ground,
+   a floating pill nav, a four-line staggered headline, a centre object with
+   props drifting around it, a giant pixel wordmark behind, and a soft rise at
+   the foot carrying the scroll cue.
 
-   Three things carry the design and nothing else is allowed to:
+   Scoped under `.lp` and set inside `@layer base`, so utilities still win the
+   cascade. Unlayered, `.lp`'s own `color` beat every Tailwind text utility on
+   inheritance — which is a silent failure that only shows up as a contrast
+   number, and did.
 
-     1. SCALE. The display face runs to 11vw and the body sits at 15px. That
-        gap is the whole hierarchy — when the contrast between the largest and
-        smallest thing on screen is big enough, you stop needing borders to
-        separate anything.
-     2. WHITESPACE. Sections breathe at 10-14rem of vertical padding. Crowding
-        is what makes a page feel cheap, and it is the easiest thing to fix.
-     3. HAIRLINES. One pixel at 12% ink. Never a border-radius on a container,
-        never a drop shadow, never a filled card.
-
-   Dark bands invert the whole thing for the two places the real product runs,
-   so the live demos read as instruments set into the page rather than as
-   another section about them.
-
-   Scoped under `.lp`, so none of it can reach the console or the control room.
-   And --hazard is still reserved: it means irreversible, and a landing page
-   that spent the alarm colour on a button would blur the one piece of
-   vocabulary the product cannot afford to blur. The warmth here is --lp-signal.
+   Contrast is computed rather than eyeballed. The reference puts white on a
+   mid orange, which measures 3.41:1 and is not usable for a button label, so
+   --lp-orange is the same hue taken down until white clears 4.87:1. Everything
+   else is checked against --lp-active, the darkest surface any text sits on.
    =========================================================================== */
 
 @layer base {
   .lp {
-    --lp-paper: #f4f3f0;
-    --lp-paper-2: #eae8e4;
-    --lp-void: #0a0b0d;
-    --lp-void-2: #121417;
+    --lp-ground: #c2c2c0; /* behind the plate, visible as a margin */
+    --lp-card: #d5d5d3; /* the plate */
+    --lp-pill: #c6c6c4; /* the nav group */
+    --lp-active: #bcbcba; /* the active nav pill — darkest text surface */
+    --lp-rise: #cbcbc9; /* the hill at the foot of the hero */
 
-    /* Ink on paper. Every step clears AA on --lp-paper-2, which is the darkest
-     light surface anything sits on. Verified by scripts/check-a11y.mjs. */
-    --lp-ink: #0d0e11;
-    --lp-ink-2: #34383f;
-    --lp-ink-3: #4c525a;
-    --lp-ink-4: #5d636c;
+    --lp-ink: #1c1c1c;
+    --lp-ink-2: #3d3d3d;
+    --lp-ink-3: #4a4a4a;
 
-    /* Ink on the dark bands. */
+    --lp-orange: #b8540f; /* white on this is 4.87:1 */
+    --lp-orange-lit: #e08238; /* highlight only — never carries text */
+    --lp-orange-ink: #8f3a06; /* orange as small text on the plate: 5.15:1 */
+    --lp-black: #141414;
+
+    --lp-void: #0b0d11;
     --lp-pale: #f0efec;
     --lp-pale-2: #a8adb6;
     --lp-pale-3: #868c96;
-
-    --lp-line: rgb(13 14 17 / 13%);
-    --lp-line-2: rgb(13 14 17 / 26%);
     --lp-line-dark: rgb(240 239 236 / 15%);
 
-    /* Darkened from #cf5216, which sat in a dead zone: white on it was 4.31
-     and ink on it was 4.48, so a filled chip carrying small text failed
-     whichever way you turned it. At #b8460f white clears 5.36. */
-    --lp-signal: #b8460f;
-    --lp-signal-ink: #96380a; /* the same hue, darkened until small text is AA */
-    --lp-signal-pale: #ff8a4c; /* for use on the dark bands only */
-
-    background: var(--lp-paper);
+    background: var(--lp-ground);
     color: var(--lp-ink);
     -webkit-font-smoothing: antialiased;
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Display type.
+/* The plate. */
+.lp-card {
+  background: var(--lp-card);
+  border-radius: 22px;
+}
 
-   Weight 800 with aggressive negative tracking. A very large heavy face looks
-   loose at default tracking — the letters need pulling together as they grow,
-   which is why this tightens rather than staying constant.
+/* ---------------------------------------------------------------------------
+   Display type — heavy, uppercase, tight.
+
+   The reference's headline is one shape rather than four rows, which is done
+   entirely with unequal indents and a line-height under 1. Tracking tightens
+   as the size grows; a heavy face at 7vw looks loose at default spacing.
    --------------------------------------------------------------------------- */
 
 .lp-display {
   font-family: var(--font-sans);
   font-weight: 800;
-  line-height: 0.82;
-  letter-spacing: -0.05em;
+  line-height: 0.9;
+  letter-spacing: -0.035em;
   text-transform: uppercase;
-  text-wrap: balance;
+  /* Deliberately no `color`. A type utility that owns colour follows the
+     wordmark onto the dark footer and paints it #1c1c1c on #0b0d11 — 1.14:1,
+     invisible, and reported as a contrast defect rather than as the styling
+     mistake it is. Colour is set where the element lives. */
 }
 
-.lp-serif-em {
-  font-style: italic;
-  font-weight: 300;
-  letter-spacing: -0.02em;
-  text-transform: none;
-}
-
-.lp-label {
+.lp-mono {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--lp-ink-3);
+  font-variant-numeric: tabular-nums;
 }
 
-.lp-lede {
-  font-size: clamp(1rem, 1.35vw, 1.2rem);
-  line-height: 1.6;
-  color: var(--lp-ink-2);
-  text-wrap: pretty;
+/* The nav group. */
+.lp-nav {
+  background: var(--lp-pill);
+  border-radius: 999px;
+}
+.lp-nav a {
+  border-radius: 999px;
+  transition: background 200ms ease, color 200ms ease;
+}
+.lp-nav a[data-active='true'] {
+  background: var(--lp-active);
 }
 
-/* A section rule. The only separator on the page. */
-.lp-hr {
-  height: 1px;
-  background: var(--lp-line);
-  border: 0;
+/* The vertical social rail on the right edge. */
+.lp-rail {
+  background: var(--lp-pill);
+  border-radius: 14px;
 }
 
-/* ---------------------------------------------------------------------------
-   The full-bleed wordmark band.
-
-   Edge to edge, clipped by the viewport, sitting on the hairline between two
-   sections. It is architecture rather than a logo — the page's one moment of
-   pure graphic weight.
-   --------------------------------------------------------------------------- */
-
+/* The giant pixel wordmark behind the centre object. */
 .lp-wordmark rect {
-  fill: currentColor;
+  fill: #fff;
 }
 
 /* ---------------------------------------------------------------------------
-   Motion.
+   Drift.
 
-   Reveals are one-way and short. A page that re-animates every time an element
-   re-enters the viewport is a page that will not sit still while you read it.
+   The props orbit on long, offset cycles so they never settle into a visible
+   pattern. Stopped entirely under reduced motion.
    --------------------------------------------------------------------------- */
 
-.lp-rise {
+@keyframes lp-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--lp-rot, 0deg));
+  }
+  50% {
+    transform: translate3d(0, -16px, 0) rotate(calc(var(--lp-rot, 0deg) * -1));
+  }
+}
+.lp-drift {
+  animation: lp-drift var(--lp-dur, 8s) ease-in-out infinite;
+  animation-delay: var(--lp-delay, 0s);
+}
+
+.lp-reveal {
   opacity: 0;
-  transform: translate3d(0, 22px, 0);
+  transform: translate3d(0, 20px, 0);
   transition:
     opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
     transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-.lp-rise[data-shown='true'] {
+.lp-reveal[data-shown='true'] {
   opacity: 1;
   transform: none;
 }
 
-@keyframes lp-float {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -12px, 0);
-  }
-}
-.lp-float {
-  animation: lp-float var(--lp-dur, 9s) ease-in-out infinite;
-  animation-delay: var(--lp-delay, 0s);
-}
-
-/* A link that underlines from the left on hover, rather than switching on. */
-.lp-link {
-  position: relative;
-  display: inline-block;
-}
-.lp-link::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -2px;
-  height: 1px;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.lp-link:hover::after {
-  transform: scaleX(1);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .lp-rise {
+  .lp-drift {
+    animation: none;
+  }
+  .lp-reveal {
     opacity: 1;
     transform: none;
     transition: none;
-  }
-  .lp-float {
-    animation: none;
   }
 }
