@@ -25,7 +25,48 @@ export interface ExpandContractStep {
   why: string;
 }
 
-const clean = (sql: string): string => sql.replace(/--.*$/gm, ' ').replace(/\s+/g, ' ').trim();
+/**
+ * Strip line comments and collapse runs of whitespace.
+ *
+ * The SQL reaching this comes off a change dossier, which is to say from the
+ * agent, which is to say ultimately from whatever it read. It is untrusted
+ * input and it can be long. The previous pair — `/--.*$/gm` then `/\s+/g` —
+ * gave a backtracking engine a superlinear worst case on exactly that kind of
+ * input, and a classifier that can be made to hang is a gate that can be made
+ * to hang.
+ *
+ * Splitting on a newline and cutting at the first `--` is the same
+ * transformation with no quantifier to backtrack over: one pass, linear in the
+ * length of the input, whatever the input is.
+ */
+const WHITESPACE = new Set([' ', '\t', '\n', '\r', '\f', '\v']);
+
+const clean = (sql: string): string => {
+  const words: string[] = [];
+  let word = '';
+
+  for (const line of sql.split('\n')) {
+    const comment = line.indexOf('--');
+    const code = comment === -1 ? line : line.slice(0, comment);
+    for (const ch of code) {
+      if (WHITESPACE.has(ch)) {
+        if (word) {
+          words.push(word);
+          word = '';
+        }
+      } else {
+        word += ch;
+      }
+    }
+    // A newline separates words even when the line ended mid-token.
+    if (word) {
+      words.push(word);
+      word = '';
+    }
+  }
+
+  return words.join(' ');
+};
 const ident = String.raw`(?:"([^"]+)"|([a-zA-Z_][a-zA-Z0-9_]*))`;
 
 function name(...groups: Array<string | undefined>): string | undefined {

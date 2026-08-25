@@ -43,6 +43,20 @@ function send(res: ServerResponse, status: number, body: unknown, headers: Recor
   res.end(payload);
 }
 
+/**
+ * Body was refused for its size, as opposed to the socket failing underneath.
+ *
+ * Marked with a class rather than by matching on the message, so the caller can
+ * answer 413 for one and 400 for the other without either answer having to
+ * quote the underlying error back over the wire.
+ */
+class BodyTooLarge extends Error {
+  constructor() {
+    super('request body too large');
+    this.name = 'BodyTooLarge';
+  }
+}
+
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let size = 0;
@@ -50,7 +64,7 @@ function readBody(req: IncomingMessage): Promise<string> {
     req.on('data', (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        reject(new Error('request body too large'));
+        reject(new BodyTooLarge());
         req.destroy();
         return;
       }
@@ -114,7 +128,22 @@ export async function serveHttp({ server, port, path = '/mcp', host = '0.0.0.0' 
     try {
       raw = await readBody(req);
     } catch (error) {
-      send(res, 413, { jsonrpc: '2.0', id: null, error: { code: PARSE_ERROR, message: String(error) } });
+      // The caller is told what it did wrong and nothing about this process.
+      // `String(error)` here handed back whatever the runtime put in the
+      // message — a stack for anything unexpected — which is free
+      // reconnaissance for someone probing the server, and none of it helps
+      // the client fix its request. The detail goes to the log instead, where
+      // the operator can see it and a caller cannot.
+      log(`request body rejected: ${String(error)}`);
+      const tooLarge = error instanceof BodyTooLarge;
+      send(res, tooLarge ? 413 : 400, {
+        jsonrpc: '2.0',
+        id: null,
+        error: {
+          code: PARSE_ERROR,
+          message: tooLarge ? `Request body exceeds ${MAX_BODY_BYTES} bytes.` : 'Could not read request body.',
+        },
+      });
       return;
     }
 

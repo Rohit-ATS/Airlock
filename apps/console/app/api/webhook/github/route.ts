@@ -111,15 +111,55 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true, dossier_id: dossier.dossier_id, session_id: sessionId }, { status: 202 });
 }
 
+/**
+ * `owner/name`, and nothing that can leave that shape.
+ *
+ * GitHub allows only alphanumerics, `-`, `_` and `.` in either half, so this is
+ * the real rule rather than a guess at one. Anchored at both ends, with no
+ * slash permitted inside either half.
+ */
+const REPO_SLUG = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
 /** Changed files for a PR. Unauthenticated works for public repos. */
 async function listChangedFiles(repo: string, number: number | undefined): Promise<string[]> {
   if (!number) return [];
+
+  /*
+   * `repo` and `number` arrive in the webhook body, which is to say from
+   * whoever can reach this route. Interpolating them straight into the API URL
+   * let a caller steer the request off api.github.com entirely — `..%2f..` to
+   * walk the path, a userinfo `@` to change host, a `?` or `#` to reshape the
+   * query. The signature check upstream raises the bar but does not remove the
+   * class: a valid signature is not a promise that the payload is honest.
+   *
+   * So both are validated before they are used, and the result is checked
+   * against the origin it is supposed to have. A request that would go
+   * anywhere else is not sent.
+   */
+  if (!REPO_SLUG.test(repo)) return [];
+  if (!Number.isSafeInteger(number) || number <= 0) return [];
+
+  const url = new URL(
+    // Each half is encoded on its own so a `.` or `-` survives while a
+    // separator cannot be smuggled in.
+    `/repos/${repo.split('/').map(encodeURIComponent).join('/')}/pulls/${number}/files`,
+    'https://api.github.com',
+  );
+  url.searchParams.set('per_page', '100');
+
+  // Belt and braces: whatever the two values did above, the request only goes
+  // out if it is still pointed at the GitHub API.
+  if (url.origin !== 'https://api.github.com') return [];
+
   const headers: Record<string, string> = { accept: 'application/vnd.github+json' };
   const token = env('GITHUB_TOKEN');
   if (token) headers.authorization = `Bearer ${token}`;
   try {
-    const res = await fetch(`https://api.github.com/repos/${repo}/pulls/${number}/files?per_page=100`, {
+    const res = await fetch(url, {
       headers,
+      // A redirect is the other way out of the allowed origin, and there is no
+      // legitimate one on this endpoint.
+      redirect: 'error',
       cache: 'no-store',
     });
     if (!res.ok) return [];

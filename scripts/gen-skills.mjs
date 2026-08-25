@@ -56,7 +56,9 @@ for (const dir of readdirSync(skillsDir, { withFileTypes: true }).sort((a, b) =>
     name: meta.name ?? dir.name,
     version: meta.version ?? '0.0.0',
     digest: `sha256:${createHash('sha256').update(raw, 'utf8').digest('hex')}`,
-    description: (meta.description ?? '').replace(/'/g, "\\'"),
+    // Stored raw. Escaping happens once, at the point of emission, so there is
+    // exactly one place that has to be right.
+    description: meta.description ?? '',
   });
 }
 
@@ -83,13 +85,30 @@ lines.push('  digest: string;');
 lines.push('  description: string;');
 lines.push('}');
 lines.push('');
+/**
+ * A value as a TypeScript string literal.
+ *
+ * This writes source code, so getting the escaping wrong is not a formatting
+ * bug — it is arbitrary content deciding where the literal ends. The old
+ * `replace(/'/g, "\\'")` escaped the quote and not the backslash, so a
+ * description ending in `\` escaped its own closing quote and ran on into the
+ * next line of generated code; `name`, `version` and `digest` were
+ * interpolated with no escaping at all. All four come from skill frontmatter,
+ * which is a file on disk that nobody validates.
+ *
+ * `JSON.stringify` is the whole fix: it emits a correctly quoted literal —
+ * backslashes, quotes, newlines and control characters included — and a JSON
+ * string literal is a valid TypeScript one.
+ */
+const literal = (value) => JSON.stringify(String(value));
+
 lines.push('export const SKILL_PACKS: readonly SkillPack[] = [');
 for (const e of entries) {
   lines.push('  {');
-  lines.push(`    name: '${e.name}',`);
-  lines.push(`    version: '${e.version}',`);
-  lines.push(`    digest: '${e.digest}',`);
-  lines.push(`    description: '${e.description}',`);
+  lines.push(`    name: ${literal(e.name)},`);
+  lines.push(`    version: ${literal(e.version)},`);
+  lines.push(`    digest: ${literal(e.digest)},`);
+  lines.push(`    description: ${literal(e.description)},`);
   lines.push('  },');
 }
 lines.push('] as const;');
