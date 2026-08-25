@@ -43,7 +43,9 @@
     "check:benchmark": "node scripts/check-benchmark.mjs",
     "benchmark": "node benchmark/run.mjs",
     "verify:claims": "node scripts/verify-claims.mjs",
-    "gen:claims": "node scripts/verify-claims.mjs --emit"
+    "gen:claims": "node scripts/verify-claims.mjs --emit",
+    "harness:turn": "node scripts/harness-turn.mjs",
+    "harness:sandbox": "node scripts/harness-sandbox.mjs"
   },
   "overrides": {
     "zustand": "^5.0.15",
