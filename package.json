@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "npm run dev --workspace @airlock/console",
     "build": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/mcp && npm run build --workspace @airlock/console",
-    "test": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/mcp && node --test packages/contract/test/*.test.mjs packages/mcp/test/*.test.mjs && node scripts/check-fixtures.mjs && node scripts/check-agents.mjs",
+    "test": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/mcp && node --test packages/contract/test/*.test.mjs packages/mcp/test/*.test.mjs && node scripts/check-fixtures.mjs && node scripts/check-agents.mjs && node scripts/check-policy.mjs",
     "lint": "npm run lint --workspace @airlock/console",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "mcp": "node packages/mcp/bin/airlock-mcp.mjs",
@@ -23,7 +23,7 @@
     "gen:schema": "node scripts/gen-schema.mjs",
     "gen:capabilities": "node scripts/gen-capabilities.mjs",
     "gen:examples": "node contracts/examples/generate.mjs",
-    "gen": "npm run build --workspace @airlock/contract && npm run gen:schema && npm run gen:capabilities && npm run gen:policy && npm run gen:examples && npm run check:fixtures",
+    "gen": "npm run build --workspace @airlock/contract && npm run gen:schema && npm run gen:capabilities && npm run gen:policy && npm run gen:examples && npm run check:fixtures && npm run check:policy",
     "gen:policy": "node scripts/gen-policy.mjs",
     "check:agents": "node scripts/check-agents.mjs",
     "check:a11y": "node scripts/check-a11y.mjs",
@@ -34,9 +34,13 @@
     "harness:down": "docker compose -f harness/docker-compose.yml down",
     "harness:logs": "docker compose -f harness/docker-compose.yml logs -f server",
     "harness:setup": "node scripts/harness-setup.mjs",
-    "mcp:http": "node packages/mcp/bin/airlock-mcp.mjs --http 8975"
+    "mcp:http": "node packages/mcp/bin/airlock-mcp.mjs --http 8975",
+    "check:policy": "node scripts/check-policy.mjs"
   },
   "overrides": {
     "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "yaml": "^2.9.0"
   }
 }

@@ -75,6 +75,8 @@ export const Sha256 = z
   .string()
   .regex(/^sha256:[a-f0-9]{64}$/, 'must be "sha256:" followed by 64 lowercase hex characters');
 
+export type Sha256Value = z.infer<typeof Sha256>;
+
 /**
  * Every system AIRLOCK can be asked to change something in.
  *
@@ -303,6 +305,35 @@ export const Drift = z.object({
 });
 export type Drift = z.infer<typeof Drift>;
 
+/**
+ * What production looked like once the change actually landed.
+ *
+ * The Undo Certificate proves a rollback works *before* anything is applied.
+ * This is the other half: proof it worked *after*. Production is re-checksummed
+ * the moment the change lands and compared against what the certificate said it
+ * would become — and if it does not match, the rollback that was already proven
+ * is executed automatically.
+ *
+ * `rolled_back_at` is therefore not a failure record. It is the safety net
+ * firing, which is the whole point of having proven the inverse in the first
+ * place.
+ */
+export const PostApply = z.object({
+  checked_at: z.string().nullable().default(null),
+  /** Production, re-checksummed after the change landed. */
+  observed_checksum: Sha256.nullable().default(null),
+  /** What the certificate predicted production would become. */
+  expected_checksum: Sha256.nullable().default(null),
+  /** Null until a check has run. Never inferred from the absence of an error. */
+  healthy: z.boolean().nullable().default(null),
+  /** Set when the proven rollback was executed automatically. */
+  rolled_back_at: z.string().nullable().default(null),
+  rollback_reason: z.string().nullable().default(null),
+  /** Detected-to-reverted, in milliseconds. The number the demo turns on. */
+  duration_ms: z.number().int().nonnegative().nullable().default(null),
+});
+export type PostApply = z.infer<typeof PostApply>;
+
 export const Audit = z.object({
   applied_at: z.string().nullable().default(null),
   post_apply_checksum: Sha256.nullable().default(null),
@@ -375,6 +406,15 @@ export const Dossier = z.object({
   }),
   drift: Drift.default({ checked_at: null, production_checksum: null, drifted: null }),
   audit: Audit.default({ applied_at: null, post_apply_checksum: null, applied_by: null }),
+  post_apply: PostApply.default({
+    checked_at: null,
+    observed_checksum: null,
+    expected_checksum: null,
+    healthy: null,
+    rolled_back_at: null,
+    rollback_reason: null,
+    duration_ms: null,
+  }),
   receipt: Receipt.nullable().default(null),
 });
 

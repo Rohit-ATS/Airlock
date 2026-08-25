@@ -249,6 +249,18 @@ export function detect(event: RawEvent, state: DetectorState): Emit[] {
       if (cost !== undefined) state.costUsd += cost;
       const total = num(pick(metrics, 'totalTokens', 'total_tokens'));
       if (total !== undefined) state.tokens.total = Math.max(state.tokens.total, total);
+
+      // A turn that ends cancelled was stopped by a human mid-flight. That is
+      // the only proof that the cancel actually landed — and, on a multi-replica
+      // deployment, that it was peered to the executor doing the work rather
+      // than swallowed by whichever replica took the HTTP request.
+      if (str(st.status) === 'cancelled') {
+        out.push({
+          capability: 23,
+          evidence: 'turn.done with state.status = cancelled',
+          detail: 'a running turn was stopped by a human',
+        });
+      }
       break;
     }
 

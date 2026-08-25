@@ -1,0 +1,107 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "postgres",
+      "op": "UPDATE orders\n   SET fulfilment_region = region_for(shipping_country)\n WHERE fulfilment_region IS NULL;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "rollback": [
+    {
+      "system": "postgres",
+      "op": "UPDATE orders SET fulfilment_region = NULL WHERE fulfilment_region IS NOT NULL;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "magnitude": {
+    "records": 840000,
+    "people": 0,
+    "amount_minor": 0,
+    "undo_window_seconds": 604800
+  },
+  "principals": [],
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "orders",
+      "rows": 840000,
+      "operation": "backfill fulfilment_region"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "EXPAND_CONTRACT",
+  "risk_notes": [
+    {
+      "note": "The proof is good and the rollback is proven. What refuses it is the lock: a single statement over 840,000 rows holds a row-exclusive lock for an estimated 9.48 seconds, and policy permits two for a DATA_OPERATION. Every write to orders queues behind it for the duration."
+    },
+    {
+      "note": "The workable version is the same change in batches of 10,000 with a lock_timeout, which holds nothing for more than a few milliseconds at a time and can be resumed if it is interrupted.",
+      "source_url": "https://www.postgresql.org/docs/16/explicit-locking.html",
+      "source_title": "PostgreSQL 16 — Explicit Locking"
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.2611,
+    "by_model": {
+      "openai/gpt-4.1": 0.2044,
+      "openai/gpt-4.1-mini": 0.0567
+    },
+    "tokens": {
+      "input": 108400,
+      "output": 6910,
+      "total": 115310
+    }
+  },
+  "signatures": [],
+  "approval": {
+    "approver": null,
+    "at": null,
+    "role_required": "approver",
+    "decision": null,
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": null,
+    "post_apply_checksum": null,
+    "applied_by": null
+  },
+  "receipt": null,
+  "dossier_id": "dos_orders_backfill",
+  "change_class": "DATA_OPERATION",
+  "request": "Backfill the new fulfilment_region column on orders from the shipping address.",
+  "requested_by": "marco.b@airlock.dev",
+  "created_at": "2026-08-24T11:52:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_c41f8",
+    "systems": [
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "UNDO",
+    "status": "PROVEN",
+    "checksums": {
+      "pre": "sha256:f4c8725a4431275d6ac2f9027641cb8c73ac18e13287d3ac640b4b728a251769",
+      "post": "sha256:b9655c5969b0143703e8968d0373ddc951f89bf68ddff17148a006abe9d7358b",
+      "post_rollback": "sha256:f4c8725a4431275d6ac2f9027641cb8c73ac18e13287d3ac640b4b728a251769",
+      "match": true
+    },
+    "lock_ms_estimate": 9480,
+    "table_rewrite": false,
+    "sandbox_artifact_url": "sandbox://verify/dos_orders_backfill/lock-profile.json",
+    "verified_at": "2026-08-24T12:07:30Z"
+  }
+}

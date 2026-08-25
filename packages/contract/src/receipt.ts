@@ -48,6 +48,14 @@ export function canonicalJson(value: unknown): string {
  * changing after a decision is recorded, and a chain that breaks because a
  * token counter ticked would be a chain nobody trusts. What is committed to is
  * everything that answers "what was decided, on what evidence, by whom".
+ *
+ * `post_apply` is deliberately outside it too, and for a better reason than
+ * convenience. A receipt seals a decision and the evidence it was taken on.
+ * What production did *afterwards* — the health check, and any automatic
+ * rollback — is a later fact about the world, not a revision of the decision.
+ * Folding it in would mean either re-sealing a sealed record, which is exactly
+ * the thing this chain exists to make impossible, or refusing to record what
+ * happened. Neither is acceptable, so the two are kept apart.
  */
 export function receiptBody(dossier: Dossier): Record<string, unknown> {
   return {

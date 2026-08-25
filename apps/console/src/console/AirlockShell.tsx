@@ -128,8 +128,37 @@ export function AirlockShell({ baseUrl, agentName }: { baseUrl: string; agentNam
     [baseUrl, agentName, store],
   );
 
+  /**
+   * The kill control.
+   *
+   * Approval stops a change before it starts; this is the only thing that stops
+   * one already running. It goes through the harness rather than the browser
+   * closing a stream, because the work is happening on an executor somewhere
+   * else — TrueForge peers the cancellation over Redis so it lands on whichever
+   * replica is actually doing it, not merely on the one that took this request.
+   */
+  const controls = useMemo(
+    () => ({
+      abort: async () => {
+        const { sessionId } = store.getSnapshot();
+        if (!sessionId) return;
+        store.noteAborting();
+        try {
+          await server.cancelSession({ sessionId });
+        } catch (error) {
+          // The turn may already have finished on its own. That is not a
+          // failure worth shouting about, but it must not leave the button
+          // stuck saying "stopping".
+          console.warn('[airlock] cancel did not land', error);
+          store.noteStreamClose();
+        }
+      },
+    }),
+    [server, store],
+  );
+
   return (
-    <HarnessProvider store={store}>
+    <HarnessProvider store={store} controls={controls}>
       <TrueForgeUI
         server={server}
         layout={AirlockConsole}

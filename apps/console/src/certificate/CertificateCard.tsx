@@ -5,6 +5,7 @@ import {
   MIN_JUSTIFICATION,
   approversFor,
   breakGlassAvailable,
+  describePostApply,
   formatMoney,
   openGate,
   sealsOutstanding,
@@ -529,6 +530,79 @@ function DriftBlock({ dossier }: { dossier: Dossier }) {
             ? `The checker reported drifted: ${String(drift.drifted)}. AIRLOCK compared the digests itself and disagreed — a claim of safety is never taken on trust.`
             : `Re-checked ${new Date(drift.checked_at).toLocaleString('en-GB', { hour12: false })}. The proof still describes the database that exists.`}
         </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What production did once the change landed.
+ *
+ * This is the Undo Certificate stopping being a permission slip. It proved the
+ * rollback works before anything was applied; this is the record of that proof
+ * being cashed in — or, when it was not needed, of production matching exactly
+ * what the certificate said it would become.
+ */
+function PostApplyBlock({ dossier }: { dossier: Dossier }) {
+  const p = dossier.post_apply;
+  if (!p.checked_at) return null;
+
+  const reverted = p.rolled_back_at !== null;
+  const healthy = p.healthy === true;
+
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <Legend>After it landed</Legend>
+        <Evidence size="xs" className={healthy ? 'text-seal' : reverted ? 'text-hazard' : 'text-fault'}>
+          {healthy ? 'healthy' : reverted ? 'rolled itself back' : 'mismatch — not reverted'}
+        </Evidence>
+      </div>
+
+      <div
+        className={cx(
+          'overflow-hidden rounded-[5px] border bg-void',
+          healthy ? 'border-seal/30' : reverted ? 'border-hazard/40' : 'border-fault/35',
+        )}
+      >
+        <div className="px-2.5 py-2">
+          {p.expected_checksum ? (
+            <div className="flex items-baseline gap-2 py-0.5">
+              <Legend className="!w-[86px] shrink-0 !text-[9px]">certificate said</Legend>
+              <Evidence size="xs" className="min-w-0 flex-1 truncate text-ink-3">
+                {p.expected_checksum}
+              </Evidence>
+            </div>
+          ) : null}
+          {p.observed_checksum ? (
+            <div className="flex items-baseline gap-2 py-0.5">
+              <Legend className="!w-[86px] shrink-0 !text-[9px]">production was</Legend>
+              <Evidence
+                size="xs"
+                className={cx('min-w-0 flex-1 truncate', healthy ? 'text-seal' : 'text-fault')}
+              >
+                {p.observed_checksum}
+              </Evidence>
+            </div>
+          ) : null}
+        </div>
+
+        <p
+          className={cx(
+            'border-t border-hairline px-2.5 py-2 text-[11px] leading-relaxed',
+            healthy ? 'text-ink-2' : reverted ? 'text-hazard' : 'text-fault',
+          )}
+        >
+          {describePostApply(dossier)}
+        </p>
+
+        {reverted ? (
+          <p className="border-t border-hairline px-2.5 py-2 text-[10.5px] leading-relaxed text-ink-3">
+            The rollback executed here is the one that was already proven against the shadow branch — the same
+            statements, in the same order, that returned it byte-for-byte. AIRLOCK will not auto-revert a change
+            whose inverse was never proven; that case raises an alarm and stops.
+          </p>
+        ) : null}
       </div>
     </div>
   );
