@@ -35,6 +35,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
  */
 const ENTRY_POINTS = [
   'packages/contract/src/connection.ts',
+  'packages/probe/src/preflight.ts',
   'packages/contract/src/shadow.ts',
   'packages/contract/src/resolve.ts',
   'packages/contract/src/gate.ts',
