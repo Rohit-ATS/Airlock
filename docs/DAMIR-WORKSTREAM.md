@@ -66,6 +66,7 @@ npm install
 npm run build --workspace @airlock/contract
 npm run seed:sqlite -- --reset
 npm run verify:sqlite -- --emit-only
+npm run verify:sqlite:failed -- --emit-only
 npm run dev --workspace @airlock/console
 ```
 
@@ -108,7 +109,9 @@ The seed is reproducible from one command and requires no external accounts. Gen
 After the schema migration works:
 
 1. data-operation verifier: intentionally detect a failed rollback and emit
-   `status: "FAILED"` with a precise `failure_reason`;
+   `status: "FAILED"` with a precise `failure_reason`. Started with
+   `npm run verify:sqlite:failed -- --emit-only`, which executes rollback SQL but
+   restores the wrong values so the checksum proof fails;
 2. erasure scope computation: enumerate records across SQLite first, then map the same
    scope shape to Postgres/Supabase and add Stripe, object storage and Slack test
    connectors;

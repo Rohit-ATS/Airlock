@@ -72,6 +72,31 @@ jobs:
           }
           NODE
 
+          AIRLOCK_DOSSIER_ID=ci_sqlite_bad_rollback node scripts/verify-sqlite-migration.mjs --emit-only --break-rollback > /tmp/airlock-ci-bad-rollback-dossier.json
+          node --input-type=module <<'NODE'
+          import { openGate } from './packages/contract/dist/index.js';
+          import { readFileSync } from 'node:fs';
+
+          const dossier = JSON.parse(readFileSync('.airlock/ci_sqlite_bad_rollback.dossier.json', 'utf8'));
+          if (dossier.certificate?.status !== 'FAILED') {
+            throw new Error(`expected FAILED certificate, got ${dossier.certificate?.status ?? 'missing'}`);
+          }
+          if (!dossier.certificate.failure_reason?.includes('post-rollback checksum')) {
+            throw new Error(`expected a precise rollback failure reason, got ${dossier.certificate.failure_reason}`);
+          }
+          if (dossier.certificate.checksums.pre === dossier.certificate.checksums.post_rollback) {
+            throw new Error('expected bad rollback to produce a checksum mismatch');
+          }
+          if (!dossier.rollback.length || !dossier.rollback.every((op) => op.proven)) {
+            throw new Error('expected rollback SQL to have executed; this test is about wrong restoration, not missing execution');
+          }
+
+          const gate = openGate(dossier, { email: 'ci-approver@airlock.dev', role: 'approver' });
+          if (gate.reason !== 'CERTIFICATE_FAILED') {
+            throw new Error(`expected gate to seal as CERTIFICATE_FAILED, got ${gate.reason}`);
+          }
+          NODE
+
       - name: Build the MCP server
         run: npm run build --workspace @airlock/mcp
 

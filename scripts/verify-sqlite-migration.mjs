@@ -19,6 +19,7 @@ const dossierId = process.env.AIRLOCK_DOSSIER_ID ?? `dos_sqlite_tier_${Date.now(
 const requestedBy = process.env.AIRLOCK_REQUESTED_BY ?? 'damir@airlock.dev';
 const keepShadow = process.env.AIRLOCK_KEEP_SHADOW === '1';
 const emitOnly = process.argv.includes('--emit-only') || !consoleUrl;
+const breakRollback = process.argv.includes('--break-rollback') || process.env.AIRLOCK_BREAK_ROLLBACK === '1';
 
 const forward = [
   'ALTER TABLE users ADD COLUMN tier TEXT;',
@@ -34,7 +35,10 @@ const forward = [
 
 const rollback = [
   'ALTER TABLE users ADD COLUMN plan_name TEXT;',
-  `UPDATE users
+  breakRollback
+    ? `UPDATE users
+      SET plan_name = '__airlock_bad_rollback__';`
+    : `UPDATE users
       SET plan_name = (
         SELECT subscriptions.legacy_plan_name
           FROM subscriptions
@@ -136,6 +140,10 @@ production.close();
 
 const verifiedAt = new Date().toISOString();
 const matched = pre !== undefined && postRollback !== undefined && pre === postRollback && productionChecksum === pre;
+const mismatchReason =
+  pre !== undefined && postRollback !== undefined
+    ? `Rollback completed, but post-rollback checksum ${postRollback} did not match pre-change checksum ${pre}.`
+    : 'The shadow database did not return to its starting checksum after rollback.';
 const certificate = failed
   ? {
       kind: 'UNDO',
@@ -153,7 +161,7 @@ const certificate = failed
       sandbox_artifact_url: `file://${path.resolve(reportPath)}`,
       ...(matched
         ? {}
-        : { failure_reason: 'The shadow database did not return to its starting checksum after rollback.' }),
+        : { failure_reason: mismatchReason }),
       verified_at: verifiedAt,
     };
 
@@ -183,6 +191,13 @@ const dossier = parseDossier({
     {
       note: 'SQLite shadow verification is the local Day 1 slice. Supabase branch lifecycle can wrap the same checksum flow once credentials are available.',
     },
+    ...(breakRollback
+      ? [
+          {
+            note: 'Negative verifier scenario: rollback SQL executed, but restored the wrong values. AIRLOCK must emit a FAILED certificate and keep the gate sealed.',
+          },
+        ]
+      : []),
   ],
   recommendation: matched ? 'APPLY' : 'BLOCK',
 });
@@ -200,6 +215,7 @@ writeFileSync(
       checksums: certificate.checksums ?? null,
       forward,
       rollback,
+      scenario: breakRollback ? 'break-rollback' : 'happy-path',
       failed: failed ? String(failed.message ?? failed) : null,
       verified_at: verifiedAt,
     },
