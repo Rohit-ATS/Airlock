@@ -114,6 +114,32 @@ export async function POST(request: Request) {
 const GITHUB_API = 'https://api.github.com';
 
 /**
+ * The repositories this webhook is willing to call the GitHub API about.
+ *
+ * Comma-separated `owner/name` in `GITHUB_REPO`, falling back to
+ * `GITHUB_REPOSITORY` — the variable GitHub Actions sets itself, so a
+ * deployment there needs no extra configuration.
+ *
+ * This exists because sanitising a value and then concatenating it into a URL
+ * is a losing game, and this route has now lost it twice: first a slug that
+ * could change host, then one that could walk the path with `..` while the
+ * origin stayed put. An allowlist ends the argument. The payload gets to say
+ * which repository it *claims* to be, and the only thing that claim can do is
+ * match an entry the operator configured, or not.
+ *
+ * Nothing is lost by requiring it: the route already refuses every request
+ * with 503 unless `GITHUB_WEBHOOK_SECRET` is set, so a webhook that is not
+ * configured was never doing anything.
+ */
+function allowedRepos(): string[] {
+  const raw = env('GITHUB_REPO') ?? env('GITHUB_REPOSITORY') ?? '';
+  return raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+/**
  * `owner` and `name`, captured separately, and nothing that can leave that shape.
  *
  * GitHub allows only alphanumerics, `-`, `_` and `.` in either half, so the
@@ -149,18 +175,28 @@ async function listChangedFiles(repo: string, number: number | undefined): Promi
    * raises the bar but does not remove the class: a valid signature is not a
    * promise that the payload is honest.
    *
-   * The defence is to stop treating the string as a URL fragment at all. It is
-   * matched, split into two named things, each checked, and the request is
-   * then built from those — and the finished URL is compared against the exact
-   * one this function is allowed to fetch.
+   * Two rounds of sanitising this value both left something behind, so the
+   * value no longer reaches the URL at all.
+   *
+   * The payload says which repository it is about. This decides whether to
+   * believe it — and what goes into the URL afterwards is the *configured*
+   * string, not the one that arrived. That is what removes the class, rather
+   * than another attempt to out-sanitise a value that is going to be
+   * concatenated anyway.
    */
-  const slug = REPO_SLUG.exec(repo);
+  const allowed = allowedRepos().find((candidate) => candidate === repo);
+  if (!allowed) return [];
+
+  // Still validated, because a typo in configuration should not be able to
+  // produce a strange URL either.
+  const slug = REPO_SLUG.exec(allowed);
   if (!slug) return [];
   const [, owner, name] = slug;
   if (DOTS_ONLY.test(owner) || DOTS_ONLY.test(name)) return [];
   if (!Number.isSafeInteger(number) || number <= 0) return [];
+  const pull = Math.trunc(number);
 
-  const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/pulls/${number}/files`;
+  const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/pulls/${pull}/files`;
   const url = new URL(path, GITHUB_API);
   url.searchParams.set('per_page', '100');
 
