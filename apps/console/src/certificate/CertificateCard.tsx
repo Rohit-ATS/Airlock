@@ -386,10 +386,14 @@ function PolicyBlock({ decision }: { decision: GateDecision }) {
       </div>
 
       <div className="overflow-hidden rounded-[5px] border border-hairline bg-void">
-        <div className="grid grid-cols-2 gap-x-4 px-2.5 py-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 px-2.5 py-2 sm:grid-cols-5">
           <PolicyCell label="certificate" value={r.requires} />
           <PolicyCell label="approvers" value={String(r.quorum)} />
           <PolicyCell label="proof valid" value={`${Math.round(r.freshness_seconds / 60)} min`} />
+          <PolicyCell
+            label="max lock"
+            value={r.max_lock_ms === null ? 'no limit' : `${(r.max_lock_ms / 1000).toFixed(2)} s`}
+          />
           <PolicyCell label="break-glass" value={r.break_glass ? 'permitted' : 'no'} />
         </div>
 
