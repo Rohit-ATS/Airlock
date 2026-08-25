@@ -97,6 +97,31 @@ jobs:
           }
           NODE
 
+          AIRLOCK_DOSSIER_ID=ci_sqlite_erasure_scope AIRLOCK_ERASURE_USER_ID=17 node scripts/verify-sqlite-erasure-scope.mjs --emit-only > /tmp/airlock-ci-erasure-scope-dossier.json
+          node --input-type=module <<'NODE'
+          import { openGate } from './packages/contract/dist/index.js';
+          import { readFileSync } from 'node:fs';
+
+          const dossier = JSON.parse(readFileSync('.airlock/ci_sqlite_erasure_scope.dossier.json', 'utf8'));
+          if (dossier.certificate?.kind !== 'SCOPE' || dossier.certificate.status !== 'PROVEN') {
+            throw new Error(`expected PROVEN SCOPE certificate, got ${dossier.certificate?.kind}/${dossier.certificate?.status}`);
+          }
+          if (!dossier.certificate.scope?.records?.length) {
+            throw new Error('expected erasure scope to list records that would be touched');
+          }
+          if (!dossier.certificate.scope?.exclusions?.length) {
+            throw new Error('expected erasure scope to list retention exclusions');
+          }
+          if (!dossier.target.systems.includes('stripe') || !dossier.target.systems.includes('slack')) {
+            throw new Error(`expected cross-system scope, got ${dossier.target.systems.join(',')}`);
+          }
+
+          const gate = openGate(dossier, { email: 'ci-approver@airlock.dev', role: 'approver' });
+          if (gate.state !== 'OPEN' || gate.grant?.irreversible !== true || gate.grant?.final !== false) {
+            throw new Error(`expected irreversible erasure gate awaiting quorum, got ${JSON.stringify(gate)}`);
+          }
+          NODE
+
       - name: Build the MCP server
         run: npm run build --workspace @airlock/mcp
 
