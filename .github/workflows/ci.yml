@@ -84,6 +84,15 @@ jobs:
       - name: No agent can write to production without holding the gate
         run: npm run check:agents
 
+      # airlock.policy.yaml is authored, not generated — a team is meant to edit
+      # it. This asserts it still resolves to exactly the shipped default, so the
+      # console enforcing one thing while the docs and tests describe another
+      # fails the build rather than surviving until someone notices. It also
+      # asserts the rules that must never exist: no change freeze on erasure,
+      # money or access, and self-approval not configurable to on.
+      - name: The policy file and the shipped default agree
+        run: npm run check:policy
+
       - name: Typecheck every workspace
         run: npm run typecheck
 
