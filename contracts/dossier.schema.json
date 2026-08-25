@@ -906,6 +906,101 @@
         }
       }
     },
+    "post_apply": {
+      "default": {
+        "checked_at": null,
+        "observed_checksum": null,
+        "expected_checksum": null,
+        "healthy": null,
+        "rolled_back_at": null,
+        "rollback_reason": null,
+        "duration_ms": null
+      },
+      "type": "object",
+      "properties": {
+        "checked_at": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_checksum": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_checksum": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "healthy": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rolled_back_at": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rollback_reason": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duration_ms": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "receipt": {
       "default": null,
       "anyOf": [
