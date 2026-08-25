@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { CHANGE_CLASS_COPY, CHANGE_CLASSES, DEFAULT_POLICY, ruleFor } from '@airlock/contract';
 import { cx } from '@/design/primitives';
-import { Band, Rise } from './Rise';
+import { Band, Reveal } from './Rise';
 import { Wordmark } from './Wordmark';
 
 /**
@@ -35,14 +35,15 @@ const STACK = [
 
 export function Stack() {
   return (
-    <section className="border-t border-[var(--lp-line)] px-6 py-10 sm:px-10">
+    <section className="px-3 pb-3 sm:px-5 sm:pb-5"><div className="lp-card px-6 py-9 sm:px-9">
       <div className="flex flex-wrap items-baseline gap-x-10 gap-y-4">
-        <span className="lp-label">Runs on</span>
+        <span className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-3)]">Runs on</span>
         {STACK.map((name) => (
           <span key={name} className="text-[15px] font-medium text-[var(--lp-ink-3)]">
             {name}
           </span>
         ))}
+      </div>
       </div>
     </section>
   );
@@ -61,7 +62,7 @@ export function RuleSection() {
       title={
         <>
           The gate is not a conditional.{' '}
-          <span className="lp-serif-em text-[var(--lp-signal-ink)]">It is a type.</span>
+          <span className="italic font-light normal-case tracking-[-0.01em] text-[var(--lp-orange-ink)]">It is a type.</span>
         </>
       }
       lede={
@@ -72,7 +73,7 @@ export function RuleSection() {
         </>
       }
     >
-      <Rise>
+      <Reveal>
         <pre className="overflow-x-auto bg-[var(--lp-void)] p-8 text-[13px] leading-relaxed sm:p-10">
           <code className="evidence">
             <span className="text-[var(--lp-pale-3)]">// packages/contract/src/gate.ts</span>
@@ -83,7 +84,7 @@ export function RuleSection() {
             <span className="text-[var(--lp-pale-2)]"> = </span>
             <span className="text-[#5fd3a6]">Symbol</span>
             <span className="text-[var(--lp-pale-2)]">(</span>
-            <span className="text-[var(--lp-signal-pale)]">&apos;airlock.gate.witness&apos;</span>
+            <span className="text-[#f2a054]">&apos;airlock.gate.witness&apos;</span>
             <span className="text-[var(--lp-pale-2)]">);</span>
             {'\n\n'}
             <span className="text-[#6ea8fe]">export interface</span>{' '}
@@ -99,7 +100,7 @@ export function RuleSection() {
             <span className="text-[var(--lp-pale-2)]">{'}'}</span>
           </code>
         </pre>
-      </Rise>
+      </Reveal>
 
       <div className="mt-16 grid gap-x-14 gap-y-12 md:grid-cols-3">
         <Point
@@ -124,13 +125,13 @@ export function RuleSection() {
 
 function Point({ n, title, body }: { n: string; title: string; body: string }) {
   return (
-    <Rise>
-      <div className="border-t border-[var(--lp-line-2)] pt-6">
-        <span className="evidence text-[12px] text-[var(--lp-signal-ink)]">{n}</span>
+    <Reveal>
+      <div className="border-t border-[var(--lp-active)] pt-6">
+        <span className="evidence text-[12px] text-[var(--lp-orange-ink)]">{n}</span>
         <h3 className="mt-4 text-[21px] leading-tight font-semibold tracking-[-0.02em]">{title}</h3>
         <p className="mt-3 text-[14.5px] leading-relaxed text-[var(--lp-ink-2)]">{body}</p>
       </div>
-    </Rise>
+    </Reveal>
   );
 }
 
@@ -147,17 +148,17 @@ export function ProofSection() {
       title={
         <>
           You cannot prove a deletion{' '}
-          <span className="lp-serif-em text-[var(--lp-signal-ink)]">reversible.</span>
+          <span className="italic font-light normal-case tracking-[-0.01em] text-[var(--lp-orange-ink)]">reversible.</span>
         </>
       }
       lede="So for the changes that genuinely cannot be undone, the agent proves the opposite thing instead — not that you can take it back, but that it knows exactly what “it” is."
     >
       <div className="grid gap-x-14 gap-y-16 lg:grid-cols-2">
-        <Rise>
+        <Reveal>
           <div>
             <div className="flex items-baseline gap-3">
               <span className="evidence text-[13px] font-semibold tracking-[0.1em] text-[#0b6349]">UNDO</span>
-              <span className="lp-label">for reversible work</span>
+              <span className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-3)]">for reversible work</span>
             </div>
             <h3 className="lp-display mt-6 text-[clamp(1.7rem,3vw,2.6rem)]">Three checksums</h3>
             <p className="mt-5 max-w-[46ch] text-[15px] leading-relaxed text-[var(--lp-ink-2)]">
@@ -176,15 +177,15 @@ export function ProofSection() {
               <span className="evidence">pre === post_rollback</span> itself, so an engine bug cannot open the door.
             </p>
           </div>
-        </Rise>
+        </Reveal>
 
-        <Rise delay={90}>
+        <Reveal delay={90}>
           <div>
             <div className="flex items-baseline gap-3">
-              <span className="evidence text-[13px] font-semibold tracking-[0.1em] text-[var(--lp-signal-ink)]">
+              <span className="evidence text-[13px] font-semibold tracking-[0.1em] text-[var(--lp-orange-ink)]">
                 SCOPE
               </span>
-              <span className="lp-label">for the irreversible</span>
+              <span className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-3)]">for the irreversible</span>
             </div>
             <h3 className="lp-display mt-6 text-[clamp(1.7rem,3vw,2.6rem)]">Exactly what dies</h3>
             <p className="mt-5 max-w-[46ch] text-[15px] leading-relaxed text-[var(--lp-ink-2)]">
@@ -203,7 +204,7 @@ export function ProofSection() {
               An exclusion with no stated reason is rejected by the contract. “We kept some things” is not a scope.
             </p>
           </div>
-        </Rise>
+        </Reveal>
       </div>
     </Band>
   );
@@ -211,12 +212,12 @@ export function ProofSection() {
 
 function Digest({ label, value, match, dim }: { label: string; value: string; match?: boolean; dim?: boolean }) {
   return (
-    <div className="flex items-baseline gap-5 border-t border-[var(--lp-line)] py-3.5 last:border-b">
-      <span className="lp-label w-[112px] shrink-0">{label}</span>
+    <div className="flex items-baseline gap-5 border-t border-[var(--lp-active)] py-3.5 last:border-b">
+      <span className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-3)] w-[112px] shrink-0">{label}</span>
       <span
         className={cx(
           'evidence min-w-0 flex-1 truncate text-[13px]',
-          dim ? 'text-[var(--lp-ink-4)]' : 'text-[var(--lp-ink)]',
+          dim ? 'text-[var(--lp-ink-3)]' : 'text-[var(--lp-ink)]',
         )}
       >
         {value}
@@ -238,11 +239,11 @@ function ScopeRow({
   count: string;
 }) {
   return (
-    <div className="flex items-baseline gap-5 border-t border-[var(--lp-line)] py-3.5 last:border-b">
+    <div className="flex items-baseline gap-5 border-t border-[var(--lp-active)] py-3.5 last:border-b">
       <span
         className={cx(
           'evidence w-[84px] shrink-0 text-[11px] tracking-[0.08em]',
-          kind === 'keep' ? 'text-[#0b6349]' : 'text-[var(--lp-signal-ink)]',
+          kind === 'keep' ? 'text-[#0b6349]' : 'text-[var(--lp-orange-ink)]',
         )}
       >
         {kind === 'keep' ? 'KEEP' : 'DESTROY'}
@@ -270,18 +271,18 @@ export function PolicySection() {
       title={
         <>
           Allowed, by whom, and{' '}
-          <span className="lp-serif-em text-[var(--lp-signal-ink)]">right now?</span>
+          <span className="italic font-light normal-case tracking-[-0.01em] text-[var(--lp-orange-ink)]">right now?</span>
         </>
       }
       lede="A certificate answers “is this change what it claims to be”. It cannot answer whether your organisation permits it — that is not a property of the change. Seven classes, each with its own rules, in a YAML file a team can argue with."
     >
-      <Rise>
+      <Reveal>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[780px] border-collapse text-left">
             <thead>
               <tr>
                 {['Class', 'Certificate', 'Approvers', 'Proof valid', 'Undo window', 'Break-glass'].map((h) => (
-                  <th key={h} className="lp-label border-b border-[var(--lp-line-2)] pb-4 font-medium">
+                  <th key={h} className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-3)] border-b border-[var(--lp-active)] pb-4 font-medium">
                     {h}
                   </th>
                 ))}
@@ -289,7 +290,7 @@ export function PolicySection() {
             </thead>
             <tbody>
               {rules.map(({ cls, rule }) => (
-                <tr key={cls} className="group border-b border-[var(--lp-line)]">
+                <tr key={cls} className="group border-b border-[var(--lp-active)]">
                   <td className="py-5 pr-6">
                     <span className="text-[16px] font-semibold tracking-[-0.015em]">
                       {CHANGE_CLASS_COPY[cls].title}
@@ -300,7 +301,7 @@ export function PolicySection() {
                       className={cx(
                         'evidence text-[12px] font-semibold tracking-[0.08em]',
                         rule.requires === 'SCOPE'
-                          ? 'text-[var(--lp-signal-ink)]'
+                          ? 'text-[var(--lp-orange-ink)]'
                           : rule.requires === 'UNDO'
                             ? 'text-[#0b6349]'
                             : 'text-[var(--lp-ink-3)]',
@@ -315,29 +316,29 @@ export function PolicySection() {
                   </td>
                   <td className="evidence py-5 pr-6 text-[14px] text-[var(--lp-ink-2)]">
                     {rule.undo_window_seconds === null ? (
-                      <span className="text-[var(--lp-ink-4)]">none</span>
+                      <span className="text-[var(--lp-ink-3)]">none</span>
                     ) : (
                       `${Math.round(rule.undo_window_seconds / 60)} min`
                     )}
                   </td>
                   <td className="py-5 text-[14px] text-[var(--lp-ink-2)]">
-                    {rule.break_glass ? 'permitted' : <span className="text-[var(--lp-ink-4)]">no</span>}
+                    {rule.break_glass ? 'permitted' : <span className="text-[var(--lp-ink-3)]">no</span>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </Rise>
+      </Reveal>
 
-      <Rise delay={80}>
+      <Reveal delay={80}>
         <p className="mt-10 max-w-[70ch] text-[14px] leading-relaxed text-[var(--lp-ink-3)]">
           Note what is deliberately <em className="not-italic text-[var(--lp-ink-2)]">absent</em>: there is no change
           freeze on erasure, money movement or access grants. A freeze that blocks a right-to-erasure request trades a
           legal problem for an operational one. That absence is asserted in the test suite, so it cannot be quietly
           reversed.
         </p>
-      </Rise>
+      </Reveal>
     </Band>
   );
 }
@@ -354,7 +355,7 @@ export function AfterSection() {
       title={
         <>
           The proof has a{' '}
-          <span className="lp-serif-em text-[var(--lp-signal-ink)]">second life.</span>
+          <span className="italic font-light normal-case tracking-[-0.01em] text-[var(--lp-orange-ink)]">second life.</span>
         </>
       }
       lede="Having demonstrated the inverse once, the system can offer something almost nothing else can: a one-press undo on a production database, for as long as it is willing to vouch for that demonstration."
@@ -377,13 +378,13 @@ export function AfterSection() {
         />
       </div>
 
-      <Rise delay={100}>
+      <Reveal delay={100}>
         <p className="mt-16 max-w-[74ch] text-[clamp(1.05rem,1.7vw,1.45rem)] leading-[1.5] text-[var(--lp-ink)]">
           <strong className="font-semibold">The refusal is the feature.</strong> AIRLOCK will only auto-revert a
           rollback it has proof of. Running an untested inverse against a database already in an unexpected state is
           how a bad afternoon becomes a bad quarter — so that case stops and gets a human.
         </p>
-      </Rise>
+      </Reveal>
     </Band>
   );
 }
@@ -401,19 +402,20 @@ const NUMBERS = [
 
 export function NumbersSection() {
   return (
-    <section className="border-t border-[var(--lp-line)] px-6 py-24 sm:px-10 md:py-32">
+    <section className="px-3 pb-3 sm:px-5 sm:pb-5"><div className="lp-card px-6 py-20 sm:px-9">
       <div className="grid gap-x-10 gap-y-14 sm:grid-cols-2 lg:grid-cols-4">
         {NUMBERS.map((n, i) => (
-          <Rise key={n.label} delay={i * 70}>
-            <div className="border-t border-[var(--lp-line-2)] pt-6">
+          <Reveal key={n.label} delay={i * 70}>
+            <div className="border-t border-[var(--lp-active)] pt-6">
               <div className="evidence text-[clamp(3rem,6.5vw,5rem)] leading-[0.82] font-bold tracking-[-0.05em]">
                 {n.value}
               </div>
               <div className="mt-5 text-[15px] font-semibold tracking-[-0.01em]">{n.label}</div>
               <div className="mt-1.5 text-[13px] text-[var(--lp-ink-3)]">{n.note}</div>
             </div>
-          </Rise>
+          </Reveal>
         ))}
+      </div>
       </div>
     </section>
   );
@@ -427,11 +429,11 @@ export function Closing() {
   return (
     <section className="relative overflow-hidden border-t border-[var(--lp-line-dark)] bg-[var(--lp-void)] px-6 pt-28 pb-0 text-[var(--lp-pale)] sm:px-10 md:pt-40">
       <div className="mx-auto max-w-[1100px] text-center">
-        <Rise>
-          <span className="lp-label !text-[var(--lp-pale-3)]">07 / 07</span>
+        <Reveal>
+          <span className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-3)] !text-[var(--lp-pale-3)]">07 / 07</span>
           <h2 className="lp-display mx-auto mt-8 max-w-[16ch] text-[clamp(2.4rem,7.5vw,6.4rem)]">
             Build the agent you would{' '}
-            <span className="lp-serif-em text-[var(--lp-signal-pale)]">trust with root</span>
+            <span className="italic font-light normal-case tracking-[-0.01em] text-[#f2a054]">trust with root</span>
           </h2>
           <p className="mx-auto mt-9 max-w-[58ch] text-[clamp(1rem,1.4vw,1.2rem)] leading-relaxed text-[var(--lp-pale-2)]">
             AIRLOCK is the literal answer — an agent that behaves as though it is{' '}
@@ -441,7 +443,7 @@ export function Closing() {
           <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-4">
             <Link
               href="/console"
-              className="group inline-flex items-center gap-3 bg-[var(--lp-pale)] px-9 py-4.5 text-[14px] font-medium text-[var(--lp-void)] transition-colors hover:bg-[var(--lp-signal)] hover:text-white"
+              className="group inline-flex items-center gap-3 bg-[var(--lp-pale)] px-9 py-4.5 text-[14px] font-medium text-[var(--lp-void)] transition-colors hover:bg-[var(--lp-orange)] hover:text-white"
             >
               Open the console
               <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden className="transition-transform duration-300 group-hover:translate-x-1">
@@ -455,7 +457,7 @@ export function Closing() {
               See the control room
             </Link>
           </div>
-        </Rise>
+        </Reveal>
       </div>
 
       {/* The wordmark, bled off the bottom edge. */}
@@ -499,10 +501,10 @@ const FOOTER: Array<{ heading: string; items: Array<{ label: string; href: strin
 
 export function Footer() {
   return (
-    <footer className="border-t border-[var(--lp-line-dark)] bg-[var(--lp-void-2)] px-6 py-20 text-[var(--lp-pale)] sm:px-10">
+    <footer className="border-t border-[var(--lp-line-dark)] bg-[var(--lp-void)] px-6 py-20 text-[var(--lp-pale)] sm:px-10">
       <div className="grid gap-x-14 gap-y-12 lg:grid-cols-[1.5fr_repeat(3,1fr)]">
         <div>
-          <div className="lp-display text-[22px] tracking-[-0.03em]">AIRLOCK</div>
+          <div className="lp-display text-[22px] tracking-[-0.03em] text-[var(--lp-pale)]">AIRLOCK</div>
           <p className="mt-6 max-w-[40ch] text-[14px] leading-relaxed text-[var(--lp-pale-2)]">
             Nothing reaches production without passing through the airlock. Built on TrueForge for the Agent Harness
             Hackathon, 24–30 August 2026.
@@ -515,7 +517,7 @@ export function Footer() {
 
         {FOOTER.map((group) => (
           <div key={group.heading}>
-            <span className="lp-label !text-[var(--lp-pale-3)]">{group.heading}</span>
+            <span className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-3)] !text-[var(--lp-pale-3)]">{group.heading}</span>
             <ul className="mt-5 space-y-3">
               {group.items.map((item) => (
                 <li key={item.label}>

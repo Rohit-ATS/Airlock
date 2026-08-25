@@ -2,7 +2,7 @@
 
 import { GateDemo } from './GateDemo';
 import { LedgerDemo } from './LedgerDemo';
-import { Band, Hero, Nav } from './Rise';
+import { Band, Hero } from './Rise';
 import {
   AfterSection,
   Closing,
@@ -31,7 +31,6 @@ import {
 export function Landing() {
   return (
     <div className="lp min-h-screen">
-      <Nav />
       <Hero />
       <Stack />
 
