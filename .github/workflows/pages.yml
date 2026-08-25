@@ -34,8 +34,10 @@ jobs:
       - name: Build shared contract
         run: npm run build --workspace @airlock/contract
 
-      - name: Disable server API routes for static Pages export
-        run: mv apps/console/app/api apps/console/api.disabled
+      - name: Disable server routes for static Pages export
+        run: |
+          mv apps/console/app/api apps/console/api.disabled
+          mv apps/console/app/harness apps/console/harness.disabled
 
       - name: Build static console for GitHub Pages
         env:

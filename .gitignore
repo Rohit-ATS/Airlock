@@ -22,3 +22,6 @@ data/*.sqlite-*
 
 # A local TrueForge checkout, if you clone one here to run the harness.
 trueforge/
+
+# Local harness env (contains no secrets, but is machine-specific).
+harness/.env
