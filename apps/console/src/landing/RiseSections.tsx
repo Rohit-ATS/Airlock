@@ -238,7 +238,7 @@ function Digest({ label, value, match, dim }: { label: string; value: string; ma
       >
         {value}
       </span>
-      {match ? <span className="text-[13px] font-semibold text-[#0f7a5a]">match</span> : null}
+      {match ? <span className="text-[13px] font-semibold text-[#0b6349]">match</span> : null}
     </div>
   );
 }
@@ -259,7 +259,7 @@ function ScopeRow({
       <span
         className={cx(
           'evidence w-[74px] shrink-0 text-[11px]',
-          kind === 'keep' ? 'text-[#0f7a5a]' : 'text-[var(--lp-signal-ink)]',
+          kind === 'keep' ? 'text-[#0b6349]' : 'text-[var(--lp-signal-ink)]',
         )}
       >
         {kind === 'keep' ? 'KEEP' : 'DESTROY'}
