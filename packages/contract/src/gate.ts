@@ -37,6 +37,7 @@ import type { Certificate, CertificateKind, Dossier } from './dossier.js';
 import { approversFor } from './dossier.js';
 import { reviewBlocks } from './review.js';
 import { contextDrifted, contextRecheckMissing, contextUnresolved } from './resolve.js';
+import { overclaimsRollback } from './shadow.js';
 import {
   DEFAULT_POLICY,
   evaluatePolicy,
@@ -89,6 +90,7 @@ export type SealReason =
   | 'SCOPE_NOT_COMPUTED'
   | 'SCOPE_UNBOUNDED'
   | 'ROLLBACK_NOT_PROVEN'
+  | 'STRATEGY_CANNOT_PROVE'
   | 'REVIEW_OUTSTANDING'
   | 'PRODUCTION_DRIFTED'
   | 'INJECTION_DETECTED'
@@ -124,6 +126,8 @@ export const SEAL_COPY: Record<SealReason, string> = {
   SCOPE_NOT_COMPUTED: 'A scope certificate was claimed without a computed blast radius.',
   SCOPE_UNBOUNDED: 'The scope certificate lists no records and no exclusions, so its blast radius is unbounded.',
   ROLLBACK_NOT_PROVEN: 'At least one rollback operation was never executed against the shadow branch.',
+  STRATEGY_CANNOT_PROVE:
+    'This certificate claims a proven rollback, but the way its shadow copy was obtained could not have observed one. Schema was read from the live database; no rows were copied and nothing was executed. A rollback nobody ran is not a rollback anybody proved.',
   REVIEW_OUTSTANDING:
     'This change carries code the agent wrote, and an independent reviewer has either not looked at it or raised findings nobody has addressed. A migration proven reversible, attached to code that still dereferences the column it removes, is a proof of the wrong thing.',
   PRODUCTION_DRIFTED:
@@ -248,6 +252,19 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
   if (cert.status === 'FAILED') return sealed('CERTIFICATE_FAILED');
 
   /* --- 5. does the proof actually hold? ---------------------------------- */
+  //
+  // Before the checksums, because a checksum triple is only meaningful if
+  // something executed to produce it. Under SCHEMA_ONLY no rows were ever
+  // copied, so three matching digests would be three readings of the same
+  // untouched schema — internally consistent and evidence of nothing.
+  //
+  // Enforced here as well as at construction time for the same reason the gate
+  // recomputes `pre === post_rollback` rather than reading `match`: it does not
+  // trust an upstream component to have been careful.
+  if (overclaimsRollback(cert.kind, cert.shadow_strategy)) {
+    return sealed('STRATEGY_CANNOT_PROVE');
+  }
+
   if (cert.kind === 'UNDO') {
     const c = cert.checksums;
     if (!c) return sealed('CHECKSUM_MISSING');
@@ -514,6 +531,7 @@ const BLOCKED_LABEL: Record<SealReason, string> = {
   CHECKSUM_MISSING: 'BLOCKED — NOTHING TO VERIFY',
   CHECKSUM_MISMATCH: 'BLOCKED — THE DATA DID NOT COME BACK',
   ROLLBACK_NOT_PROVEN: 'BLOCKED — ROLLBACK NEVER EXECUTED',
+  STRATEGY_CANNOT_PROVE: 'BLOCKED — NOTHING RAN AGAINST REAL ROWS',
   REVIEW_OUTSTANDING: 'BLOCKED — THE CODE HAS NOT BEEN REVIEWED',
   SCOPE_NOT_COMPUTED: 'BLOCKED — SCOPE NOT COMPUTED',
   SCOPE_UNBOUNDED: 'BLOCKED — BLAST RADIUS UNBOUNDED',

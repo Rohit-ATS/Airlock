@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { INJECTION_KINDS, UNTRUSTED_SOURCES } from './quarantine.js';
 import { REVIEW_PROVIDERS, REVIEW_SEVERITIES } from './review.js';
 import { RESOLUTION_STATUSES, RESOLUTION_TRUST } from './resolve.js';
+import { SHADOW_STRATEGIES } from './shadow.js';
 import type { InjectionFinding } from './quarantine.js';
 
 /**
@@ -217,6 +218,16 @@ export const Certificate = z.object({
    * second sentence stops being true while the first still looks fine.
    */
   context_fingerprint: z.string().optional(),
+  /**
+   * How a copy of real data was obtained to prove this change.
+   *
+   * Recorded on the certificate rather than on the connection because it is a
+   * property of THIS proof: the same database can yield a different strategy
+   * next week, when a table has grown past the restore ceiling or a sandbox has
+   * been configured. A reader asking "what was this actually run against" is
+   * asking about the run, not about the connection.
+   */
+  shadow_strategy: z.enum(SHADOW_STRATEGIES).optional(),
 });
 export type Certificate = z.infer<typeof Certificate>;
 
