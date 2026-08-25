@@ -27,6 +27,8 @@
     "gen:policy": "node scripts/gen-policy.mjs",
     "check:agents": "node scripts/check-agents.mjs",
     "check:a11y": "node scripts/check-a11y.mjs",
+    "seed:sqlite": "node scripts/seed-sqlite.mjs",
+    "verify:sqlite": "npm run build --workspace @airlock/contract && node scripts/verify-sqlite-migration.mjs",
     "register:agent": "node scripts/register-agent.mjs"
   },
   "overrides": {

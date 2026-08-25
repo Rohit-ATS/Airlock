@@ -1,0 +1,62 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22.14'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build shared contract
+        run: npm run build --workspace @airlock/contract
+
+      - name: Disable server API routes for static Pages export
+        run: mv apps/console/app/api apps/console/api.disabled
+
+      - name: Build static console for GitHub Pages
+        env:
+          GITHUB_PAGES: 'true'
+          NEXT_PUBLIC_TRUEFORGE_BASE_URL: ''
+        run: npm run build --workspace @airlock/console
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: apps/console/out
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
