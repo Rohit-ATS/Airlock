@@ -36,7 +36,7 @@ export function Wordmark({
   text = 'AIRLOCK',
   className,
   /** Rounded corners on each pixel. 0 is a hard square. */
-  radius = 0.5,
+  radius = 0,
   opacity = 1,
 }: {
   text?: string;
@@ -68,7 +68,10 @@ export function Wordmark({
     >
       <g className="lp-wordmark">
         {cells.map((c) => (
-          <rect key={`${c.x}-${c.y}`} x={c.x} y={c.y} width={1} height={1} rx={radius * 0.5} />
+          // Slightly over 1 unit so adjacent pixels butt together. At exactly
+          // 1 the renderer leaves a hairline seam and the glyphs read as
+          // dotted instead of solid, which is the whole look.
+          <rect key={`${c.x}-${c.y}`} x={c.x} y={c.y} width={1.04} height={1.04} rx={radius} />
         ))}
       </g>
     </svg>

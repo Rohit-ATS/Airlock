@@ -2,7 +2,8 @@
 
 import { GateDemo } from './GateDemo';
 import { LedgerDemo } from './LedgerDemo';
-import { Band, Hero } from './Rise';
+import { Band } from './Rise';
+import { Hero } from './Hero';
 import {
   AfterSection,
   Closing,
