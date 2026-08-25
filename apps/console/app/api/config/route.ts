@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { airlockAgentName, breakGlassEnabled, envSource, trueforgeBaseUrl } from '@/data/env';
+import { activePolicy } from '@/data/policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,10 @@ export async function GET() {
     trueforgeBaseUrl: trueforgeBaseUrl(),
     agentName: airlockAgentName(),
     breakGlassEnabled: breakGlassEnabled(),
+    // The run budget, straight from `airlock.policy.yaml`. The console needs it
+    // to enforce, and it is the same document the gate reads — a ceiling that
+    // lived only in the browser would be a ceiling nobody could audit.
+    budget: activePolicy().budget,
     // Which .env this process actually read. Present because the absence of
     // this line cost an hour: a console pointed at the wrong port looks
     // identical to a console pointed at the right one until something fails.

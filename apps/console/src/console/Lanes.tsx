@@ -174,7 +174,10 @@ export function SandboxLog({ collapsed, onToggle }: { collapsed: boolean; onTogg
             </p>
           ) : (
             run.sandboxLog.map((line, i) => (
-              <div key={i} className="flex gap-2 py-[1px]">
+              // `data-step-id` is the anchor a traced figure on the certificate
+              // scrolls to. Same id the harness ledger stamps on a capability
+              // proof, so a number and the line that produced it can be joined.
+              <div key={i} data-step-id={line.stepId ?? undefined} className="log-line flex gap-2 py-[1px]">
                 <Evidence size="xs" className="shrink-0 text-ink-4">
                   {new Date(line.at).toLocaleTimeString('en-GB', { hour12: false })}
                 </Evidence>

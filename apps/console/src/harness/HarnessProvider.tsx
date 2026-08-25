@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useMemo, useRef, useSyncExternalStore, type ReactNode } from 'react';
+import type { StopCause } from '@airlock/contract';
 import { RunStore, type RunState } from './store';
 
 const StoreCtx = createContext<RunStore | null>(null);
@@ -14,8 +15,14 @@ const StoreCtx = createContext<RunStore | null>(null);
  * cancel one.
  */
 export interface RunControls {
-  /** Cancel the turn in flight. Peered across replicas by the harness. */
-  abort: () => Promise<void>;
+  /**
+   * Cancel the turn in flight. Peered across replicas by the harness.
+   *
+   * `cause` is recorded rather than inferred. A cancelled turn looks identical
+   * whether a person pressed the button or a ceiling was reached, and those are
+   * very different things to find in a log afterwards.
+   */
+  abort: (cause?: StopCause) => Promise<void>;
 }
 
 const ControlsCtx = createContext<RunControls | null>(null);

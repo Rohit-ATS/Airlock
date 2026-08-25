@@ -83,9 +83,9 @@
     "applied_by": "sam.okafor@airlock.dev"
   },
   "receipt": {
-    "seq": 3,
-    "prev_hash": "sha256:359ee55856e0f63436add30a19539691f115eebc753b2b3ac16da7b92f1e193b",
-    "hash": "sha256:182d3338aa0e5ddc8464d4d2a19af0209fe3dce1bdf47dfd4a08569da575569e",
+    "seq": 4,
+    "prev_hash": "sha256:af362e232183590eb0ea75fdf705e49fdadcab8b969a8084dd6a0588c51f234f",
+    "hash": "sha256:b871960aedb78a87e5c78809aa2fe53039ffb9382bb362c5548c163e7f372231",
     "sealed_at": "2026-08-23T10:20:00Z"
   },
   "dossier_id": "dos_email_unique",

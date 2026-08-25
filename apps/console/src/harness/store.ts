@@ -7,7 +7,16 @@
  * server contract, and keeps a high-frequency stream from re-rendering the
  * whole console on every token delta.
  */
-import { HarnessLedger, type HarnessEvent, type RawEvent } from '@airlock/contract';
+import {
+  DEFAULT_POLICY,
+  HarnessLedger,
+  assessBudget,
+  type BudgetPolicy,
+  type BudgetVerdict,
+  type HarnessEvent,
+  type RawEvent,
+  type StopCause,
+} from '@airlock/contract';
 
 export interface LaneState {
   threadId: string;
@@ -26,6 +35,16 @@ export interface SandboxLine {
   at: string;
   text: string;
   kind: 'tool' | 'result' | 'system';
+  /**
+   * The TrueForge event id this line was produced from.
+   *
+   * This is what makes a figure on the certificate clickable. A capability lamp
+   * and a log line derived from the same event carry the same id, so pressing
+   * "4.2s lock" can scroll the log to the line that produced it rather than
+   * gesturing vaguely at a panel. Null when the harness sent no id — which is
+   * rendered as "no anchor" rather than papered over with a guess.
+   */
+  stepId: string | null;
 }
 
 export interface RunState {
@@ -55,6 +74,15 @@ export interface RunState {
    * broken and one that is visibly working.
    */
   aborting: boolean;
+  /**
+   * Why the run stopped, when it did.
+   *
+   * A cancelled turn is otherwise indistinguishable from one a person
+   * cancelled, and those are very different facts to find in a log a week
+   * later: one is an operator making a judgement call, the other is a ceiling
+   * nobody has raised yet.
+   */
+  stopCause: StopCause | null;
 }
 
 function emptyRun(): RunState {
@@ -76,6 +104,7 @@ function emptyRun(): RunState {
     lastEventAt: null,
     reconnects: 0,
     aborting: false,
+    stopCause: null,
   };
 }
 
@@ -107,6 +136,8 @@ export class RunStore {
 
   reset(startedBy: RunState['startedBy'] = 'ui') {
     this.state = { ...emptyRun(), startedBy };
+    // A new run gets the whole budget. The ceiling is per run, not per session.
+    this.breached = false;
     for (const fn of this.listeners) fn();
   }
 
@@ -124,8 +155,59 @@ export class RunStore {
   }
 
   /** A human pressed ABORT; the harness has not confirmed yet. */
-  noteAborting() {
-    this.commit({ aborting: true });
+  noteAborting(cause: StopCause = 'human') {
+    this.commit({ aborting: true, stopCause: cause });
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* The budget cap                                                           */
+  /* ------------------------------------------------------------------------ */
+
+  private budget: BudgetPolicy = DEFAULT_POLICY.budget;
+  private onBreach: ((verdict: BudgetVerdict) => void) | null = null;
+  private breached = false;
+
+  /**
+   * Install the ceiling and the thing to do about it.
+   *
+   * The handler is injected rather than imported because the store must not
+   * know how to talk to the harness — the cancel call belongs to the shell,
+   * which owns the server adapter. Keeping the store ignorant of transport is
+   * also what lets the budget be tested without a network.
+   */
+  configureBudget(budget: BudgetPolicy, onBreach: (verdict: BudgetVerdict) => void) {
+    this.budget = budget;
+    this.onBreach = onBreach;
+  }
+
+  /** Where this run stands. The same computation the badge renders. */
+  budgetVerdict(): BudgetVerdict {
+    return assessBudget({ usd: this.state.costUsd, tokens: this.state.tokens.total }, this.budget);
+  }
+
+  /**
+   * Stop the run if it has reached its ceiling.
+   *
+   * Fires once per run — `breached` is not a debounce but a correctness
+   * requirement: cost arrives on every `turn.done`, and without it a run that
+   * ends over budget would issue a cancel for each subsequent event.
+   *
+   * A run that is already finished is not cancelled. Reaching the ceiling on
+   * the final event of a completed turn is a fact to report, not a turn to kill
+   * — and issuing a cancel against a finished session would produce an error
+   * that looks like the budget failing when it did exactly its job.
+   */
+  private enforceBudget() {
+    if (this.breached) return;
+    const verdict = this.budgetVerdict();
+    if (!verdict.shouldStop) return;
+
+    this.breached = true;
+    const live = this.state.status === 'running' || this.state.status === 'paused';
+    if (!live) return;
+
+    this.commit({ aborting: true, stopCause: 'budget' });
+    this.onBreach?.(verdict);
   }
 
   /**
@@ -156,6 +238,9 @@ export class RunStore {
     const type = event.type;
     const at = str(pick(event, 'createdAt', 'created_at')) ?? new Date().toISOString();
     const threadId = str(pick(event, 'threadId', 'thread_id')) ?? null;
+    // The same id the harness ledger stamps onto a capability proof, so a claim
+    // on the certificate and the log line behind it can be joined.
+    const stepId = str(event.id) ?? null;
     const next: Partial<RunState> = { lastEventAt: at };
 
     switch (type) {
@@ -181,7 +266,7 @@ export class RunStore {
         next.sandboxId = id;
         next.sandboxLog = [
           ...this.state.sandboxLog,
-          { at, kind: 'system', text: `sandbox provisioned${id ? ` · ${id}` : ''}` },
+          { at, kind: 'system', text: `sandbox provisioned${id ? ` · ${id}` : ''}`, stepId },
         ];
         break;
       }
@@ -243,7 +328,7 @@ export class RunStore {
             const server = str(pick(info, 'serverName', 'server_name')) ?? null;
             const id = str(call.id) ?? name;
             laneAdds.push({ id, name, server, at });
-            logged.push({ at, kind: 'tool', text: `${server ? `${server}·` : ''}${name}` });
+            logged.push({ at, kind: 'tool', text: `${server ? `${server}·` : ''}${name}`, stepId });
           }
           if (threadId) {
             const base = next.lanes ?? this.state.lanes;
@@ -263,6 +348,7 @@ export class RunStore {
             at,
             kind: 'result',
             text: content.length > 220 ? `${content.slice(0, 220)}…` : content,
+            stepId,
           };
           next.sandboxLog = [...(next.sandboxLog ?? this.state.sandboxLog), line].slice(-400);
         }
@@ -333,6 +419,11 @@ export class RunStore {
     }
 
     this.commit(next);
+
+    // Checked after the commit, so the ceiling is evaluated against the spend
+    // the console is actually displaying rather than the one it is about to.
+    this.enforceBudget();
+
     if (fresh.length > 0) this.flash(fresh[fresh.length - 1]!.capability);
   }
 }

@@ -251,6 +251,25 @@ export interface DetachedReceipt {
   issued_at: string;
   receipt: Receipt;
   body: Record<string, unknown>;
+  /**
+   * Later facts about the same change: the health check, and any undo.
+   *
+   * These are **not covered by the hash**, and that is not an oversight — it
+   * falls straight out of what a receipt is. The hash seals a decision and the
+   * evidence it was taken on, at the instant it was taken. What production did
+   * twenty minutes afterwards cannot be inside that seal without re-sealing a
+   * sealed record, which is the exact thing this chain exists to prevent.
+   *
+   * But omitting them would be worse. An auditor handed one file for a change
+   * that was applied and then taken back must not read a document that says
+   * only "approved and applied" — technically true, and misleading in the one
+   * way that matters. So they travel alongside, labelled as unsealed, and
+   * `verifyDetached` says which half it actually verified.
+   */
+  annotations: {
+    post_apply: Dossier['post_apply'];
+    undo: Dossier['undo'];
+  };
 }
 
 export function detach(dossier: Dossier, issuedAt?: string): DetachedReceipt | null {
@@ -260,6 +279,10 @@ export function detach(dossier: Dossier, issuedAt?: string): DetachedReceipt | n
     issued_at: issuedAt ?? new Date().toISOString(),
     receipt: dossier.receipt,
     body: receiptBody(dossier),
+    annotations: {
+      post_apply: dossier.post_apply,
+      undo: dossier.undo,
+    },
   };
 }
 
@@ -268,6 +291,12 @@ export interface DetachedVerdict {
   recomputed: string;
   claimed: string;
   message: string;
+  /**
+   * What the hash did *not* cover, named rather than left for the reader to
+   * notice. A verdict that says "verified" about a document containing unsealed
+   * fields, without saying which, is a verdict that overstates itself.
+   */
+  unsealed: string[];
 }
 
 /** Verify a detached receipt on its own, with nothing else present. */
@@ -276,12 +305,26 @@ export async function verifyDetached(input: DetachedReceipt): Promise<DetachedVe
     canonicalJson({ seq: input.receipt.seq, prev: input.receipt.prev_hash, body: input.body }),
   );
   const ok = recomputed === input.receipt.hash;
+
+  // Only report an annotation as unsealed when it actually carries something.
+  // Listing empty fields would train a reader to skim the warning.
+  const unsealed: string[] = [];
+  if (input.annotations?.post_apply?.checked_at) unsealed.push('post_apply');
+  if (input.annotations?.undo?.undone_at) unsealed.push('undo');
+
+  const caveat =
+    unsealed.length > 0
+      ? ` This document also carries later facts about the change (${unsealed.join(', ')}) which are outside the seal and were not verified by this check.`
+      : '';
+
   return {
     ok,
     recomputed,
     claimed: input.receipt.hash,
-    message: ok
-      ? 'The receipt matches its contents. This record has not been altered since it was sealed.'
-      : 'The receipt does not match its contents. This record has been altered since it was sealed.',
+    unsealed,
+    message:
+      (ok
+        ? 'The receipt matches its contents. This record has not been altered since it was sealed.'
+        : 'The receipt does not match its contents. This record has been altered since it was sealed.') + caveat,
   };
 }

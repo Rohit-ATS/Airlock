@@ -10,7 +10,7 @@ import {
   ToasterProvider,
 } from '@truefoundry/trueforge-ui';
 import type { ApprovalGrant, Dossier, Viewer } from '@airlock/contract';
-import { CAPABILITY_TOTAL } from '@airlock/contract';
+import { CAPABILITY_TOTAL, formatUsd } from '@airlock/contract';
 import { Chip, Dot, Empty, Evidence, Legend, cx } from '@/design/primitives';
 import { HarnessCounter, HarnessPanel } from '@/harness/HarnessPanel';
 import { useRun, useRunControls, useRunStore } from '@/harness/HarnessProvider';
@@ -82,11 +82,56 @@ function StatusReadout() {
     cancelled: { tone: 'neutral', label: 'cancelled' },
   } as const;
   const s = map[run.status];
+
+  // A cancelled run says *why*. "Cancelled" alone leaves an operator wondering
+  // whether a colleague stopped it or a ceiling did, and those want different
+  // responses.
+  const label =
+    run.status === 'cancelled' && run.stopCause === 'budget' ? 'stopped — over budget' : s.label;
+
   return (
     <div className="flex items-center gap-1.5">
       <Dot tone={s.tone} pulse={run.status === 'running' || run.status === 'paused'} />
-      <span className="text-[11px] text-ink-2">{s.label}</span>
+      <span className="text-[11px] text-ink-2">{label}</span>
     </div>
+  );
+}
+
+/**
+ * The run budget.
+ *
+ * Shown from the moment a run starts spending, not only once it is in trouble —
+ * a meter that appears when you are already over is an alarm, and this is meant
+ * to be a gauge. Goes amber at the warning threshold and red at the ceiling,
+ * using the one alarm colour the design system permits.
+ *
+ * A budget set to observe rather than enforce is labelled as such. Rendering
+ * the two identically would let a team believe they had a cap when what they
+ * had was a number.
+ */
+function BudgetReadout() {
+  const run = useRun();
+  const store = useRunStore();
+
+  const verdict = store.budgetVerdict();
+  if (verdict.state === 'UNCAPPED') return null;
+  if (run.costUsd === 0 && run.tokens.total === 0) return null;
+
+  const tone = verdict.state === 'EXCEEDED' ? 'fault' : verdict.state === 'WARNING' ? 'hazard' : 'neutral';
+  const advisory = verdict.state === 'EXCEEDED' && !verdict.shouldStop;
+
+  return (
+    <Chip
+      tone={tone}
+      mono
+      className="!text-[9.5px]"
+      title={`${verdict.message}${advisory ? ' This budget observes rather than enforces.' : ''}`}
+    >
+      {formatUsd(run.costUsd)}
+      <span className="text-ink-4">/</span>
+      {Math.round(verdict.fraction * 100)}%
+      {advisory ? <span className="text-ink-3">observe</span> : null}
+    </Chip>
   );
 }
 
@@ -142,6 +187,7 @@ function Topbar({ viewer, onToggleHarness }: { viewer: Viewer; onToggleHarness: 
       <div className="mx-1 h-5 w-px bg-hairline" />
       <StatusReadout />
       <AbortControl />
+      <BudgetReadout />
 
       {run.connectors.length > 0 ? (
         <div className="hidden items-center gap-1.5 lg:flex">
@@ -459,6 +505,22 @@ function ConsoleBody({ className }: { className?: string }) {
     [post, selected],
   );
 
+  /**
+   * Take an applied change back.
+   *
+   * Posted rather than decided here, because the window is the server's to
+   * judge: it re-derives it from when the change landed, on its own clock, and
+   * refuses a press that arrives late however much time the countdown appeared
+   * to have left.
+   */
+  const onUndo = useCallback(
+    (reason: string) => {
+      if (!selected) return;
+      void post(`/api/dossiers/${selected.dossier_id}/undo`, { reason });
+    },
+    [post, selected],
+  );
+
   const startExample = useCallback((prompt: string) => {
     setStarted(true);
     // Hand the prompt to the composer the SDK owns, rather than posting a turn
@@ -488,6 +550,7 @@ function ConsoleBody({ className }: { className?: string }) {
       onApprove={onApprove}
       onReject={onReject}
       onBreakGlass={onBreakGlass}
+      onUndo={onUndo}
       breakGlassEnabled={breakGlassEnabled}
       busy={busy}
       className="max-h-full"
