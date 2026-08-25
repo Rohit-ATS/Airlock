@@ -13,7 +13,7 @@ import type { ApprovalGrant, Dossier, Viewer } from '@airlock/contract';
 import { CAPABILITY_TOTAL } from '@airlock/contract';
 import { Chip, Dot, Empty, Evidence, Legend, cx } from '@/design/primitives';
 import { HarnessCounter, HarnessPanel } from '@/harness/HarnessPanel';
-import { useRun, useRunStore } from '@/harness/HarnessProvider';
+import { useRun, useRunControls, useRunStore } from '@/harness/HarnessProvider';
 import { CertificateCard } from '@/certificate/CertificateCard';
 import { Wordmark } from './Mark';
 import { Lanes, SandboxLog } from './Lanes';
@@ -90,6 +90,46 @@ function StatusReadout() {
   );
 }
 
+/**
+ * The kill control.
+ *
+ * The brief AIRLOCK answers names three failures: the agent cannot reach your
+ * tools, cannot run its own code safely, and cannot be stopped before it does
+ * damage. An approval gate covers the third only in the sense that it stops a
+ * change before it starts. This is the part that stops one already running.
+ *
+ * It is deliberately the only red control in the console. It is present only
+ * while something is genuinely in flight — a stop button on an idle run is
+ * furniture, and furniture is what people learn to ignore.
+ */
+function AbortControl() {
+  const run = useRun();
+  const controls = useRunControls();
+
+  const running = run.status === 'running' || run.status === 'paused';
+  if (!running || !controls) return null;
+
+  return (
+    <button
+      onClick={() => void controls.abort()}
+      disabled={run.aborting}
+      title="Cancel the turn in flight. The harness peers the cancellation to whichever replica is doing the work."
+      className={cx(
+        'inline-flex h-8 items-center gap-1.5 rounded-[4px] border px-2.5 text-[11.5px] font-semibold tracking-[0.08em] transition-colors',
+        run.aborting
+          ? 'cursor-wait border-hairline-2 bg-raised-2 text-ink-3'
+          : 'border-fault/55 bg-fault-bg text-fault hover:brightness-125',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cx('size-2 rounded-[1px]', run.aborting ? 'bg-ink-3 breathe' : 'bg-fault')}
+      />
+      {run.aborting ? 'STOPPING…' : 'ABORT'}
+    </button>
+  );
+}
+
 function Topbar({ viewer, onToggleHarness }: { viewer: Viewer; onToggleHarness: () => void }) {
   const run = useRun();
   const sealed = run.pausedOn === 'approval';
@@ -101,6 +141,7 @@ function Topbar({ viewer, onToggleHarness }: { viewer: Viewer; onToggleHarness: 
       </Link>
       <div className="mx-1 h-5 w-px bg-hairline" />
       <StatusReadout />
+      <AbortControl />
 
       {run.connectors.length > 0 ? (
         <div className="hidden items-center gap-1.5 lg:flex">

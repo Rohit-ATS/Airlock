@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ledgerHead, posture } from '@/data/dossierStore';
 import { resolveViewer } from '@/data/viewer';
 import { BREAK_GLASS_ENABLED } from '@/data/dossierStore';
+import { loadPolicy } from '@/data/policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,13 @@ export async function GET(request: Request) {
     posture: p,
     ledger: head,
     breakGlassEnabled: BREAK_GLASS_ENABLED,
+    // Which policy is actually in force, and whether it came from a file. "Why
+    // did that go through" should have an answer that does not require reading
+    // the source.
+    policy: (() => {
+      const { policy, source, problems } = loadPolicy();
+      return { name: policy.name, version: policy.version, source, problems };
+    })(),
     generated_at: new Date().toISOString(),
   });
 }

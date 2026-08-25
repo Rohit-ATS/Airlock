@@ -5,8 +5,40 @@ import { RunStore, type RunState } from './store';
 
 const StoreCtx = createContext<RunStore | null>(null);
 
-export function HarnessProvider({ store, children }: { store: RunStore; children: ReactNode }) {
-  return <StoreCtx.Provider value={store}>{children}</StoreCtx.Provider>;
+/**
+ * Things a human can do to a run while it is running.
+ *
+ * Kept separate from the store on purpose: the store folds events and knows
+ * nothing about the transport, and `abort` has to reach the harness. Putting it
+ * on the store would give every component that reads run state the ability to
+ * cancel one.
+ */
+export interface RunControls {
+  /** Cancel the turn in flight. Peered across replicas by the harness. */
+  abort: () => Promise<void>;
+}
+
+const ControlsCtx = createContext<RunControls | null>(null);
+
+export function HarnessProvider({
+  store,
+  controls,
+  children,
+}: {
+  store: RunStore;
+  controls?: RunControls;
+  children: ReactNode;
+}) {
+  return (
+    <StoreCtx.Provider value={store}>
+      <ControlsCtx.Provider value={controls ?? null}>{children}</ControlsCtx.Provider>
+    </StoreCtx.Provider>
+  );
+}
+
+/** Null when the console is mounted without a live harness to cancel against. */
+export function useRunControls(): RunControls | null {
+  return useContext(ControlsCtx);
 }
 
 export function useRunStore(): RunStore {

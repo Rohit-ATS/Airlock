@@ -15,8 +15,9 @@
  * is genuinely proven and genuinely not permitted is sealed for the second
  * reason and told so precisely.
  */
+import { z } from 'zod';
 import type { ChangeClass, CertificateKind, Dossier } from './dossier.js';
-import { CHANGE_CLASSES, approversFor } from './dossier.js';
+import { CERTIFICATE_KINDS, CHANGE_CLASSES, approversFor } from './dossier.js';
 
 /* -------------------------------------------------------------------------- */
 /* Shape                                                                       */
@@ -61,6 +62,15 @@ export interface ClassRule {
   max_people: number | null;
   /** Ceiling on `magnitude.amount_minor`, in minor units. */
   max_amount_minor: number | null;
+  /**
+   * Ceiling on `certificate.lock_ms_estimate`.
+   *
+   * A lock is not a magnitude — it is a duration during which every other query
+   * against the table queues behind yours. Two seconds on a table nobody reads
+   * is nothing; two seconds on the table behind checkout is an outage caused by
+   * waiting rather than by working. So it gets its own ceiling.
+   */
+  max_lock_ms: number | null;
   /** Every principal in the change must carry an expiry. */
   require_expiry: boolean;
   /** Whether the person who asked for the change may also approve it. */
@@ -113,6 +123,7 @@ export const DEFAULT_POLICY: Policy = {
     max_records: null,
     max_people: null,
     max_amount_minor: null,
+    max_lock_ms: null,
     require_expiry: false,
     allow_self_approval: false,
     blackout: [],
@@ -124,6 +135,7 @@ export const DEFAULT_POLICY: Policy = {
     SCHEMA_MIGRATION: {
       requires: 'UNDO',
       freshness_seconds: 1800,
+      max_lock_ms: 5_000,
       break_glass: true,
       note: 'Structural change must be proven reversible. A schema change with no proven rollback is not a migration, it is a bet.',
     },
@@ -132,6 +144,7 @@ export const DEFAULT_POLICY: Policy = {
       requires: 'UNDO',
       freshness_seconds: 1800,
       max_records: 5_000_000,
+      max_lock_ms: 2_000,
       break_glass: true,
       note: 'Above five million rows the batch strategy stops being an implementation detail and becomes a capacity decision.',
     },
@@ -214,6 +227,86 @@ export const DEFAULT_POLICY: Policy = {
     },
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/* Policy as a document                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The shape a policy file has to have.
+ *
+ * `DEFAULT_POLICY` above is what ships. This is what lets a team replace it
+ * without touching TypeScript — an `airlock.policy.yaml` at the repository root
+ * is read at runtime and validated against this before it is allowed anywhere
+ * near the gate.
+ *
+ * Validation is not a formality here. A policy file with a typo'd key would
+ * otherwise silently *loosen* a rule: `max_peple: 1000` is not a ceiling, it is
+ * an absent ceiling with a spelling mistake, and nobody would find out until an
+ * erasure went through that should not have. `.strict()` turns that into a
+ * startup error, which is the only acceptable outcome.
+ */
+const BlackoutSchema = z
+  .object({
+    days: z.array(z.number().int().min(0).max(6)).min(1),
+    from: z.string().regex(/^\d{1,2}:\d{2}$/, 'must be HH:MM'),
+    to: z.string().regex(/^\d{1,2}:\d{2}$/, 'must be HH:MM'),
+    tz: z.string().min(1),
+    reason: z.string().min(1, 'a change freeze without a stated reason is not enforceable'),
+  })
+  .strict();
+
+const ClassRuleSchema = z
+  .object({
+    requires: z.enum([...CERTIFICATE_KINDS, 'ANY']),
+    quorum: z.number().int().min(1),
+    freshness_seconds: z.number().int().positive(),
+    max_records: z.number().int().nonnegative().nullable(),
+    max_people: z.number().int().nonnegative().nullable(),
+    max_amount_minor: z.number().int().nonnegative().nullable(),
+    max_lock_ms: z.number().int().nonnegative().nullable(),
+    require_expiry: z.boolean(),
+    allow_self_approval: z.boolean(),
+    blackout: z.array(BlackoutSchema),
+    break_glass: z.boolean(),
+    note: z.string().optional(),
+  })
+  .strict();
+
+export const PolicySchema = z
+  .object({
+    version: z.string().min(1),
+    name: z.string().min(1),
+    defaults: ClassRuleSchema,
+    classes: z.record(z.enum(CHANGE_CLASSES), ClassRuleSchema.partial().strict()),
+  })
+  .strict();
+
+export interface PolicyParseResult {
+  ok: boolean;
+  policy: Policy;
+  /** Human-readable problems. Non-empty means `policy` fell back to the default. */
+  problems: string[];
+}
+
+/**
+ * Validate a parsed policy document, falling back to the shipped default.
+ *
+ * Never throws. A console that will not start because someone mistyped a YAML
+ * key is a console nobody will keep running — but it must be *loud*, and it
+ * must fall back to the stricter shipped policy rather than to nothing.
+ */
+export function parsePolicy(input: unknown): PolicyParseResult {
+  const result = PolicySchema.safeParse(input);
+  if (result.success) {
+    return { ok: true, policy: result.data as Policy, problems: [] };
+  }
+  return {
+    ok: false,
+    policy: DEFAULT_POLICY,
+    problems: result.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`),
+  };
+}
 
 /** Resolve the effective rule for a class: class overrides merged onto defaults. */
 export function ruleFor(policy: Policy, cls: ChangeClass): ClassRule {
@@ -317,6 +410,7 @@ export type PolicyCode =
   | 'RECORD_CEILING'
   | 'PEOPLE_CEILING'
   | 'AMOUNT_CEILING'
+  | 'LOCK_CEILING'
   | 'GRANT_WITHOUT_EXPIRY'
   | 'BLACKOUT_WINDOW'
   | 'SELF_APPROVAL';
@@ -416,6 +510,18 @@ export function evaluatePolicy(
       message: 'This moves more money than AIRLOCK is authorised to move. Above the ceiling this is a treasury decision, not a change request.',
       limit: fmt(rule.max_amount_minor),
       observed: fmt(Math.abs(m.amount_minor)),
+    });
+  }
+
+  /* --- how long everything else waits ------------------------------------ */
+  const lockMs = cert?.lock_ms_estimate;
+  if (rule.max_lock_ms !== null && lockMs !== undefined && lockMs > rule.max_lock_ms) {
+    findings.push({
+      code: 'LOCK_CEILING',
+      message:
+        'This operation holds a lock for longer than policy permits. Every query against the affected table queues behind it for the duration, which is an outage caused by waiting rather than by working.',
+      limit: `${(rule.max_lock_ms / 1000).toFixed(2)} s`,
+      observed: `${(lockMs / 1000).toFixed(2)} s`,
     });
   }
 

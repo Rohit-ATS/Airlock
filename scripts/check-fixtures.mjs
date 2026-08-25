@@ -38,9 +38,11 @@ const EXPECTED = {
   dos_refund_stripe: 'POLICY_AMOUNT_CEILING',
   dos_incident_email: 'POLICY_PEOPLE_CEILING',
   dos_replica_scaledown: 'PRODUCTION_DRIFTED',
+  dos_orders_backfill: 'POLICY_LOCK_CEILING',
   dos_orders_index: 'ALREADY_APPLIED',
   dos_gdpr_batch: 'ALREADY_APPLIED',
   dos_bucket_delete: 'ALREADY_DECIDED',
+  dos_email_unique: 'ALREADY_APPLIED',
 };
 
 const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort();

@@ -170,6 +170,60 @@ test('the money ceiling is absolute, so a large refund is caught as well as a la
   assert.equal(openGate(inbound, APPROVER, at).reason, 'POLICY_AMOUNT_CEILING');
 });
 
+test('a lock held longer than policy permits seals the gate', () => {
+  // A lock is not a magnitude. It is a duration during which every other query
+  // against the table queues behind yours, which is an outage caused by waiting
+  // rather than by working.
+  const slow = base({
+    certificate: {
+      kind: 'UNDO',
+      status: 'PROVEN',
+      checksums: { pre: HASH_A, post: HASH_B, post_rollback: HASH_A, match: true },
+      lock_ms_estimate: 9_400,
+      table_rewrite: true,
+      verified_at: '2026-08-24T09:05:00Z',
+    },
+  });
+  const decision = openGate(slow, APPROVER, at);
+  assert.equal(decision.reason, 'POLICY_LOCK_CEILING');
+  assert.equal(decision.finding.limit, '5.00 s');
+  assert.equal(decision.finding.observed, '9.40 s');
+  assert.match(decision.message, /queues behind it/);
+
+  // The same operation under the ceiling is fine, so this is a number and not a
+  // general suspicion of long migrations.
+  const quick = base({
+    certificate: {
+      kind: 'UNDO',
+      status: 'PROVEN',
+      checksums: { pre: HASH_A, post: HASH_B, post_rollback: HASH_A, match: true },
+      lock_ms_estimate: 4_210,
+      verified_at: '2026-08-24T09:05:00Z',
+    },
+  });
+  assert.equal(openGate(quick, APPROVER, at).state, 'OPEN');
+});
+
+test('a bulk data operation gets a tighter lock ceiling than a migration', () => {
+  // It holds its lock for the whole write, not for a catalog update.
+  assert.equal(ruleFor(DEFAULT_POLICY, 'SCHEMA_MIGRATION').max_lock_ms, 5_000);
+  assert.equal(ruleFor(DEFAULT_POLICY, 'DATA_OPERATION').max_lock_ms, 2_000);
+});
+
+test('a certificate with no lock estimate is not judged on one', () => {
+  // Absence of a measurement is not a measurement of zero, and it is certainly
+  // not grounds to refuse.
+  const noEstimate = base({
+    certificate: {
+      kind: 'UNDO',
+      status: 'PROVEN',
+      checksums: { pre: HASH_A, post: HASH_B, post_rollback: HASH_A, match: true },
+      verified_at: '2026-08-24T09:05:00Z',
+    },
+  });
+  assert.equal(openGate(noEstimate, APPROVER, at).state, 'OPEN');
+});
+
 /* -------------------------------------------------------------------------- */
 /* No standing access                                                          */
 /* -------------------------------------------------------------------------- */

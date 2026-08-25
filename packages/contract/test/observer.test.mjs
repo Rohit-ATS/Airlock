@@ -28,7 +28,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { observeTurnStream, HarnessLedger } from '../dist/index.js';
+import { observeTurnStream, HarnessLedger, CAPABILITY_TOTAL } from '../dist/index.js';
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                     */
@@ -359,6 +359,7 @@ test('a realistic run lights the capabilities it actually exercised', async () =
     [17, 'no replica was lost'],
     [19, 'the run was started from the UI, not the HTTP API'],
     [21, 'no OIDC role was resolved'],
+    [23, 'nobody pressed ABORT — the turn completed on its own'],
   ]) {
     assert.equal(lit.has(capability), false, `capability ${capability} must stay dark: ${why}`);
   }
@@ -392,7 +393,34 @@ test('replaying the same run twice does not double-count anything', async () => 
   assert.equal(events[0].at, '2026-08-24T09:00:01Z', 'and it keeps the first sighting, not the last');
 });
 
-test('the panel cannot reach 22 from a stream alone', async () => {
+test('a turn cancelled by a human lights the abort capability, and only then', async () => {
+  // Approval stops a change before it starts. This is the proof that the other
+  // half works: a turn that a person stopped mid-flight.
+  const completed = new HarnessLedger();
+  await drain(
+    observeTurnStream(streamOf(chunks(RUN)), META, { onEvent: (e) => completed.observe(e) }),
+  );
+  assert.equal(completed.isLit(23), false, 'a turn that finished normally proves nothing about cancelling');
+
+  const aborted = new HarnessLedger();
+  const stopped = [
+    ...RUN.slice(0, -1),
+    {
+      type: 'turn.done',
+      id: 'evt_014',
+      createdAt: '2026-08-24T09:01:11Z',
+      state: { status: 'cancelled', metrics: { totalCostInUsd: 0.21 } },
+    },
+  ];
+  await drain(observeTurnStream(streamOf(chunks(stopped)), META, { onEvent: (e) => aborted.observe(e) }));
+
+  assert.equal(aborted.isLit(23), true);
+  const proof = aborted.events().find((e) => e.capability === 23);
+  assert.equal(proof.evidence, 'turn.done with state.status = cancelled');
+  assert.equal(proof.step_id, 'evt_014', 'the lamp deep-links to the cancel itself');
+});
+
+test('the panel cannot be filled from a stream alone', async () => {
   // Five of the twenty-two are established by configuration or by observed
   // runtime behaviour rather than by an event, and no amount of streaming can
   // produce them. An honest run therefore ends below the total — which is the
@@ -401,6 +429,6 @@ test('the panel cannot reach 22 from a stream alone', async () => {
   await drain(
     observeTurnStream(streamOf(chunks(RUN)), META, { onEvent: (event) => ledger.observe(event) }),
   );
-  assert.ok(ledger.litCount < 22, 'a stream alone must not be able to fill the panel');
+  assert.ok(ledger.litCount < CAPABILITY_TOTAL, 'a stream alone must not be able to fill the panel');
   assert.ok(ledger.litCount >= 13, `expected a substantial run, got ${ledger.litCount}`);
 });
