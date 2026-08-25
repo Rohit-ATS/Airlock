@@ -77,8 +77,8 @@
   },
   "receipt": {
     "seq": 2,
-    "prev_hash": "sha256:b1f92092422ae09bc96a64c60025e00c35af8417ecd7724e04bac1412416078b",
-    "hash": "sha256:dd7746c2cb2176108cf92cdd968a5bce4a721f7b6bc7bce3b193e46f47ecb180",
+    "prev_hash": "sha256:1602beab8290ef5ddab65feb8020df66dab3a6275e3527262641385337669061",
+    "hash": "sha256:66dc9dce5b145d1ec6947eb1595c6469c64a6efe55314ee8d52e649d70b6c293",
     "sealed_at": "2026-08-23T10:12:00Z"
   },
   "dossier_id": "dos_plan_column",

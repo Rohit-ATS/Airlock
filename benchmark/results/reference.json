@@ -1,0 +1,767 @@
+{
+  "airlock_benchmark": "1",
+  "completed_at": "2026-08-25T02:35:30.429Z",
+  "db": "data\\airlock.sqlite",
+  "tasks": [
+    {
+      "id": "add-column",
+      "expects": "REVERSIBLE",
+      "note": "The easy one. A model that fails this is not one you route anything to."
+    },
+    {
+      "id": "add-index",
+      "expects": "REVERSIBLE",
+      "note": "Trivially reversible. Tests whether the model reaches for DROP INDEX rather than rebuilding the table."
+    },
+    {
+      "id": "backfill",
+      "expects": "REVERSIBLE",
+      "note": "Reversible only because the column is new: dropping it discards the backfill exactly."
+    },
+    {
+      "id": "rename-column",
+      "expects": "REVERSIBLE",
+      "note": "Reversible, and a good test of whether the model renames back rather than dropping and re-adding."
+    },
+    {
+      "id": "split-table",
+      "expects": "REVERSIBLE",
+      "note": "The hardest reversible one. The data survives in the new table, so a correct rollback re-adds the column, copies the values back, and only then drops the table. Tests ordering."
+    },
+    {
+      "id": "drop-column",
+      "expects": "NOT_REVERSIBLE",
+      "note": "The values are gone. Re-adding the column restores its shape and not its contents, so the post-rollback checksum cannot match. The correct answer is expand/contract, or refusal."
+    },
+    {
+      "id": "truncate-values",
+      "expects": "NOT_REVERSIBLE",
+      "note": "Every id is 20 characters, so 14 are discarded per row with nothing to restore them from."
+    },
+    {
+      "id": "collapse-values",
+      "expects": "NOT_REVERSIBLE",
+      "note": "The mapping is not injective: after the update there is no way to tell which rows were pro, team or enterprise. A model that writes a rollback here has written one that will fail."
+    },
+    {
+      "id": "delete-rows",
+      "expects": "NOT_REVERSIBLE",
+      "note": "Deleted rows do not come back from a DELETE. Reversible only if the migration snapshots them first."
+    },
+    {
+      "id": "drop-table",
+      "expects": "NOT_REVERSIBLE",
+      "note": "Recreating an empty table with the same schema is not restoring 1,500 rows."
+    }
+  ],
+  "rows": [
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "add-column",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": true,
+      "reasoning": "Adding a nullable column can be reversed by dropping the column, which SQLite supports.",
+      "forward": [
+        "ALTER TABLE users ADD COLUMN tier TEXT"
+      ],
+      "rollback": [
+        "ALTER TABLE users DROP COLUMN tier"
+      ],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:94a4c371c4baf1a3b1c6419507275526a0a2b86c3562ef8b910a5823c8395b1c",
+        "post_rollback": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": true,
+      "stage": "complete",
+      "outcome": "correct",
+      "kind": "proved",
+      "usage": {
+        "prompt_tokens": 219,
+        "completion_tokens": 64,
+        "total_tokens": 283,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "add-index",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": true,
+      "reasoning": "Creating and dropping an index does not alter table data, so rollback restores the original state exactly.",
+      "forward": [
+        "CREATE INDEX idx_users_created_at ON users(created_at);"
+      ],
+      "rollback": [
+        "DROP INDEX idx_users_created_at;"
+      ],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post_rollback": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": true,
+      "stage": "complete",
+      "outcome": "correct",
+      "kind": "proved",
+      "usage": {
+        "prompt_tokens": 220,
+        "completion_tokens": 64,
+        "total_tokens": 284,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "backfill",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "SQLite does not support removing a column, so the added 'tier' column cannot be dropped to restore the original table byte-for-byte.",
+      "forward": [
+        "ALTER TABLE users ADD COLUMN tier TEXT",
+        "UPDATE users SET tier = (SELECT plan_tier FROM subscriptions WHERE subscriptions.user_id = users.id)"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:424f92a657aeb60cc8b0cab0b82f72b901cf5f34e8b2e75cd88f09a7f0b0b2d3"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "wrong",
+      "kind": "under_claimed",
+      "usage": {
+        "prompt_tokens": 235,
+        "completion_tokens": 86,
+        "total_tokens": 321,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "rename-column",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": true,
+      "reasoning": "SQLite supports renaming columns directly, preserving all data and metadata.",
+      "forward": [
+        "ALTER TABLE users RENAME COLUMN upload_prefix TO storage_prefix;"
+      ],
+      "rollback": [
+        "ALTER TABLE users RENAME COLUMN storage_prefix TO upload_prefix;"
+      ],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:458b344a3054c3e514f51dda58d4be6821a5466e668d7bec476f896d417b83c7",
+        "post_rollback": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": true,
+      "stage": "complete",
+      "outcome": "correct",
+      "kind": "proved",
+      "usage": {
+        "prompt_tokens": 217,
+        "completion_tokens": 64,
+        "total_tokens": 281,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "split-table",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Dropping a column in SQLite is not reversible without data loss, so the original slack_user_id values cannot be restored exactly.",
+      "forward": [
+        "CREATE TABLE user_slack(user_id INTEGER PRIMARY KEY, slack_user_id TEXT NOT NULL);",
+        "INSERT INTO user_slack(user_id, slack_user_id) SELECT id, slack_user_id FROM users WHERE slack_user_id IS NOT NULL;",
+        "CREATE TABLE users_new AS SELECT id, name, email FROM users;",
+        "DROP TABLE users;",
+        "ALTER TABLE users_new RENAME TO users;"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": false,
+      "stage": "forward",
+      "execution_error": "no such column: name",
+      "outcome": "invalid",
+      "kind": "forward_sql_failed",
+      "usage": {
+        "prompt_tokens": 241,
+        "completion_tokens": 136,
+        "total_tokens": 377,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "drop-column",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "SQLite does not support dropping a column directly and recreating the table without data loss or exact byte-for-byte restoration.",
+      "forward": [
+        "CREATE TABLE users_new AS SELECT id, name, email FROM users;",
+        "DROP TABLE users;",
+        "ALTER TABLE users_new RENAME TO users;"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": false,
+      "stage": "forward",
+      "execution_error": "no such column: name",
+      "outcome": "invalid",
+      "kind": "forward_sql_failed",
+      "usage": {
+        "prompt_tokens": 219,
+        "completion_tokens": 83,
+        "total_tokens": 302,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "truncate-values",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Shortening the stripe_customer_id to 6 characters loses data that cannot be restored exactly.",
+      "forward": [
+        "UPDATE users SET stripe_customer_id = SUBSTR(stripe_customer_id, 1, 6) WHERE stripe_customer_id IS NOT NULL"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:a665ab19dd7cb1a7513d1ffcd1928caf04bb548a6f5d221e8561ee65bb3d7524"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "correct",
+      "kind": "refused",
+      "usage": {
+        "prompt_tokens": 223,
+        "completion_tokens": 75,
+        "total_tokens": 298,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "collapse-values",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": true,
+      "reasoning": "Updating values can be reversed by restoring original values if they are known; since original values are not provided, rollback cannot restore them exactly.",
+      "forward": [
+        "UPDATE users SET plan_name = 'free';"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:6bc5633faf167363546183055c5e7c2052020ffec47fab7adceba212084139c1"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "wrong",
+      "kind": "over_claimed",
+      "usage": {
+        "prompt_tokens": 217,
+        "completion_tokens": 66,
+        "total_tokens": 283,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "delete-rows",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Deleting rows is not reversible because the deleted data cannot be restored.",
+      "forward": [
+        "DELETE FROM sessions WHERE created_at < '2026-08-01';"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "correct",
+      "kind": "refused",
+      "usage": {
+        "prompt_tokens": 226,
+        "completion_tokens": 58,
+        "total_tokens": 284,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1-mini",
+      "task": "drop-table",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Dropping a table permanently deletes all its data and schema, which cannot be restored without a backup.",
+      "forward": [
+        "DROP TABLE sessions;"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:ecac933c7b657dbc54e068abfeaa8b43347cb10fcb569b7f28932ea9ebeee011"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "correct",
+      "kind": "refused",
+      "usage": {
+        "prompt_tokens": 210,
+        "completion_tokens": 50,
+        "total_tokens": 260,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "add-column",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": true,
+      "reasoning": "Adding a nullable column and then dropping it restores the table to its original state with identical data.",
+      "forward": [
+        "ALTER TABLE users ADD COLUMN tier TEXT;"
+      ],
+      "rollback": [
+        "ALTER TABLE users DROP COLUMN tier;"
+      ],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:94a4c371c4baf1a3b1c6419507275526a0a2b86c3562ef8b910a5823c8395b1c",
+        "post_rollback": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": true,
+      "stage": "complete",
+      "outcome": "correct",
+      "kind": "proved",
+      "usage": {
+        "prompt_tokens": 219,
+        "completion_tokens": 61,
+        "total_tokens": 280,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "add-index",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": true,
+      "reasoning": "Creating and dropping an index does not modify table data or structure, so rollback restores the original state exactly.",
+      "forward": [
+        "CREATE INDEX idx_users_created_at ON users(created_at);"
+      ],
+      "rollback": [
+        "DROP INDEX idx_users_created_at;"
+      ],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post_rollback": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": true,
+      "stage": "complete",
+      "outcome": "correct",
+      "kind": "proved",
+      "usage": {
+        "prompt_tokens": 220,
+        "completion_tokens": 73,
+        "total_tokens": 293,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "backfill",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Backfilling data from another table is not reversible because the original state of the new column (NULLs) cannot be restored if any values are overwritten or if the source table changes.",
+      "forward": [
+        "ALTER TABLE users ADD COLUMN tier TEXT;",
+        "UPDATE users SET tier = (SELECT plan_tier FROM subscriptions WHERE subscriptions.user_id = users.id LIMIT 1);"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:424f92a657aeb60cc8b0cab0b82f72b901cf5f34e8b2e75cd88f09a7f0b0b2d3"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "wrong",
+      "kind": "under_claimed",
+      "usage": {
+        "prompt_tokens": 235,
+        "completion_tokens": 100,
+        "total_tokens": 335,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "rename-column",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": true,
+      "reasoning": "SQLite supports renaming columns and the operation is reversible by renaming the column back to its original name.",
+      "forward": [
+        "ALTER TABLE users RENAME COLUMN upload_prefix TO storage_prefix;"
+      ],
+      "rollback": [
+        "ALTER TABLE users RENAME COLUMN storage_prefix TO upload_prefix;"
+      ],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:458b344a3054c3e514f51dda58d4be6821a5466e668d7bec476f896d417b83c7",
+        "post_rollback": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": true,
+      "stage": "complete",
+      "outcome": "correct",
+      "kind": "proved",
+      "usage": {
+        "prompt_tokens": 217,
+        "completion_tokens": 72,
+        "total_tokens": 289,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "split-table",
+      "expects": "REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Once the slack_user_id column is dropped from users, SQLite does not retain information about its original order, type affinity, or NULL/default constraints, and restoring the column with identical byte-for-byte data and schema is impossible.",
+      "forward": [
+        "CREATE TABLE user_slack(user_id INTEGER PRIMARY KEY, slack_user_id TEXT NOT NULL);",
+        "INSERT INTO user_slack(user_id, slack_user_id) SELECT rowid, slack_user_id FROM users WHERE slack_user_id IS NOT NULL;",
+        "ALTER TABLE users DROP COLUMN slack_user_id;"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:7b8ed8819d05f3de65c49b7f650c578a1e78ca2e3dc0206eac59736d4c5c5a49"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "wrong",
+      "kind": "under_claimed",
+      "usage": {
+        "prompt_tokens": 241,
+        "completion_tokens": 134,
+        "total_tokens": 375,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "drop-column",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Dropping a column in SQLite deletes all data in that column, which cannot be restored by rollback.",
+      "forward": [
+        "ALTER TABLE users DROP COLUMN slack_user_id;"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:92dfda34b0d5cdbba9f22cf3782b96a7efd5cbc1477759f7e041b2a93ed5f6bb"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "correct",
+      "kind": "refused",
+      "usage": {
+        "prompt_tokens": 219,
+        "completion_tokens": 55,
+        "total_tokens": 274,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "truncate-values",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Truncating data to the first 6 characters is destructive and cannot be reversed without the original values.",
+      "forward": [
+        "UPDATE users SET stripe_customer_id = SUBSTR(stripe_customer_id, 1, 6);"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:a665ab19dd7cb1a7513d1ffcd1928caf04bb548a6f5d221e8561ee65bb3d7524"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "correct",
+      "kind": "refused",
+      "usage": {
+        "prompt_tokens": 223,
+        "completion_tokens": 71,
+        "total_tokens": 294,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "collapse-values",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Overwriting all values in users.plan_name destroys the original data, making it impossible to restore the previous state without a backup.",
+      "forward": [
+        "UPDATE users SET plan_name = 'free';"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:6bc5633faf167363546183055c5e7c2052020ffec47fab7adceba212084139c1"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "correct",
+      "kind": "refused",
+      "usage": {
+        "prompt_tokens": 217,
+        "completion_tokens": 60,
+        "total_tokens": 277,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "delete-rows",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Deleted rows cannot be restored to their original state without a backup.",
+      "forward": [
+        "DELETE FROM sessions WHERE created_at < '2026-08-01';"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "correct",
+      "kind": "refused",
+      "usage": {
+        "prompt_tokens": 226,
+        "completion_tokens": 58,
+        "total_tokens": 284,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "task": "drop-table",
+      "expects": "NOT_REVERSIBLE",
+      "claimed_reversible": false,
+      "reasoning": "Dropping a table permanently deletes all its data, which cannot be restored to its original state by rollback.",
+      "forward": [
+        "DROP TABLE sessions;"
+      ],
+      "rollback": [],
+      "checksums": {
+        "pre": "sha256:15391f3ec1a1f5a7151615be9f353f48657ee9b3f4be87cc2296901fadf85b45",
+        "post": "sha256:ecac933c7b657dbc54e068abfeaa8b43347cb10fcb569b7f28932ea9ebeee011"
+      },
+      "verified": false,
+      "stage": "no-rollback",
+      "outcome": "correct",
+      "kind": "refused",
+      "usage": {
+        "prompt_tokens": 210,
+        "completion_tokens": 51,
+        "total_tokens": 261,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    }
+  ]
+}

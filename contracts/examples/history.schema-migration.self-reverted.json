@@ -84,8 +84,8 @@
   },
   "receipt": {
     "seq": 4,
-    "prev_hash": "sha256:af362e232183590eb0ea75fdf705e49fdadcab8b969a8084dd6a0588c51f234f",
-    "hash": "sha256:b871960aedb78a87e5c78809aa2fe53039ffb9382bb362c5548c163e7f372231",
+    "prev_hash": "sha256:f11491e518258ba5db1e3bbedc735688ff53e674d35deaaeb2269a65b194d7dc",
+    "hash": "sha256:8e3904e0b8f418386bba5f4d34e1707ba6cf405e586ddabc3db07434d59cadda",
     "sealed_at": "2026-08-23T10:20:00Z"
   },
   "dossier_id": "dos_email_unique",

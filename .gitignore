@@ -25,3 +25,8 @@ trueforge/
 
 # Local harness env (contains no secrets, but is machine-specific).
 harness/.env
+
+# Benchmark runs are reproducible and large; the generated docs/BENCHMARK.md is
+# the committed artefact. Keep one representative run so the doc has a source.
+benchmark/results/*.json
+!benchmark/results/reference.json

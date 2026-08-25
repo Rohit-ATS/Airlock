@@ -129,6 +129,26 @@
     "table_rewrite": false,
     "verified_at": "2026-08-24T15:31:00Z"
   },
+  "skills_used": [
+    {
+      "name": "postgres-safety",
+      "version": "1.1.0",
+      "digest": "sha256:3ca6c98a5cd2fb7d4aeae224d74c521879aca5db359175b00d7039cc84512133",
+      "description": "What is genuinely irreversible in PostgreSQL, which DDL takes which lock, and when a statement rewrites the whole table. Load before writing or reviewing any migration."
+    },
+    {
+      "name": "expand-contract",
+      "version": "1.0.0",
+      "digest": "sha256:613d73e2890de18ecb6d4680b311c2757bc3365a31d58ba2b888a41a37081412",
+      "description": "The three-phase pattern for making an irreversible schema or data change reversible. Load whenever a migration fails its rollback proof, or whenever a change would drop or narrow anything."
+    },
+    {
+      "name": "code-review-loop",
+      "version": "1.0.0",
+      "digest": "sha256:75a07112bf79e46e8554df9234168254ad6c029b170e55cf0d6a41c1739763af",
+      "description": "Write the application changes a migration implies, open a pull request, get it reviewed by an independent reviewer, and address the findings before asking anyone to approve anything. Load whenever a change has a non-empty blast radius."
+    }
+  ],
   "code_changes": {
     "repo": "airlock/app",
     "branch": "airlock/retire-plan-name",
