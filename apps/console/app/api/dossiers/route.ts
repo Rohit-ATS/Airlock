@@ -1,41 +1,17 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import { NextResponse } from 'next/server';
-import { listDossiers, putDossier, seedIfEmpty } from '@/data/dossierStore';
-import { seedDisabled } from '@/data/env';
+import { listDossiers, putDossier } from '@/data/dossierStore';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Seed the ledger from the contract examples the first time it is read.
+ * The change queue and the ledger, in one list.
  *
- * This is what makes the console show something real ninety seconds after a
- * clone, without a database or a single API key. These are console fixtures —
- * they exercise the certificate card, the queue and the ledger. They are not
- * evidence about anybody's database, and the README says exactly that.
- *
- * Set AIRLOCK_NO_SEED=1 to start with an empty ledger.
+ * Seeding from `contracts/examples` happens inside the store, not here, so that
+ * every route sees the same ledger regardless of which one is hit first. Set
+ * AIRLOCK_NO_SEED=1 to start empty.
  */
-async function loadExamples(): Promise<unknown[]> {
-  if (seedDisabled()) return [];
-  const dir = path.join(process.cwd(), '..', '..', 'contracts', 'examples');
-  try {
-    const names = (await fs.readdir(dir)).filter((n) => n.endsWith('.json'));
-    return await Promise.all(names.map(async (n) => JSON.parse(await fs.readFile(path.join(dir, n), 'utf8'))));
-  } catch {
-    return [];
-  }
-}
-
-/** The change queue and the ledger, in one list. */
 export async function GET() {
-  const existing = await listDossiers();
-  if (existing.length === 0) {
-    const examples = await loadExamples();
-    if (examples.length > 0) await seedIfEmpty(examples);
-  }
-  const dossiers = await listDossiers();
-  return NextResponse.json({ dossiers });
+  return NextResponse.json({ dossiers: await listDossiers() });
 }
 
 /**

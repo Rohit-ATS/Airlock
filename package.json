@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "npm run dev --workspace @airlock/console",
     "build": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/mcp && npm run build --workspace @airlock/console",
-    "test": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/mcp && node --test packages/contract/test/*.test.mjs packages/mcp/test/*.test.mjs && node scripts/check-fixtures.mjs && node scripts/check-agents.mjs && node scripts/check-policy.mjs",
+    "test": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/mcp && node --test packages/contract/test/*.test.mjs packages/mcp/test/*.test.mjs && node scripts/check-fixtures.mjs && node scripts/check-agents.mjs && node scripts/check-policy.mjs && node scripts/verify-claims.mjs",
     "lint": "npm run lint --workspace @airlock/console",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "mcp": "node packages/mcp/bin/airlock-mcp.mjs",
@@ -23,7 +23,7 @@
     "gen:schema": "node scripts/gen-schema.mjs",
     "gen:capabilities": "node scripts/gen-capabilities.mjs",
     "gen:examples": "node contracts/examples/generate.mjs",
-    "gen": "npm run build --workspace @airlock/contract && npm run gen:skills && npm run gen:schema && npm run gen:capabilities && npm run gen:policy && npm run gen:examples && npm run check:fixtures && npm run check:policy",
+    "gen": "npm run build --workspace @airlock/contract && npm run gen:skills && npm run gen:schema && npm run gen:capabilities && npm run gen:policy && npm run gen:examples && npm run check:fixtures && npm run check:policy && npm run gen:claims",
     "gen:policy": "node scripts/gen-policy.mjs",
     "check:agents": "node scripts/check-agents.mjs",
     "check:a11y": "node scripts/check-a11y.mjs",
@@ -41,12 +41,16 @@
     "check:policy": "node scripts/check-policy.mjs",
     "gen:skills": "node scripts/gen-skills.mjs",
     "check:benchmark": "node scripts/check-benchmark.mjs",
-    "benchmark": "node benchmark/run.mjs"
+    "benchmark": "node benchmark/run.mjs",
+    "verify:claims": "node scripts/verify-claims.mjs",
+    "gen:claims": "node scripts/verify-claims.mjs --emit"
   },
   "overrides": {
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "axe-core": "^4.13.0",
+    "playwright-core": "^1.62.1",
     "yaml": "^2.9.0"
   }
 }

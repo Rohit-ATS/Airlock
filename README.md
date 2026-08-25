@@ -15,6 +15,15 @@ with the evidence attached.
 
 Built on [TrueForge](https://trueforge.dev) for the Agent Harness Hackathon, 24–30 August 2026.
 
+**→ [rohit-ats.github.io/Airlock](https://rohit-ats.github.io/Airlock/)** — the landing page,
+live, nothing to install. The gate on it is the real `openGate()` compiled to the browser, not
+a recording: every combination you set is a genuine evaluation. Try to find one that opens a
+door it shouldn't.
+
+To run the console and the API — the parts a static page cannot host — see
+[Run it](#run-it), four commands below. To check any claim in this document against the code
+that implements it, see [Verify it](#verify-it).
+
 ---
 
 ## The idea in one rule
@@ -69,20 +78,37 @@ Six attempts to forge one are asserted as compile errors in
 expected errors disappear, `tsc` reports an unused `@ts-expect-error`, and **the build fails.**
 
 The same rule runs again server-side. Approving through the HTTP API, with no browser
-involved, is refused identically:
+involved, is refused identically — and both of these are transcripts, not illustrations:
 
 ```console
-$ curl -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision -d '{"decision":"approved"}'
+$ curl -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision \
+    -H 'Content-Type: application/json' -d '{"decision":"approved"}'
 {"error":"CERTIFICATE_FAILED","message":"Verification ran and failed. This change cannot be approved from this dossier."}
 403
+```
 
-$ # …and a dossier that lies, claiming match:true with checksums that differ:
-{"error":"CHECKSUM_MISMATCH","message":"The data did not return to its starting state after rollback."}
+Then the harder case — a dossier that **lies**, claiming `match:true` over checksums that
+differ. Forge one from a change whose proof really did pass, and post it in:
+
+```console
+$ curl -s localhost:3000/api/dossiers | node -e '
+    const d = JSON.parse(require("fs").readFileSync(0)).dossiers
+      .find(x => x.dossier_id === "dos_tier_migration");
+    d.dossier_id = "dos_liar";
+    d.certificate.checksums.post_rollback = "sha256:" + "d".repeat(64);
+    d.certificate.checksums.match = true;          // the lie
+    process.stdout.write(JSON.stringify(d));
+  ' | curl -s -XPOST localhost:3000/api/dossiers -H 'Content-Type: application/json' --data-binary @-
+
+$ curl -XPOST localhost:3000/api/dossiers/dos_liar/decision \
+    -H 'Content-Type: application/json' -d '{"decision":"approved"}'
+{"error":"CHECKSUM_MISMATCH","message":"The data did not return to its starting state after rollback. The pre-migration and post-rollback checksums differ."}
 403
 ```
 
 AIRLOCK never trusts the verifier's own `match` flag. It recomputes `pre === post_rollback`
-itself, so an engine bug or a forged payload cannot open the door.
+itself ([`gate.ts:221`](packages/contract/src/gate.ts#L221)), so an engine bug or a forged
+payload cannot open the door.
 
 > **Try it without installing anything.** The landing page carries a live gate: it builds a
 > real Change Dossier from a set of controls and passes it to the real `openGate()`. Every
@@ -92,6 +118,8 @@ itself, so an engine bug or a forged payload cannot open the door.
 
 ## Run it
 
+Node 22.14 or newer ([`.nvmrc`](.nvmrc)). No database, no API key, no signup, no Docker.
+
 ```bash
 git clone https://github.com/Rohit-ATS/Airlock && cd Airlock
 npm install
@@ -99,23 +127,40 @@ npm run build --workspace @airlock/contract
 npm run dev --workspace @airlock/console
 ```
 
+Four commands, about ninety seconds, most of it `npm install`. Then:
+
 | Route | What it is |
 | --- | --- |
 | [`/`](http://localhost:3000) | The front door — the argument, with two live demos in it |
 | [`/console`](http://localhost:3000/console) | The operator console: DOING / WAITING / DID |
 | [`/control`](http://localhost:3000/control) | The control room: posture, refusals, ledger integrity |
 
-The console seeds itself from [`contracts/examples/`](contracts/examples) on first run, so you
+Three things that go wrong on somebody else's machine, so they are written down rather than
+left to be discovered:
+
+- **`/console` takes a minute or two the first time you open it, in dev.** It is not hung.
+  The route pulls in `@truefoundry/trueforge-ui` — 16,697 modules — and Next compiles routes
+  on demand, so the first request pays for all of it at once and every request after it is
+  instant. `/` and `/control` are much smaller and come up in seconds. If you would rather not
+  wait, `npm run build --workspace @airlock/console && npm start --workspace @airlock/console`
+  compiles everything up front.
+- **Something already on port 3000.** `PORT=3100 npm run dev --workspace @airlock/console`,
+  or in PowerShell `$env:PORT=3100; npm run dev --workspace @airlock/console`.
+- **The build step is not optional.** `apps/console` imports `@airlock/contract` from its
+  build output, so skipping the third line gives a module-not-found on the first render.
+  `npm test` also builds it, if you run that first.
+
+The console seeds itself from [`contracts/examples/`](contracts/examples) on first read, so you
 land on a live approval queue with **sixteen real changes** — four ready to approve, seven
 sealed for seven different reasons, and five decided records in a hash chain, one of which was
-applied, health-checked clean, and taken back anyway — without a database, an API key, or a
-signup.
+applied, health-checked clean, and taken back anyway. The ledger is written to
+`apps/console/.airlock/` — the console's working directory — so delete that to start over, or
+set `AIRLOCK_NO_SEED=1` to start empty.
 
 > Those sixteen are **console fixtures**. They exercise the certificate card, the queue, the
 > policy engine and the ledger. They are not evidence about anybody's database, and the
 > undecided ones are re-based to the current time when they are seeded, because a certificate
 > has a freshness window and a permanently-expired demo demonstrates nothing.
-> `AIRLOCK_NO_SEED=1` starts empty.
 
 To drive the agent rather than the fixtures, point it at a TrueForge server:
 
@@ -130,7 +175,129 @@ sandbox fallback is macOS/Linux only. See [docs/TRUEFORGE-NOTES.md](docs/TRUEFOR
 
 ---
 
+## Verify it
+
+Everything below this line is a claim, and a claim you cannot check in a few seconds is
+indistinguishable from one that is false. So each one names the file and line that implements
+it and the command that demonstrates it.
+
+**The three that matter most, in about ninety seconds:**
+
+```bash
+npm test
+```
+> `201 tests, 0 fail` · `16 fixtures check out.` · `4 agent spec(s) check out.` ·
+> `airlock.policy.yaml checks out` · `24 claims, every one anchored to a line that exists.`
+>
+> Included in that: `gate.test.mjs` asserts no non-`PROVEN` certificate opens the gate under
+> any combination of class, status and viewer, and building the contract asserts the
+> compile-time half — [six forgeries of an `ApprovalGrant`](packages/contract/src/gate.typetest.ts)
+> that `tsc` must reject.
+
+```bash
+npm run verify:ledger
+```
+> Walks the hash chain record by record and prints the head hash. Edit any record in
+> `apps/console/.airlock/ledger.json` and run it again: it names the record where the chain
+> breaks, and tells you every record after it is no longer trustworthy.
+
+```bash
+# with the console running — no need to open it first, the store seeds on any read
+curl -s -XPOST http://localhost:3000/api/dossiers/dos_currency_fix/decision \
+  -H 'Content-Type: application/json' -d '{"decision":"approved"}' -w '\n%{http_code}\n'
+```
+> ```json
+> {"error":"CERTIFICATE_FAILED","message":"Verification ran and failed. This change cannot be approved from this dossier."}
+> 403
+> ```
+> The gate is not a UI state. Approving over HTTP with no browser involved is refused by the
+> same function, on the server, against the stored dossier.
+
+### The full list
+
+Each row is checked by [`scripts/verify-claims.mjs`](scripts/verify-claims.mjs), which resolves
+every anchor to a line number and **fails the build if it cannot find it exactly once**. The
+table is generated from that file, so the line numbers you are about to click were produced by
+reading the code rather than typed in and left to rot.
+
+<!-- BEGIN CLAIMS -->
+
+<!-- Generated by scripts/verify-claims.mjs. Do not edit by hand: run `npm run verify:claims -- --emit`. -->
+
+
+**The gate**
+
+| The claim | The code | Run this | What you see |
+| --- | --- | --- | --- |
+| An approval for an unproven change cannot be constructed: `ApprovalGrant` carries a module-private symbol only `openGate` can mint. | [`gate.ts:48`](packages/contract/src/gate.ts#L48) | `npm run build --workspace @airlock/contract` | Compiles. Weaken the type and the build fails — see the next row. |
+| Six attempts to forge a grant are asserted as compile errors. Weaken the type and `tsc` fails on the now-unused `@ts-expect-error`. | [`gate.typetest.ts:27`](packages/contract/src/gate.typetest.ts#L27) | `npm run build --workspace @airlock/contract` | Six `@ts-expect-error` lines, each a forgery the compiler rejects. |
+| A detected injection seals the gate **before** the certificate is examined — step 2 of 7, ahead of proof integrity. | [`gate.ts:208`](packages/contract/src/gate.ts#L208) | `node --test packages/contract/test/quarantine.test.mjs` | The ordering is pinned by test, not left to code review. |
+| The verifier's own `match` flag is never trusted. AIRLOCK recomputes `pre === post_rollback` itself. | [`gate.ts:221`](packages/contract/src/gate.ts#L221) | `node --test packages/contract/test/gate.test.mjs` | A dossier claiming `match:true` over differing checksums is still sealed. |
+| A claim of danger is believed; a claim of safety is recomputed. Drift seals the gate even when the drift checker reported everything fine. | [`gate.ts:306`](packages/contract/src/gate.ts#L306) | `node --test packages/contract/test/policy.test.mjs` | `drifted:false` with a production checksum that does not match still seals. |
+| Break-glass is not an approval: `BreakGlassOverride` carries a different private symbol, and no function accepts both. | [`gate.ts:349`](packages/contract/src/gate.ts#L349) | `node --test packages/contract/test/policy.test.mjs` | Two of the six compile-error forgeries are exactly this swap. |
+| The same rule runs server-side. Approving over HTTP with no browser involved is refused identically. | [`dossierStore.ts:302`](apps/console/src/data/dossierStore.ts#L302) | `curl -s -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision -H 'Content-Type: application/json' -d '{"decision":"approved"}'` | `{"error":"CERTIFICATE_FAILED"}` and HTTP 403. |
+
+**Policy**
+
+| The claim | The code | Run this | What you see |
+| --- | --- | --- | --- |
+| A quorum counts people, not clicks — signatures collapse by identity, so one approver signing twice is one approver. | [`dossier.ts:644`](packages/contract/src/dossier.ts#L644) | `node --test packages/contract/test/policy.test.mjs` | Two signatures from one identity leave the change still waiting. |
+| No standing production access: every access grant must carry an expiry, so the default state is that nobody holds the keys. | [`policy.ts:85`](packages/contract/src/policy.ts#L85) | `npm run check:fixtures` | `access-grant.standing.json` is refused for `GRANT_WITHOUT_EXPIRY`. |
+| The shipped `airlock.policy.yaml` is byte-identical to the compiled default, so the documented policy and the enforced one cannot disagree. | [`check-policy.mjs:53`](scripts/check-policy.mjs#L53) | `npm run check:policy` | `airlock.policy.yaml checks out — 7 classes, identical to the shipped default.` |
+
+**The ledger**
+
+| The claim | The code | Run this | What you see |
+| --- | --- | --- | --- |
+| Every decided change is sealed with the hash of the one before it, so editing any historical record breaks every link after it. | [`receipt.ts:153`](packages/contract/src/receipt.ts#L153) | `npm run verify:ledger` | Each record listed with its hash, and the head hash of the chain. |
+| Tampering is detected at the record where it happened, not merely somewhere in the file. | [`receipt.ts:224`](packages/contract/src/receipt.ts#L224) | `node --test packages/contract/test/receipt.test.mjs` | Edit, reorder and delete are each caught, at the right index. |
+
+**The agent**
+
+| The claim | The code | Run this | What you see |
+| --- | --- | --- | --- |
+| There is no tool that applies a change to production. Nine tools ship; exactly one is destructive, and the harness holds it for a human. | [`tools.ts:724`](packages/mcp/src/tools.ts#L724) | `node --test packages/mcp/test/server.test.mjs` | The tool list is asserted whole — a tenth tool fails the test. |
+| The agent may open a pull request and may not merge one. `merge_pull_request` is on a deny-list checked independently of the allow-list. | [`check-agents.mjs:73`](scripts/check-agents.mjs#L73) | `npm run check:agents` | Four specs check out; `airlock-scout` reports no path to production at all. |
+| Untrusted excerpts are neutralised before storage, so a finding cannot carry the injection into the next prompt that summarises it. | [`quarantine.ts:277`](packages/contract/src/quarantine.ts#L277) | `node --test packages/contract/test/quarantine.test.mjs` | The stored excerpt is defanged; the raw payload is never persisted. |
+
+**Evidence**
+
+| The claim | The code | Run this | What you see |
+| --- | --- | --- | --- |
+| A capability lamp cannot be lit from application code. The only writer is the detector fold over the real event stream. | [`detectors.ts:82`](packages/contract/src/detectors.ts#L82) | `node --test packages/contract/test/harness.test.mjs` | Noise, repeated connectors and prose that merely mentions a chart light nothing. |
+| The observer is a faithful passthrough: same chunks, same objects, same order, none added, none lost — even when a detector throws. | [`observedServer.ts:26`](apps/console/src/server/observedServer.ts#L26) | `node --test packages/contract/test/observer.test.mjs` | A realistic turn stream is driven through it and checked both ways: what lit, and what must stay dark. |
+| An unsourced claim says it is unsourced, rather than defaulting to a grade that makes every number look accounted for. | [`provenance.ts:154`](packages/contract/src/provenance.ts#L154) | `node --test packages/contract/test/provenance.test.mjs` | A figure the agent asserted never acquires a link to an event that did not produce it. |
+
+**After the change**
+
+| The claim | The code | Run this | What you see |
+| --- | --- | --- | --- |
+| No proven inverse, no undo. A SCOPE certificate never earns one, because you cannot un-send forty thousand emails. | [`undo.ts:64`](packages/contract/src/undo.ts#L64) | `node --test packages/contract/test/undo.test.mjs` | No arrangement of policy, window and clock produces an undo without a proven inverse. |
+| The undo window is measured on the server from `audit.applied_at`, so a sleeping laptop cannot extend it. | [`undo.ts:76`](packages/contract/src/undo.ts#L76) | `node --test packages/contract/test/undo.test.mjs` | A late press is refused with the closing time quoted back. |
+| Unreviewed code does not open the gate, and a fix that predates the finding is not a fix. | [`review.ts:132`](packages/contract/src/review.ts#L132) | `node --test packages/contract/test/review.test.mjs` | A commit earlier than the finding leaves it outstanding. Nits never block. |
+| The binding budget ceiling is the one furthest consumed, not the first declared. | [`budget.ts:101`](packages/contract/src/budget.ts#L101) | `node --test packages/contract/test/budget.test.mjs` | A run cannot pass its token cap while the console reassures everybody about dollars. |
+
+**The benchmark**
+
+| The claim | The code | Run this | What you see |
+| --- | --- | --- | --- |
+| Models are scored by executing their own SQL and comparing bytes — the gate's rule, `pre === post_rollback`, not a rubric and not an LLM judge. | [`run.mjs:257`](benchmark/run.mjs#L257) | `node scripts/check-benchmark.mjs` | Every table, column and index the tasks name really exists in the database. |
+| Forward SQL that does not run is scored as neither a pass nor a refusal, so a model cannot be rewarded for writing SQL that never parsed. | [`run.mjs:292`](benchmark/run.mjs#L292) | `node scripts/check-benchmark.mjs` | The `Unscored` column in docs/BENCHMARK.md is that outcome, reported rather than averaged away. |
+
+<!-- END CLAIMS -->
+
+If a claim in this README is not in that table, it is prose — an argument for why something is
+built the way it is — and should be read as such. Several claims were **removed** rather than
+kept unevidenced; they are listed in [Honest notes](#honest-notes).
+
+---
+
 ## What a judge is looking at
+
+Each section below states what a thing does and why it is built that way. Where the *what* is
+a checkable fact rather than an argument, it is a row in [the claims table](#the-full-list),
+with the file, the line and the command. Nothing here asks to be taken on trust that could
+have been demonstrated instead.
 
 ### The agent has exactly one doorway
 
@@ -150,8 +317,19 @@ one tool that moves a change forward is held by the harness until a person answe
 
 Production connectors are mounted `@read-only` alongside it, and because TrueForge subagents
 inherit the root agent's MCP scope, the guarantee extends to every subagent automatically:
-**no principal in the run can reach production without a human.** That is asserted by
-[`scripts/check-agents.mjs`](scripts/check-agents.mjs) in CI, so it cannot drift.
+**no principal in the run can reach production without a human.**
+
+```console
+$ npm run check:agents
+  ok  airlock-change-control    gated on airlock_request_approval, 8 connectors, 8 skills, preloaded: airlock
+  ok  airlock-privacy           gated on airlock_request_approval, 5 connectors, 2 skills, preloaded: airlock
+  ok  airlock-scout             read-only — no path to production, 3 connectors, 1 skills, all deferred
+  ok  airlock-treasury          gated on airlock_request_approval, 3 connectors, 1 skills, preloaded: airlock, stripe
+
+4 agent spec(s) check out. 8 skills referenced.
+```
+
+[`scripts/check-agents.mjs`](scripts/check-agents.mjs) runs in CI, so this cannot drift.
 
 ### Seven classes of change
 
@@ -201,11 +379,33 @@ every link after it:
 
 ```console
 $ npm run verify:ledger
-  ok  #000  dos_orders_index         a41f9c02be7d8e5f31c4…
-  FAIL #001  dos_gdpr_batch          9e02cc71a4bb0d3f2871…
-         fault      : content-modified
-FAIL — the chain breaks at record 1. Every record after that point is no longer trustworthy.
+  ok   #000  dos_orders_index         26685b93cb2880350bde…
+  ok   #001  dos_gdpr_batch           1602beab8290ef5ddab6…
+  ok   #002  dos_plan_column          66dc9dce5b145d1ec694…
+  ok   #003  dos_bucket_delete        f11491e518258ba5db1e…
+  ok   #004  dos_email_unique         8e3904e0b8f418386bba…
+
+PASS — the chain is intact across 5 sealed record(s).
+Head: sha256:8e3904e0b8f418386bba5f4d34e1707ba6cf405e586ddabc3db07434d59cadda
 ```
+
+Now edit one word of one decided change in `apps/console/.airlock/ledger.json` — the request
+and run it again:
+
+```console
+  ok   #000  dos_orders_index         26685b93cb2880350bde…
+  FAIL #001  dos_gdpr_batch           1602beab8290ef5ddab6…
+         fault      : content-modified
+         recomputed : sha256:29a5b022e614c47a02fffeae625797b695619a5aa6d9899b8a0caf5ca64008e4
+  ok   #002  dos_plan_column          66dc9dce5b145d1ec694…
+
+FAIL — the chain breaks at record 1 (dos_gdpr_batch).
+Every record after that point is no longer trustworthy.
+```
+
+It names the record, the fault, and the hash it recomputed — and says plainly that everything
+downstream is now suspect, rather than reporting one bad row and letting you assume the rest
+is fine.
 
 This does not make the ledger unforgeable — anyone who can rewrite the file can recompute the
 whole chain. What it makes is **tampering visible** to anyone holding an older copy of a
@@ -417,15 +617,24 @@ Ten migrations against a real database, five of them deliberately impossible, sc
 executing the model's own SQL and comparing bytes — `pre → forward → post → rollback →
 post-rollback`, and the score is whether digest 3 equals digest 1.
 
-There is no rubric and no LLM judge, because AIRLOCK already contains a grader: it is the same
-function the gate uses to decide whether a real change may be approved. The benchmark cannot be
-won with a persuasive explanation, and it cannot drift from the product, because it **is** the
-product.
+There is no rubric and no LLM judge. The scorer applies the gate's own rule — digest 3 must
+equal digest 1, byte for byte — so the benchmark cannot be won with a persuasive explanation.
 
-| Model | Correct | Over-claimed | Under-claimed |
-| --- | --- | --- | --- |
-| `gpt-4.1` | 8/10 | **0** | 2 |
-| `gpt-4.1-mini` | 6/8 | 1 | 1 |
+Being exact about what that shares with the product, because this is the sort of claim worth
+being exact about: it is the same **rule**, not literally the same function call.
+[`grade()`](benchmark/run.mjs#L257) computes `verified: pre === postRollback` against a SQLite
+shadow copy; [`openGate`](packages/contract/src/gate.ts#L221) seals a change when
+`c.pre !== c.post_rollback`. Two implementations of one sentence — which is why both lines sit
+in the claims table, so that if either drifts the build says so.
+
+| Model | Correct | Over-claimed | Under-claimed | Unscored |
+| --- | --- | --- | --- | --- |
+| `gpt-4.1` | 8/10 | **0** | 2 | 0 |
+| `gpt-4.1-mini` | 6/8 | 1 | 1 | 2 |
+
+*Unscored* is forward SQL that did not execute. Failing to write runnable SQL is a different
+mistake from failing to recognise that something cannot be undone, so it is reported rather
+than folded into either column — and the denominators differ because of it.
 
 The totals are the less interesting half. What matters is **which kind of mistake each model
 makes**: `gpt-4.1` never over-claimed — never wrote a rollback that failed — while mini did. An
@@ -530,6 +739,54 @@ listed as unverified. If a real run does not prove them, those lamps stay dark a
 denominator drops. **An honest 20/20 beats a padded 23/23 that a judge disproves by clicking
 one lamp.**
 
+### What a clean clone found
+
+This README was checked the only way a README can be: cloned from GitHub into an empty
+directory on a machine with none of the project's state, and followed literally, line by line.
+Eight things were wrong. They are listed because the list is the evidence that the exercise
+happened, and because a reader is owed the specifics rather than an assurance.
+
+**Three were real defects, and are fixed in code rather than papered over in prose:**
+
+- **The `curl` above returned `404 NOT_FOUND`.** Seeding lived in `GET /api/dossiers`, so the
+  fixtures existed only once something had listed them, and going straight at a single change
+  — which is exactly what the README told you to do — missed. A system behaving correctly
+  looked like a false claim. Seeding moved into the store itself
+  ([`dossierStore.ts`](apps/console/src/data/dossierStore.ts)), so every route sees the same
+  ledger whatever order they are hit in. The fixture search also walks up from the working
+  directory now, instead of assuming `../../`.
+- **Port 3000 was not overridable.** `next dev -p 3000` beats the `PORT` environment variable,
+  so anyone with something already on 3000 got `EADDRINUSE` and no suggestion. The flag is
+  gone; `PORT` works.
+- **One of the two scrollable panes on the fault screen had no keyboard path.** The other one
+  did, with a comment explaining why it mattered — which made the omission next to it look
+  deliberate. Found by running `check:a11y` against the current tree rather than trusting the
+  number this README already carried. Fixed in
+  [`ErrorBoundary.tsx`](apps/console/src/console/ErrorBoundary.tsx).
+
+**Five were claims this README made that did not hold up:**
+
+- It said **199 tests**. There are 201. A number typed once and never re-read.
+- It said *"plus **two** structural checks"* and then listed three. There are five now, and
+  the count is in the sentence that lists them.
+- The accessibility section claimed **0 failing nodes** with a command that could not run:
+  `playwright-core` and `axe-core` were not in `package.json` at all, so `npm run check:a11y`
+  exited with instructions instead of a number. They are ordinary devDependencies now — they
+  are small and pull no browser — and the claim is verified above, against a clean clone, with
+  its output pasted in.
+- It said nothing about `/console` taking **109 seconds** to compile on first open in dev,
+  which is the single most likely reason a reader concludes the project is broken. Silence
+  about a two-minute wait is not a small omission; it is the difference between "loading" and
+  "hung". It is in [Run it](#run-it) now, with the number and the way around it.
+- The benchmark section said the scorer **is the same function** the gate uses. It is not. It
+  is the same *rule*, implemented twice — `benchmark/run.mjs` compares digests itself rather
+  than calling `openGate`. That is still the interesting property, and it is now stated the
+  way it is actually true, with both lines in the claims table so neither can move alone.
+
+The last one is the reason the claims table exists at all. It was not a lie anybody told on
+purpose; it was a sentence that was true of an earlier design, and stayed in the document after
+the design changed, because nothing was checking. Prose does not fail a build. Anchors do.
+
 ### Two upstream bugs found
 
 - `@truefoundry/trueforge-ui@0.2.4` has a dependency conflict: `@assistant-ui/core` peer-depends
@@ -547,10 +804,10 @@ one lamp.**
 ## Tests
 
 ```bash
-npm test        # 199 tests, 16 fixtures, 4 agent specs
+npm test        # 201 tests, 16 fixtures, 4 agent specs, 1 policy file, 24 claims
 ```
 
-Ten suites, and each pins a property rather than an implementation:
+Twelve suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |
@@ -567,7 +824,7 @@ Ten suites, and each pins a property rather than an implementation:
 | `review.test.mjs` | A migration with unreviewed code does not open the gate; a fix that predates the finding is not a fix; nits never block |
 | `mcp/server.test.mjs` | Exactly one tool is destructive and it is the one held for approval; there is no tool that applies a change |
 
-Plus two structural checks that run in CI:
+Plus five structural checks. The first four run inside `npm test`; the fifth runs in CI:
 
 - `check-fixtures.mjs` — every fixture parses against the contract *and* produces the gate
   verdict its filename implies, so a fixture named `.standing.json` really is refused for
@@ -575,21 +832,42 @@ Plus two structural checks that run in CI:
 - `check-agents.mjs` — no production connector carries a write selector, no agent anywhere
   holds `merge_pull_request` or any other verb that would apply rather than propose, and every
   named write tool is on a deliberate per-connector allow-list.
+- `check-policy.mjs` — `airlock.policy.yaml` is authored rather than generated, because a team
+  is meant to edit it. This asserts it still resolves to exactly the shipped default, so a
+  console enforcing one thing while the docs describe another fails the build.
+- `verify-claims.mjs` — every claim in the table above still resolves to a line that exists,
+  exactly once, and the README's copy of the table agrees with the code. Move the gate's
+  checksum comparison and this fails; delete the behaviour and it fails louder.
 - `check-benchmark.mjs` — every table, column and index the benchmark tasks name really exists.
   A drifted task does not fail loudly; its SQL errors, the scorer reads that as a model mistake,
   and the next number anybody quotes is inflated.
 
 Generated artefacts (`contracts/dossier.schema.json`, `docs/CAPABILITIES.md`,
-`docs/POLICY.md`, the fixtures) come from `npm run gen` and are idempotent, so what the docs
-claim and what the code does cannot drift.
+`docs/POLICY.md`, the fixtures, and the claims table in this file) come from `npm run gen` and
+are idempotent, so what the docs claim and what the code does cannot drift.
 
 ### Accessibility
 
 ```bash
-npm run check:a11y      # axe-core, WCAG 2.1 AA, all three routes
+npx playwright-core install chromium         # the browser binary; npm install does not fetch it
+npm run dev --workspace @airlock/console &   # or `npm start` against a build
+npm run check:a11y                           # axe-core, WCAG 2.1 AA, all three routes
 ```
 
-**Currently clean: 0 failing nodes.** The first run of it found **106** — legends, hints and
+```console
+  landing    0 violation type(s), 0 node(s)
+  console    0 violation type(s), 0 node(s)
+  control    0 violation type(s), 0 node(s)
+
+TOTAL failing nodes: 0
+Clean against WCAG 2.1 AA.
+```
+
+**Currently clean: 0 failing nodes**, and that is the output of the run, not a remembered
+number — it is three commands away if you want it yourself. `AIRLOCK_BASE_URL` points the
+check at a console on another port.
+
+The first run of it found **106** — legends, hints and
 secondary evidence text on every page — because two ink tokens had been chosen for the mood
 they created rather than measured. `--ink-3` was at 3.03:1 and `--ink-4` at 1.57:1 against a
 required 4.5:1.
