@@ -58,6 +58,7 @@ const nextConfig: NextConfig = {
   // Inlined at build time, so the value has to be resolved before this object
   // is constructed — which is why loadRootEnv() runs at import.
   env: {
+    NEXT_PUBLIC_GITHUB_PAGES: isGithubPages ? 'true' : 'false',
     NEXT_PUBLIC_TRUEFORGE_BASE_URL:
       process.env.NEXT_PUBLIC_TRUEFORGE_BASE_URL ?? 'http://localhost:8790',
     NEXT_PUBLIC_AIRLOCK_AGENT: process.env.NEXT_PUBLIC_AIRLOCK_AGENT ?? 'airlock-change-control',

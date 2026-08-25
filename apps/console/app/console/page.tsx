@@ -32,6 +32,7 @@ interface Config {
 }
 
 export default function Page() {
+  const isStaticPagesBuild = process.env.NEXT_PUBLIC_GITHUB_PAGES === 'true';
   /**
    * Config is fetched, not inlined.
    *
@@ -63,9 +64,13 @@ export default function Page() {
   }, []);
 
   if (failed) {
+    const note = isStaticPagesBuild
+      ? 'This GitHub Pages build is static. The live console needs a running backend or harness deployment.'
+      : 'The console could not read its own configuration. Is the server running?';
+
     return (
       <div className="fixed inset-0 overflow-hidden">
-        <Waiting note="The console could not read its own configuration. Is the server running?" />
+        <Waiting note={note} />
       </div>
     );
   }
