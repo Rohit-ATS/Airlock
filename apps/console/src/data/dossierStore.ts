@@ -11,6 +11,12 @@ import {
   isBreakGlass,
   approversFor,
   assessPostApply,
+  assessUndo,
+  requestUndo,
+  undoRestored,
+  undoWindowSeconds,
+  hasProvenInverse,
+  ruleFor,
   sealsOutstanding,
   sealReceipt,
   GENESIS_HASH,
@@ -127,6 +133,34 @@ export type DecisionOutcome =
   | { ok: true; state: 'countersigned'; dossier: Dossier; outstanding: number }
   | { ok: false; status: number; reason: string; message: string };
 
+/**
+ * Stamp the undo window onto a change at the moment it is applied.
+ *
+ * Written once, here, rather than derived on every read. The window is a
+ * promise made at a particular instant under a particular policy, and a policy
+ * file can be edited afterwards — recomputing it later would silently move a
+ * deadline a human was already relying on, in whichever direction the edit
+ * happened to go.
+ *
+ * Only stamped when a proven inverse exists, so the presence of `expires_at` in
+ * the record means there is genuinely something to run, not merely that policy
+ * would have permitted it.
+ */
+function withUndoWindow(dossier: Dossier, appliedAt: string): Dossier {
+  if (!hasProvenInverse(dossier)) return dossier;
+
+  const seconds = undoWindowSeconds(dossier, ruleFor(activePolicy(), dossier.change_class));
+  if (seconds === null) return dossier;
+
+  const landed = new Date(appliedAt).getTime();
+  if (!Number.isFinite(landed)) return dossier;
+
+  return {
+    ...dossier,
+    undo: { ...dossier.undo, expires_at: new Date(landed + seconds * 1000).toISOString() },
+  };
+}
+
 /** Attach a signature and, when the quorum is met, close and seal the record. */
 async function commit(
   dossier: Dossier,
@@ -169,15 +203,19 @@ async function commit(
         },
   };
 
+  // A change that is going in gets its undo window now. A rejected one never
+  // landed, so there is nothing to take back.
+  const stamped = rejected ? decided : withUndoWindow(decided, now);
+
   // Seal it into the chain. `seq` is the count of records already sealed, so a
   // record cannot be inserted into the middle without every later hash changing.
   const sealed = Object.values(ledger)
     .filter((d) => d.receipt !== null)
     .sort((a, b) => a.receipt!.seq - b.receipt!.seq);
   const prev = sealed[sealed.length - 1]?.receipt?.hash ?? GENESIS_HASH;
-  const receipt = await sealReceipt(decided, sealed.length, prev, now);
+  const receipt = await sealReceipt(stamped, sealed.length, prev, now);
 
-  const final: Dossier = { ...decided, receipt };
+  const final: Dossier = { ...stamped, receipt };
   await persist({ ...ledger, [dossier.dossier_id]: final });
   return { ok: true, state: 'decided', dossier: final };
 }
@@ -294,13 +332,18 @@ export async function breakGlass(
     audit: { ...dossier.audit, applied_at: now, applied_by: override.operator },
   };
 
+  // Break-glass changes get an undo window like any other, and arguably need it
+  // most: a change that went in around the safeguards is the one most likely to
+  // want taking back twenty minutes later.
+  const stamped = withUndoWindow(decided, now);
+
   const sealed = Object.values(ledger)
     .filter((d) => d.receipt !== null)
     .sort((a, b) => a.receipt!.seq - b.receipt!.seq);
   const prev = sealed[sealed.length - 1]?.receipt?.hash ?? GENESIS_HASH;
-  const receipt = await sealReceipt(decided, sealed.length, prev, now);
+  const receipt = await sealReceipt(stamped, sealed.length, prev, now);
 
-  const final: Dossier = { ...decided, receipt };
+  const final: Dossier = { ...stamped, receipt };
   await persist({ ...ledger, [id]: final });
   console.warn(`[airlock] BREAK-GLASS on ${id} by ${override.operator}: bypassed ${override.bypassed}`);
   return { ok: true, state: 'decided', dossier: final };
@@ -378,6 +421,101 @@ export async function recordPostApply(
   }
 
   return { ok: true, state: outcome.state, message: outcome.message, dossier: next };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Taking it back                                                              */
+/* -------------------------------------------------------------------------- */
+
+export type UndoResult =
+  | { ok: true; dossier: Dossier; message: string; operations: Dossier['rollback'] }
+  | { ok: false; status: number; reason: string; message: string };
+
+/**
+ * Take an applied change back, inside its window.
+ *
+ * The decision is `requestUndo`, which is pure and lives in the contract. This
+ * function does the two things that cannot be pure: it checks the clock on the
+ * server, and it writes.
+ *
+ * The server clock is the point. A countdown rendered in a browser is
+ * decoration — it can be paused by a sleeping laptop, wound back by a system
+ * clock, or simply looked at a minute after it stopped being true. So the
+ * window is re-evaluated here, from `audit.applied_at`, against this machine's
+ * time, on every request. A press that was legitimate when the button was drawn
+ * and arrives after the window closed is refused, and told exactly when it
+ * closed.
+ *
+ * What is written is `undo` and nothing else, for the same reason `post_apply`
+ * is: a decided record is immutable, and `undo` sits outside the sealed body so
+ * recording one cannot break the hash chain. The original approval remains
+ * exactly as it was, because it genuinely happened and was correctly decided —
+ * an undo is a later fact about the world, not a revision of the decision.
+ *
+ * `restoredChecksum` comes from whatever actually ran the statements. When it
+ * is absent the undo is recorded as unmeasured rather than as successful:
+ * nothing here is entitled to claim production came back just because no error
+ * was thrown.
+ */
+export async function undoChange(
+  id: string,
+  viewer: Viewer,
+  reason: string,
+  restoredChecksum?: string | null,
+): Promise<UndoResult> {
+  const ledger = { ...(await load()) };
+  const dossier = ledger[id];
+  if (!dossier) return { ok: false, status: 404, reason: 'NOT_FOUND', message: 'No such change.' };
+
+  const decision = requestUndo(dossier, { email: viewer.email, role: viewer.role }, { policy: activePolicy() });
+  if (decision.state === 'REFUSED') {
+    return { ok: false, status: 403, reason: decision.reason, message: decision.message };
+  }
+
+  const now = new Date().toISOString();
+  const observed = restoredChecksum ?? null;
+  const restored = undoRestored(dossier, observed);
+
+  const next: Dossier = {
+    ...dossier,
+    undo: {
+      ...dossier.undo,
+      expires_at: decision.expiresAt,
+      undone_at: now,
+      undone_by: viewer.email,
+      reason,
+      restored_checksum: observed,
+      restored,
+    },
+  };
+
+  await persist({ ...ledger, [id]: next });
+
+  // Loud on purpose. An undo is production being written to on the strength of
+  // a proof taken earlier, which is exactly the kind of event that should be
+  // trivial to find in a log at 3am.
+  console.warn(
+    `[airlock] UNDO on ${id} by ${viewer.email} — ${decision.operations.length} proven rollback operation(s)`,
+  );
+  if (restored === false) {
+    console.error(`[airlock] UNDO on ${id} did NOT restore production to its pre-migration checksum`);
+  }
+
+  const message =
+    restored === true
+      ? 'Taken back. Production matches the checksum it started from.'
+      : restored === false
+        ? 'The rollback ran and production did NOT return to its starting state. This needs a human now.'
+        : 'Taken back. The proven rollback was issued; the result has not been checksummed.';
+
+  return { ok: true, dossier: next, message, operations: decision.operations };
+}
+
+/** What the console needs to draw the window, computed with the server's clock. */
+export async function undoAvailability(id: string) {
+  const dossier = await getDossier(id);
+  if (!dossier) return null;
+  return assessUndo(dossier, { policy: activePolicy() });
 }
 
 /* -------------------------------------------------------------------------- */

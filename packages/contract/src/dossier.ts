@@ -334,6 +334,47 @@ export const PostApply = z.object({
 });
 export type PostApply = z.infer<typeof PostApply>;
 
+/**
+ * The time-boxed right to take a change back.
+ *
+ * `post_apply` above is AIRLOCK noticing something is wrong. This is a human
+ * noticing — which is the more common case, because most bad changes are
+ * perfectly healthy by every checksum and simply turn out to be the wrong idea.
+ * A migration that applies cleanly and quietly breaks a report is not a failed
+ * change; it is a correct change nobody wanted.
+ *
+ * The window exists because the same proof that opened the gate has a second
+ * life. The agent already executed this rollback against a shadow copy and
+ * checksummed the data back to byte-identical, so for as long as production has
+ * not moved on, that inverse is still known-good. `expires_at` is when AIRLOCK
+ * stops being willing to vouch for it.
+ *
+ * What this deliberately is *not*: a general undo. It is offered only where a
+ * proven inverse exists, only inside the window, and never for a change whose
+ * certificate was SCOPE — you cannot un-send an email, and a button that
+ * pretends otherwise is worse than no button.
+ */
+export const Undo = z.object({
+  /**
+   * When the window closes. Written at apply time from the policy ceiling and
+   * the change's own request, so it is a fact about this change rather than a
+   * calculation the console redoes with a clock the server cannot see.
+   */
+  expires_at: z.string().nullable().default(null),
+  undone_at: z.string().nullable().default(null),
+  undone_by: z.string().nullable().default(null),
+  reason: z.string().nullable().default(null),
+  /** Production, re-checksummed after the undo ran. */
+  restored_checksum: Sha256.nullable().default(null),
+  /**
+   * Null until an undo has run. True only when the restored checksum equals the
+   * pre-migration one — the same equality the certificate had to satisfy. An
+   * undo that ran without restoring is recorded as an undo that did not work.
+   */
+  restored: z.boolean().nullable().default(null),
+});
+export type Undo = z.infer<typeof Undo>;
+
 export const Audit = z.object({
   applied_at: z.string().nullable().default(null),
   post_apply_checksum: Sha256.nullable().default(null),
@@ -414,6 +455,14 @@ export const Dossier = z.object({
     rolled_back_at: null,
     rollback_reason: null,
     duration_ms: null,
+  }),
+  undo: Undo.default({
+    expires_at: null,
+    undone_at: null,
+    undone_by: null,
+    reason: null,
+    restored_checksum: null,
+    restored: null,
   }),
   receipt: Receipt.nullable().default(null),
 });

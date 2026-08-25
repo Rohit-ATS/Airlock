@@ -40,6 +40,10 @@ const EXPECTED = {
   dos_replica_scaledown: 'PRODUCTION_DRIFTED',
   dos_orders_backfill: 'POLICY_LOCK_CEILING',
   dos_orders_index: 'ALREADY_APPLIED',
+  // Applied, health-checked clean, and taken back anyway inside the window. The
+  // gate is closed for the ordinary reason — it already went in — and the undo
+  // is a later fact recorded outside the seal.
+  dos_plan_column: 'ALREADY_APPLIED',
   dos_gdpr_batch: 'ALREADY_APPLIED',
   dos_bucket_delete: 'ALREADY_DECIDED',
   dos_email_unique: 'ALREADY_APPLIED',

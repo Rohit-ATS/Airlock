@@ -27,6 +27,10 @@ defaults:
   max_people: null
   max_amount_minor: null
   max_lock_ms: null
+  # No undo by default. A window is permission to run statements against
+  # production on the strength of a proof taken earlier, so a class has to be
+  # granted one deliberately rather than inherit it.
+  undo_window_seconds: null
   require_expiry: false
   allow_self_approval: false
   blackout: []
@@ -39,10 +43,14 @@ classes:
     freshness_seconds: 1800
     # Beyond five seconds every query against the table is queueing behind you.
     max_lock_ms: 5000
+    # Thirty minutes to take it back. The inverse was executed against a shadow
+    # copy half an hour ago and the table has not moved, so it is still good.
+    undo_window_seconds: 1800
     break_glass: true
     note: >-
       Structural change must be proven reversible. A schema change with no proven
-      rollback is not a migration, it is a bet.
+      rollback is not a migration, it is a bet. Thirty minutes to take it back,
+      because the inverse was proven half an hour ago and the table has not moved.
 
   DATA_OPERATION:
     requires: UNDO
@@ -50,10 +58,15 @@ classes:
     max_records: 5000000
     # Tighter than a migration: a bulk update holds its lock for the whole write.
     max_lock_ms: 2000
+    # Half the schema window: a backfill has live writes landing on top of it,
+    # so its inverse goes stale faster than a structural one.
+    undo_window_seconds: 900
     break_glass: true
     note: >-
       Above five million rows the batch strategy stops being an implementation
-      detail and becomes a capacity decision.
+      detail and becomes a capacity decision. Half the schema window to take it
+      back: a backfill has live writes landing on top of it, and an inverse gets
+      stale faster than a structural one.
 
   ERASURE:
     requires: SCOPE
@@ -107,6 +120,9 @@ classes:
     requires: ANY
     quorum: 2
     freshness_seconds: 900
+    # Ten minutes. Scaling a cluster back down is genuinely undoable, but the
+    # thing you scaled has been serving traffic in the meantime.
+    undo_window_seconds: 600
     break_glass: true
     blackout:
       - days: [5]
@@ -133,6 +149,33 @@ classes:
     note: >-
       Frozen from Friday afternoon to Monday morning. Break-glass exists here
       because production outages do not read the policy.
+
+# What one run may spend before it is stopped.
+#
+# Every rule above governs what a change may do to production. This governs what
+# the agent may do to your invoice, which is a different kind of irreversible:
+# nobody has ever been refunded for a verification loop that ran all night
+# against a shadow branch because a retry never terminated.
+#
+# Reaching the ceiling cancels the turn through the harness — the same call the
+# ABORT button makes — so it lands on whichever executor is doing the work
+# rather than in the browser tab that noticed. Set `enforce: false` to make this
+# an observation instead; the console renders the two differently, because a
+# budget that cannot stop anything is a number, not a cap.
+budget:
+  usd: 5
+  tokens: 2000000
+  warn_at: 0.75
+  enforce: true
+
+# Deliberately absent: there is no undo window on ERASURE, ACCESS_GRANT,
+# MONEY_MOVEMENT or COMMS_BLAST.
+#
+# Not an oversight and not caution — those classes carry a SCOPE certificate,
+# which proves what will be destroyed rather than that it can be restored. There
+# is no proven inverse to keep warm, so there is nothing an undo button could
+# honestly do. A control that implies you can un-send forty thousand emails is
+# worse than no control.
 
 # Deliberately absent: there is no change freeze on ERASURE, MONEY_MOVEMENT,
 # ACCESS_GRANT, SCHEMA_MIGRATION or DATA_OPERATION.

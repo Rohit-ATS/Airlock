@@ -11,11 +11,14 @@ import {
   sealsOutstanding,
   verdictOf,
   type ApprovalGrant,
+  type ClaimKey,
   type Dossier,
   type GateDecision,
   type Viewer,
 } from '@airlock/contract';
 import { Button, Chip, Divider, Evidence, Legend, Panel, Readout, cx } from '@/design/primitives';
+import { ProvenanceInspector, ProvenanceProvider, Traced } from '@/provenance/Provenance';
+import { UndoWindow } from '@/undo/UndoWindow';
 import { ChecksumTriple } from './ChecksumTriple';
 
 /**
@@ -258,9 +261,13 @@ function MagnitudeBlock({ dossier }: { dossier: Dossier }) {
     <div>
       <Legend className="mb-2">What this costs the world</Legend>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {m.records > 0 ? <MagnitudeCell label="records" value={m.records.toLocaleString()} /> : null}
+        {m.records > 0 ? (
+          <MagnitudeCell dossier={dossier} claim="records" label="records" value={m.records.toLocaleString()} />
+        ) : null}
         {m.people > 0 ? (
           <MagnitudeCell
+            dossier={dossier}
+            claim="people"
             label={m.people === 1 ? 'person' : 'people'}
             value={m.people.toLocaleString()}
             tone="hazard"
@@ -268,12 +275,15 @@ function MagnitudeBlock({ dossier }: { dossier: Dossier }) {
         ) : null}
         {m.amount_minor !== 0 ? (
           <MagnitudeCell
+            dossier={dossier}
+            claim="amount"
             label={m.amount_minor > 0 ? 'leaving' : 'arriving'}
             value={formatMoney(Math.abs(m.amount_minor), m.currency)}
             tone="hazard"
           />
         ) : null}
         <MagnitudeCell
+          dossier={dossier}
           label="undo window"
           value={
             m.undo_window_seconds === null
@@ -294,11 +304,23 @@ function MagnitudeBlock({ dossier }: { dossier: Dossier }) {
   );
 }
 
+/**
+ * One figure in the magnitude grid.
+ *
+ * `claim` makes it interrogable. The distinction it surfaces is the point of
+ * the whole provenance layer: a record count sitting next to a checksum looks
+ * exactly as authoritative, and is very often something the agent simply
+ * asserted about its own change.
+ */
 function MagnitudeCell({
+  dossier,
+  claim,
   label,
   value,
   tone = 'ink',
 }: {
+  dossier: Dossier;
+  claim?: ClaimKey;
   label: string;
   value: string;
   tone?: 'ink' | 'hazard' | 'seal';
@@ -307,7 +329,13 @@ function MagnitudeCell({
   return (
     <div className="rounded-[5px] border border-hairline bg-void px-2.5 py-2">
       <Evidence size="md" className={cx('block leading-none', tones[tone])}>
-        {value}
+        {claim ? (
+          <Traced dossier={dossier} claim={claim}>
+            {value}
+          </Traced>
+        ) : (
+          value
+        )}
       </Evidence>
       <Legend className="mt-1.5 !text-[9px]">{label}</Legend>
     </div>
@@ -715,7 +743,13 @@ function LockProfile({ dossier }: { dossier: Dossier }) {
   return (
     <div className="rounded-[5px] border border-hairline bg-void px-3 py-2">
       <Readout label="Estimated lock" tone={(c.lock_ms_estimate ?? 0) > 2000 ? 'hazard' : 'seal'}>
-        {c.lock_ms_estimate !== undefined ? `${(c.lock_ms_estimate / 1000).toFixed(2)} s` : '—'}
+        {c.lock_ms_estimate !== undefined ? (
+          <Traced dossier={dossier} claim="lock_ms">
+            {`${(c.lock_ms_estimate / 1000).toFixed(2)} s`}
+          </Traced>
+        ) : (
+          '—'
+        )}
       </Readout>
       <Divider />
       <Readout label="Table rewrite" tone={rewrite ? 'hazard' : 'seal'}>
@@ -830,7 +864,11 @@ function CostBlock({ dossier }: { dossier: Dossier }) {
   const models = Object.entries(dossier.cost.by_model);
   return (
     <div className="rounded-[5px] border border-hairline bg-void px-3 py-2">
-      <Readout label="Run cost">${dossier.cost.usd.toFixed(4)}</Readout>
+      <Readout label="Run cost">
+        <Traced dossier={dossier} claim="cost">
+          ${dossier.cost.usd.toFixed(4)}
+        </Traced>
+      </Readout>
       {models.length > 0 ? (
         <>
           <Divider />
@@ -904,6 +942,7 @@ export function CertificateCard({
   onApprove,
   onReject,
   onBreakGlass,
+  onUndo,
   breakGlassEnabled = false,
   busy,
   className,
@@ -913,6 +952,7 @@ export function CertificateCard({
   onApprove: (grant: ApprovalGrant) => void;
   onReject: (reason: string) => void;
   onBreakGlass?: (justification: string) => void;
+  onUndo?: (reason: string) => void;
   breakGlassEnabled?: boolean;
   busy?: boolean;
   className?: string;
@@ -921,6 +961,7 @@ export function CertificateCard({
   const cert = dossier.certificate;
 
   return (
+    <ProvenanceProvider>
     <Panel className={cx('flex min-h-0 flex-col overflow-hidden', className)}>
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3.5 py-2.5">
         <Legend>Change certificate</Legend>
@@ -1022,9 +1063,17 @@ export function CertificateCard({
           </div>
         ) : null}
 
+        {/* The undo window sits directly under the health check, because the two
+            are the same question asked by different parties: did this change do
+            what it was supposed to, and does anybody still want it. */}
+        <PostApplyBlock dossier={dossier} />
+        <UndoWindow dossier={dossier} onUndo={(reason) => onUndo?.(reason)} busy={busy} />
+
         <CostBlock dossier={dossier} />
         <ReceiptBlock dossier={dossier} />
       </div>
+
+      <ProvenanceInspector dossier={dossier} />
 
       {/* ---- the decision ---- */}
       <footer className="shrink-0 space-y-2 border-t border-hairline bg-panel px-3.5 py-3">
@@ -1052,5 +1101,6 @@ export function CertificateCard({
         )}
       </footer>
     </Panel>
+    </ProvenanceProvider>
   );
 }
