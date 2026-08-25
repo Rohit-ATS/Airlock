@@ -1,0 +1,126 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "postgres",
+      "op": "ALTER TABLE users DROP COLUMN plan_name;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "rollback": [
+    {
+      "system": "postgres",
+      "op": "ALTER TABLE users ADD COLUMN plan_name text;\nUPDATE users SET plan_name = plan_name_for(tier);",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "magnitude": {
+    "records": 412880,
+    "people": 0,
+    "amount_minor": 0,
+    "undo_window_seconds": null
+  },
+  "principals": [],
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "users",
+      "rows": 412880,
+      "operation": "drop column"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "APPLY",
+  "risk_notes": [],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.0874,
+    "by_model": {
+      "openai/gpt-4.1-mini": 0.0874
+    },
+    "tokens": {
+      "input": 39100,
+      "output": 2240,
+      "total": 41340
+    }
+  },
+  "signatures": [
+    {
+      "approver": "sam.okafor@airlock.dev",
+      "at": "2026-08-23T10:12:00Z",
+      "decision": "approved",
+      "reason": null,
+      "break_glass": false
+    }
+  ],
+  "approval": {
+    "approver": "sam.okafor@airlock.dev",
+    "at": "2026-08-23T10:12:00Z",
+    "role_required": "approver",
+    "decision": "approved",
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": "2026-08-23T10:12:00Z",
+    "post_apply_checksum": null,
+    "applied_by": "sam.okafor@airlock.dev"
+  },
+  "receipt": {
+    "seq": 2,
+    "prev_hash": "sha256:b1f92092422ae09bc96a64c60025e00c35af8417ecd7724e04bac1412416078b",
+    "hash": "sha256:dd7746c2cb2176108cf92cdd968a5bce4a721f7b6bc7bce3b193e46f47ecb180",
+    "sealed_at": "2026-08-23T10:12:00Z"
+  },
+  "dossier_id": "dos_plan_column",
+  "change_class": "SCHEMA_MIGRATION",
+  "request": "Drop the deprecated plan_name column from users now that every service reads tier instead.",
+  "requested_by": "marco.b@airlock.dev",
+  "created_at": "2026-08-23T10:00:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_9d33a",
+    "systems": [
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "UNDO",
+    "status": "PROVEN",
+    "checksums": {
+      "pre": "sha256:fa4c9edac2a978c736f85b05d132875e6bd2d8ed81357911c6354220eb71ed5e",
+      "post": "sha256:121105c0f2067396329c7c13ce649ca085c76c0667054a823721d4cb9a38ec03",
+      "post_rollback": "sha256:fa4c9edac2a978c736f85b05d132875e6bd2d8ed81357911c6354220eb71ed5e",
+      "match": true
+    },
+    "lock_ms_estimate": 340,
+    "table_rewrite": false,
+    "verified_at": "2026-08-23T10:06:00Z"
+  },
+  "post_apply": {
+    "checked_at": "2026-08-23T10:12:18Z",
+    "observed_checksum": "sha256:121105c0f2067396329c7c13ce649ca085c76c0667054a823721d4cb9a38ec03",
+    "expected_checksum": "sha256:121105c0f2067396329c7c13ce649ca085c76c0667054a823721d4cb9a38ec03",
+    "healthy": true,
+    "rolled_back_at": null,
+    "rollback_reason": null,
+    "duration_ms": null
+  },
+  "undo": {
+    "expires_at": "2026-08-23T10:42:00Z",
+    "undone_at": "2026-08-23T10:23:30Z",
+    "undone_by": "sam.okafor@airlock.dev",
+    "reason": "Finance nightly reads plan_name. Putting it back until they cut over.",
+    "restored_checksum": "sha256:fa4c9edac2a978c736f85b05d132875e6bd2d8ed81357911c6354220eb71ed5e",
+    "restored": true
+  }
+}

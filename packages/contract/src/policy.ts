@@ -71,6 +71,16 @@ export interface ClassRule {
    * waiting rather than by working. So it gets its own ceiling.
    */
   max_lock_ms: number | null;
+  /**
+   * How long after applying a change it may still be taken back, in seconds.
+   * `null` means it is permanent the moment it lands.
+   *
+   * This is a promise about how long the organisation will keep a proven
+   * inverse warm, so policy grants it and a change may only waive part of it.
+   * Classes that carry a SCOPE certificate get `null` and always would: there
+   * is no inverse of an erasure to keep warm in the first place.
+   */
+  undo_window_seconds: number | null;
   /** Every principal in the change must carry an expiry. */
   require_expiry: boolean;
   /** Whether the person who asked for the change may also approve it. */
@@ -89,11 +99,46 @@ export interface ClassRule {
   note?: string;
 }
 
+/**
+ * What a single run is allowed to spend before it is stopped.
+ *
+ * The rest of this file governs what a change may do to production. This
+ * governs what the *agent* may do to your invoice, which is a different kind of
+ * irreversible: nobody has ever been refunded for a verification loop that ran
+ * all night against a shadow branch because a retry never terminated.
+ *
+ * A cap that only warns is a budget nobody has. So when the ceiling is reached
+ * AIRLOCK cancels the turn — through exactly the same harness call the ABORT
+ * button uses, because the run must stop on whichever replica is doing the
+ * work, not merely in the tab that noticed.
+ */
+export interface BudgetPolicy {
+  /** Ceiling for one run, in US dollars. `null` means uncapped. */
+  usd: number | null;
+  /** Ceiling on total tokens for one run. `null` means uncapped. */
+  tokens: number | null;
+  /**
+   * Fraction of the ceiling at which the console starts saying so out loud,
+   * while the run continues. 0.8 warns at four-fifths spent.
+   */
+  warn_at: number;
+  /**
+   * Whether reaching the ceiling actually cancels the run.
+   *
+   * False makes this an observation rather than a control, which is a
+   * legitimate way to introduce it to a team — but it is named honestly, and
+   * the console renders a budget that cannot stop anything differently from one
+   * that can.
+   */
+  enforce: boolean;
+}
+
 export interface Policy {
   version: string;
   name: string;
   defaults: ClassRule;
   classes: Partial<Record<ChangeClass, Partial<ClassRule>>>;
+  budget: BudgetPolicy;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -124,6 +169,7 @@ export const DEFAULT_POLICY: Policy = {
     max_people: null,
     max_amount_minor: null,
     max_lock_ms: null,
+    undo_window_seconds: null,
     require_expiry: false,
     allow_self_approval: false,
     blackout: [],
@@ -136,8 +182,9 @@ export const DEFAULT_POLICY: Policy = {
       requires: 'UNDO',
       freshness_seconds: 1800,
       max_lock_ms: 5_000,
+      undo_window_seconds: 1_800,
       break_glass: true,
-      note: 'Structural change must be proven reversible. A schema change with no proven rollback is not a migration, it is a bet.',
+      note: 'Structural change must be proven reversible. A schema change with no proven rollback is not a migration, it is a bet. Thirty minutes to take it back, because the inverse was proven half an hour ago and the table has not moved.',
     },
 
     DATA_OPERATION: {
@@ -145,8 +192,9 @@ export const DEFAULT_POLICY: Policy = {
       freshness_seconds: 1800,
       max_records: 5_000_000,
       max_lock_ms: 2_000,
+      undo_window_seconds: 900,
       break_glass: true,
-      note: 'Above five million rows the batch strategy stops being an implementation detail and becomes a capacity decision.',
+      note: 'Above five million rows the batch strategy stops being an implementation detail and becomes a capacity decision. Half the schema window to take it back: a backfill has live writes landing on top of it, and an inverse gets stale faster than a structural one.',
     },
 
     ERASURE: {
@@ -199,6 +247,7 @@ export const DEFAULT_POLICY: Policy = {
       requires: 'ANY',
       quorum: 2,
       freshness_seconds: 900,
+      undo_window_seconds: 600,
       break_glass: true,
       blackout: [
         {
@@ -225,6 +274,22 @@ export const DEFAULT_POLICY: Policy = {
       ],
       note: 'Frozen from Friday afternoon to Monday morning. Break-glass exists here because production outages do not read the policy.',
     },
+  },
+
+  /**
+   * Five dollars and two million tokens for a single run.
+   *
+   * The number is not the interesting part — it is meant to be argued with, and
+   * it lives in the policy file so a team can. What matters is that reaching it
+   * stops the run rather than colouring a badge, and that the stop goes through
+   * the harness, so it lands on the executor rather than in the browser tab
+   * that happened to notice.
+   */
+  budget: {
+    usd: 5,
+    tokens: 2_000_000,
+    warn_at: 0.75,
+    enforce: true,
   },
 };
 
@@ -265,11 +330,29 @@ const ClassRuleSchema = z
     max_people: z.number().int().nonnegative().nullable(),
     max_amount_minor: z.number().int().nonnegative().nullable(),
     max_lock_ms: z.number().int().nonnegative().nullable(),
+    undo_window_seconds: z.number().int().nonnegative().nullable(),
     require_expiry: z.boolean(),
     allow_self_approval: z.boolean(),
     blackout: z.array(BlackoutSchema),
     break_glass: z.boolean(),
     note: z.string().optional(),
+  })
+  .strict();
+
+/**
+ * The budget block.
+ *
+ * `warn_at` is bounded above by 1 rather than merely being a number, because a
+ * warning threshold above the ceiling is a warning that never fires — the same
+ * class of quiet mistake as a mistyped ceiling key, and it deserves the same
+ * treatment.
+ */
+const BudgetSchema = z
+  .object({
+    usd: z.number().positive().nullable(),
+    tokens: z.number().int().positive().nullable(),
+    warn_at: z.number().gt(0).lte(1, 'a warning above the ceiling would never fire'),
+    enforce: z.boolean(),
   })
   .strict();
 
@@ -279,6 +362,7 @@ export const PolicySchema = z
     name: z.string().min(1),
     defaults: ClassRuleSchema,
     classes: z.record(z.enum(CHANGE_CLASSES), ClassRuleSchema.partial().strict()),
+    budget: BudgetSchema,
   })
   .strict();
 

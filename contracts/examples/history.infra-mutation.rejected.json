@@ -86,9 +86,9 @@
     "applied_by": null
   },
   "receipt": {
-    "seq": 2,
-    "prev_hash": "sha256:b1f92092422ae09bc96a64c60025e00c35af8417ecd7724e04bac1412416078b",
-    "hash": "sha256:359ee55856e0f63436add30a19539691f115eebc753b2b3ac16da7b92f1e193b",
+    "seq": 3,
+    "prev_hash": "sha256:dd7746c2cb2176108cf92cdd968a5bce4a721f7b6bc7bce3b193e46f47ecb180",
+    "hash": "sha256:af362e232183590eb0ea75fdf705e49fdadcab8b969a8084dd6a0588c51f234f",
     "sealed_at": "2026-08-23T16:10:00Z"
   },
   "dossier_id": "dos_bucket_delete",

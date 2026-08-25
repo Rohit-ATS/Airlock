@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import type { BudgetPolicy } from '@airlock/contract';
 import { ErrorBoundary } from '@/console/ErrorBoundary';
 
 /**
@@ -29,6 +30,8 @@ interface Config {
   /** Path on this origin that proxies the harness. */
   harnessPath: string;
   agentName: string;
+  /** The run ceiling, read from the same policy document the gate uses. */
+  budget: BudgetPolicy;
 }
 
 export default function Page() {
@@ -88,6 +91,7 @@ export default function Page() {
             // a direct browser call fails before it arrives.
             baseUrl={new URL(config.harnessPath, window.location.origin).toString()}
             agentName={config.agentName}
+            budget={config.budget}
           />
         ) : (
           <Waiting note="Reading configuration…" />
