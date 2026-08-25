@@ -67,6 +67,7 @@ npm run build --workspace @airlock/contract
 npm run seed:sqlite -- --reset
 npm run verify:sqlite -- --emit-only
 npm run verify:sqlite:failed -- --emit-only
+npm run verify:sqlite:drift -- --emit-only
 npm run verify:sqlite:scope -- --emit-only
 npm run dev --workspace @airlock/console
 ```
@@ -128,6 +129,9 @@ After the schema migration works:
    Started for erasure scope: the dossier carries aggregate counts, while row-level
    details are written to `.airlock/*.scope.ndjson`;
 4. drift re-check: recompute production checksum just before asking for approval.
+   Started with `npm run verify:sqlite:drift -- --emit-only`: the rollback proof
+   still passes, but production changes before approval, so the gate seals as
+   `PRODUCTION_DRIFTED`.
 
 ## Local Setup Note
 
