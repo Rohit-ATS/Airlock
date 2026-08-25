@@ -1,6 +1,6 @@
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
-import { breakGlassEnabled, dataDir } from './env';
+import { breakGlassEnabled, dataDir, seedDisabled } from './env';
 import { activePolicy } from './policy';
 import {
   Dossier,
@@ -67,7 +67,61 @@ async function load(): Promise<Ledger> {
   } catch {
     cache = {};
   }
+
+  // Seed here rather than in the route that happens to be read first.
+  //
+  // This used to live in `GET /api/dossiers`, which meant the fixtures existed
+  // only once something had listed them. Anyone who went straight at a single
+  // change — the curl in the README does exactly that — got `404 NOT_FOUND`
+  // from a system that was working correctly, which reads as a false claim
+  // rather than an ordering quirk. Seeding at the one place every route already
+  // funnels through makes the store's behaviour independent of arrival order.
+  //
+  // Re-entry is not a risk: `cache` is assigned above, so the `seedIfEmpty`
+  // below re-enters `load()` and returns on the first line.
+  if (Object.keys(cache).length === 0) {
+    seeding ??= seedFromExamples();
+    await seeding;
+  }
+
   return cache;
+}
+
+/** One in-flight seed, however many requests arrive together on a cold start. */
+let seeding: Promise<void> | null = null;
+
+async function seedFromExamples(): Promise<void> {
+  if (seedDisabled()) return;
+  const dir = examplesDir();
+  if (!dir) return;
+  try {
+    const names = (await fs.readdir(dir)).filter((n) => n.endsWith('.json'));
+    const examples = await Promise.all(
+      names.map(async (n) => JSON.parse(await fs.readFile(path.join(dir, n), 'utf8')) as unknown),
+    );
+    if (examples.length > 0) await seedIfEmpty(examples);
+  } catch {
+    // No fixtures is a legitimate state — an empty console, not a broken one.
+  }
+}
+
+/**
+ * Find `contracts/examples`, walking up from wherever the process was started.
+ *
+ * `next dev` runs with cwd at `apps/console`, but `npm start` from the repo
+ * root does not, and a fixed `../../` resolves to nothing in the second case —
+ * an empty queue with no error, which is the worst way for this to fail.
+ */
+function examplesDir(): string | null {
+  let dir = process.cwd();
+  for (let up = 0; up < 5; up += 1) {
+    const candidate = path.join(dir, 'contracts', 'examples');
+    if (existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
 }
 
 async function persist(ledger: Ledger): Promise<void> {

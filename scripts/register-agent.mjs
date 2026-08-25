@@ -179,8 +179,28 @@ say(`  connectors attached: ${manifest.mcp_servers.map((s) => s.name).join(', ')
 const payload = { name, manifest: stripComments(manifest) };
 
 let result = await api('POST', '/api/v1/agents', payload);
+
+// Already registered, so update it in place. Creation and update are not
+// symmetric on this server, in two ways that both fail loudly only on the
+// second run of the script:
+//
+//   - The update route addresses the agent by *id*. A name in the path is not
+//     resolved, it is 404 "Agent not found: airlock-change-control".
+//   - It rejects a `name` key in the body — 400 "Unrecognized key" — because
+//     the identity is the path. The create route requires that same key.
+//
+// So re-registering needs the id looked up first and the payload narrowed to
+// the manifest alone. Getting this wrong is invisible until an agent already
+// exists, which is why it survived: the first run of a fresh harness passes.
 if (result.status === 409) {
-  result = await api('PUT', `/api/v1/agents/${encodeURIComponent(name)}`, payload);
+  const existing = ((await api('GET', '/api/v1/agents')).body?.data ?? []).find((a) => a.name === name);
+  if (existing) {
+    result = await api('PUT', `/api/v1/agents/${encodeURIComponent(existing.id)}`, {
+      manifest: payload.manifest,
+    });
+  }
+  // No `existing` means the name collided with something this list does not
+  // show. Fall through with the 409 rather than papering over it.
 }
 
 if (!result.ok) {

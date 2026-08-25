@@ -45,7 +45,17 @@ export class ErrorBoundary extends Component<
             {error.stack ? (
               <div>
                 <p className="legend mb-1">Stack</p>
-                <pre className="scroll-thin evidence max-h-56 overflow-auto rounded-[4px] border border-hairline bg-void p-2 text-[10.5px] leading-relaxed text-ink-2">
+                <pre
+                  // Same reason as the component stack below: a scrollable region has
+                  // to be reachable without a mouse. Both panes on this screen scroll,
+                  // and only one of them had been given a keyboard path — which is the
+                  // failure mode axe exists to catch, since the fixed one right below
+                  // makes the omission look deliberate.
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Error stack"
+                  className="scroll-thin evidence max-h-56 overflow-auto rounded-[4px] border border-hairline bg-void p-2 text-[10.5px] leading-relaxed text-ink-2"
+                >
                   {error.stack}
                 </pre>
               </div>

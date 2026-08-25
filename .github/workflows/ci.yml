@@ -179,6 +179,13 @@ jobs:
       - name: The policy file and the shipped default agree
         run: npm run check:policy
 
+      # The README's claims table names a file and a line for every load-bearing
+      # claim, and this resolves each anchor against the code. A claim that no
+      # longer points at anything is a failure here rather than a discovery a
+      # judge makes with a broken link, which is the whole reason it exists.
+      - name: Every claim in the README still points at the code
+        run: npm run verify:claims
+
       - name: Typecheck every workspace
         run: npm run typecheck
 

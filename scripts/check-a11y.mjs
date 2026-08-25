@@ -31,11 +31,15 @@ try {
   ({ chromium } = require('playwright-core'));
   axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 } catch {
-  console.error('This check needs two dev dependencies that are not installed by default:\n');
-  console.error('  npm i -D playwright-core axe-core');
-  console.error('  npx playwright install chromium\n');
-  console.error('They are kept out of the default install because a browser download is a');
-  console.error('slow, flaky thing to put between a judge and a working clone.');
+  console.error('This check needs a browser binary, which `npm install` does not fetch:\n');
+  console.error('  npx playwright-core install chromium\n');
+  console.error('`playwright-core` and `axe-core` are ordinary devDependencies and arrive with');
+  console.error('`npm install` — they are small and pull no browser. Only the binary is a');
+  console.error('separate step, because a ~140MB download is a slow, flaky thing to put');
+  console.error('between a judge and a working clone.\n');
+  console.error('Note it is `playwright-core install`, not `playwright install`: the CLI lives');
+  console.error('in whichever of the two packages you actually have, and the wrong one prints');
+  console.error('a confident, unrelated suggestion to install a third.');
   process.exit(2);
 }
 
