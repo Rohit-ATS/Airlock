@@ -14,6 +14,7 @@ coverage/
 .turbo/
 .vercel/
 data/*.sqlite
+data/*.sqlite-*
 .gstack/
 
 # AIRLOCK console ledger (local demo state)

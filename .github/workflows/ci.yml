@@ -50,6 +50,28 @@ jobs:
       - name: Build the contract (this is also the compile-time gate proof)
         run: npm run build --workspace @airlock/contract
 
+      - name: SQLite verifier proves the Day 1 migration
+        run: |
+          AIRLOCK_SEED_ROWS=1000 npm run seed:sqlite -- --reset
+          AIRLOCK_DOSSIER_ID=ci_sqlite_tier node scripts/verify-sqlite-migration.mjs --emit-only > /tmp/airlock-ci-dossier.json
+          node --input-type=module <<'NODE'
+          import { openGate } from './packages/contract/dist/index.js';
+          import { readFileSync } from 'node:fs';
+
+          const dossier = JSON.parse(readFileSync('.airlock/ci_sqlite_tier.dossier.json', 'utf8'));
+          if (dossier.certificate?.status !== 'PROVEN') {
+            throw new Error(`expected PROVEN certificate, got ${dossier.certificate?.status ?? 'missing'}`);
+          }
+          if (dossier.certificate.checksums?.match !== true) {
+            throw new Error('expected checksum triple to match after rollback');
+          }
+
+          const gate = openGate(dossier, { email: 'ci-approver@airlock.dev', role: 'approver' });
+          if (gate.state !== 'OPEN') {
+            throw new Error(`expected gate to open, got ${gate.reason}`);
+          }
+          NODE
+
       - name: Build the MCP server
         run: npm run build --workspace @airlock/mcp
 
