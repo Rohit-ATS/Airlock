@@ -5,3 +5,4 @@ export * from './receipt.js';
 export * from './capabilities.js';
 export * from './detectors.js';
 export * from './observer.js';
+export * from './recovery.js';

@@ -244,6 +244,16 @@ export const CAPABILITIES: readonly CapabilitySpec[] = [
     evidence: 'model provider base URL resolves to a gateway',
     group: 'PLATFORM',
   },
+  {
+    id: 23,
+    name: 'Cross-replica cancellation',
+    loadBearing:
+      'Approval stops a change before it starts. Until now nothing stopped one already running. ABORT cancels the turn mid-flight — and because TrueForge peers cancellations between executors over Redis, it lands even when the request reaches a different replica from the one doing the work. Without it, a long verification against a live shadow branch cannot be called off once it has begun.',
+    visibleAt: 'The ABORT control on a running turn',
+    proof: 'stream',
+    evidence: 'turn.done with state.status = cancelled',
+    group: 'CONTROL',
+  },
 ] as const;
 
 export const CAPABILITY_TOTAL = CAPABILITIES.length;

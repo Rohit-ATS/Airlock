@@ -1,0 +1,125 @@
+{
+  "started_by": "ui",
+  "session_id": null,
+  "turn_id": null,
+  "forward": [
+    {
+      "system": "postgres",
+      "op": "ALTER TABLE accounts ADD CONSTRAINT accounts_email_key UNIQUE (email);",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "rollback": [
+    {
+      "system": "postgres",
+      "op": "ALTER TABLE accounts DROP CONSTRAINT accounts_email_key;",
+      "reversible": true,
+      "proven": true
+    }
+  ],
+  "magnitude": {
+    "records": 412880,
+    "people": 0,
+    "amount_minor": 0,
+    "undo_window_seconds": 604800
+  },
+  "principals": [],
+  "affected_tables": [
+    {
+      "system": "postgres",
+      "name": "accounts",
+      "rows": 412880,
+      "operation": "add unique constraint"
+    }
+  ],
+  "blast_radius": [],
+  "questions": [],
+  "recommendation": "APPLY",
+  "risk_notes": [
+    {
+      "note": "The proof held and the change was approved on it. Between verification and apply, two more duplicate rows were written by a signup race, so the constraint took on a table the proof had not seen. The post-apply checksum caught it in under four seconds and the rollback that had already been proven put it back."
+    },
+    {
+      "note": "This is what the undo certificate is for. It is not a permission slip; it is the thing that made an automatic revert safe enough to run without waking anybody."
+    }
+  ],
+  "harness_events": [],
+  "cost": {
+    "usd": 0.1544,
+    "by_model": {
+      "openai/gpt-4.1": 0.1544
+    },
+    "tokens": {
+      "input": 61200,
+      "output": 3880,
+      "total": 65080
+    }
+  },
+  "signatures": [
+    {
+      "approver": "sam.okafor@airlock.dev",
+      "at": "2026-08-23T10:20:00Z",
+      "decision": "approved",
+      "reason": null,
+      "break_glass": false
+    }
+  ],
+  "approval": {
+    "approver": "sam.okafor@airlock.dev",
+    "at": "2026-08-23T10:20:00Z",
+    "role_required": "approver",
+    "decision": "approved",
+    "reason": null
+  },
+  "drift": {
+    "checked_at": null,
+    "production_checksum": null,
+    "drifted": null
+  },
+  "audit": {
+    "applied_at": "2026-08-23T10:20:30Z",
+    "post_apply_checksum": null,
+    "applied_by": "sam.okafor@airlock.dev"
+  },
+  "receipt": {
+    "seq": 3,
+    "prev_hash": "sha256:359ee55856e0f63436add30a19539691f115eebc753b2b3ac16da7b92f1e193b",
+    "hash": "sha256:182d3338aa0e5ddc8464d4d2a19af0209fe3dce1bdf47dfd4a08569da575569e",
+    "sealed_at": "2026-08-23T10:20:00Z"
+  },
+  "dossier_id": "dos_email_unique",
+  "change_class": "SCHEMA_MIGRATION",
+  "request": "Add a unique constraint on accounts(email) now that the duplicate cleanup has finished.",
+  "requested_by": "priya.n@airlock.dev",
+  "created_at": "2026-08-23T10:00:00Z",
+  "target": {
+    "project_ref": "airlock-demo",
+    "branch_ref": "br_shadow_6d19c",
+    "systems": [
+      "postgres"
+    ]
+  },
+  "certificate": {
+    "kind": "UNDO",
+    "status": "PROVEN",
+    "checksums": {
+      "pre": "sha256:c9b8bb42077ab83630d9f8bc858c7adba2a6630706ac8bddc12d21222dae1d06",
+      "post": "sha256:1594f2a4229db91217b82a2d02787ec7d86f7adc785f8b8af9d5ef6bc03ee8d6",
+      "post_rollback": "sha256:c9b8bb42077ab83630d9f8bc858c7adba2a6630706ac8bddc12d21222dae1d06",
+      "match": true
+    },
+    "lock_ms_estimate": 820,
+    "table_rewrite": false,
+    "verified_at": "2026-08-23T10:14:00Z"
+  },
+  "post_apply": {
+    "checked_at": "2026-08-23T10:20:31Z",
+    "observed_checksum": "sha256:bff61de62b48f277c311c8c8c5728e2126926b009f921d06bf7c5d978e152d57",
+    "expected_checksum": "sha256:1594f2a4229db91217b82a2d02787ec7d86f7adc785f8b8af9d5ef6bc03ee8d6",
+    "healthy": false,
+    "rolled_back_at": "2026-08-23T10:20:34Z",
+    "rollback_reason": "Production does not match the state the certificate predicted. Executing the rollback that was already proven to restore it byte-for-byte.",
+    "duration_ms": 3400
+  }
+}

@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { breakGlassEnabled, dataDir } from './env';
+import { activePolicy } from './policy';
 import {
   Dossier,
   parseDossier,
@@ -9,6 +10,7 @@ import {
   isGrant,
   isBreakGlass,
   approversFor,
+  assessPostApply,
   sealsOutstanding,
   sealReceipt,
   GENESIS_HASH,
@@ -137,7 +139,7 @@ async function commit(
   // A single rejection stops a change; a quorum is required to move one. That
   // asymmetry is deliberate: it should always be easier to stop than to go.
   const rejected = signature.decision === 'rejected';
-  const outstanding = rejected ? 0 : sealsOutstanding(withSignature);
+  const outstanding = rejected ? 0 : sealsOutstanding(withSignature, { policy: activePolicy() });
 
   if (!rejected && outstanding > 0) {
     const next = { ...ledger, [dossier.dossier_id]: withSignature };
@@ -205,7 +207,7 @@ export async function decide(
   if (!dossier) return { ok: false, status: 404, reason: 'NOT_FOUND', message: 'No such change.' };
 
   if (decision === 'approved') {
-    const gate = openGate(dossier, viewer);
+    const gate = openGate(dossier, viewer, { policy: activePolicy() });
     if (gate.state !== 'OPEN') {
       return { ok: false, status: 403, reason: gate.reason, message: gate.message };
     }
@@ -257,7 +259,10 @@ export async function breakGlass(
   const dossier = ledger[id];
   if (!dossier) return { ok: false, status: 404, reason: 'NOT_FOUND', message: 'No such change.' };
 
-  const decision = openBreakGlass(dossier, viewer, justification, { enabled: BREAK_GLASS_ENABLED });
+  const decision = openBreakGlass(dossier, viewer, justification, {
+    enabled: BREAK_GLASS_ENABLED,
+    policy: activePolicy(),
+  });
   if (decision.state !== 'AVAILABLE') {
     return { ok: false, status: 403, reason: decision.reason, message: decision.message };
   }
@@ -299,6 +304,80 @@ export async function breakGlass(
   await persist({ ...ledger, [id]: final });
   console.warn(`[airlock] BREAK-GLASS on ${id} by ${override.operator}: bypassed ${override.bypassed}`);
   return { ok: true, state: 'decided', dossier: final };
+}
+
+/* -------------------------------------------------------------------------- */
+/* After it lands                                                              */
+/* -------------------------------------------------------------------------- */
+
+export type PostApplyResult =
+  | { ok: true; state: 'HEALTHY' | 'REVERT' | 'ALARM' | 'NOT_CHECKED'; message: string; dossier: Dossier }
+  | { ok: false; status: number; reason: string; message: string };
+
+/**
+ * Record what production looked like once the change landed, and act on it.
+ *
+ * This is the seam the verification engine writes through: it applies the
+ * change, re-checksums production, and posts the digest here. AIRLOCK decides
+ * what that means — and the decision is made by `assessPostApply`, which is
+ * pure and tested, not by this function.
+ *
+ * The one thing worth stating plainly: a REVERT outcome means AIRLOCK *asks*
+ * for the rollback to be executed, and records that it did. It will only ever
+ * ask for a rollback it has proof of. A change with no proven inverse produces
+ * an ALARM and nothing is touched, because running an untested rollback against
+ * a database already in an unexpected state turns a bad afternoon into a bad
+ * quarter.
+ *
+ * Note what this is allowed to change: `post_apply`, and nothing else. A
+ * decided record is otherwise immutable, and `post_apply` sits outside the
+ * receipt body precisely so recording it cannot break the hash chain.
+ */
+export async function recordPostApply(
+  id: string,
+  observed: string | null,
+  options: { durationMs?: number; rolledBack?: boolean } = {},
+): Promise<PostApplyResult> {
+  const ledger = { ...(await load()) };
+  const dossier = ledger[id];
+  if (!dossier) return { ok: false, status: 404, reason: 'NOT_FOUND', message: 'No such change.' };
+
+  if (dossier.audit.applied_at === null) {
+    return {
+      ok: false,
+      status: 409,
+      reason: 'NOT_APPLIED',
+      message: 'This change has not been applied, so there is nothing to health-check.',
+    };
+  }
+
+  const outcome = assessPostApply(dossier, observed);
+  const now = new Date().toISOString();
+  const reverted = outcome.state === 'REVERT';
+
+  const next: Dossier = {
+    ...dossier,
+    post_apply: {
+      checked_at: now,
+      observed_checksum: observed,
+      expected_checksum: dossier.certificate?.checksums?.post ?? null,
+      healthy: outcome.state === 'HEALTHY' ? true : outcome.state === 'NOT_CHECKED' ? null : false,
+      rolled_back_at: reverted ? now : dossier.post_apply.rolled_back_at,
+      rollback_reason: reverted ? outcome.message : dossier.post_apply.rollback_reason,
+      duration_ms: options.durationMs ?? dossier.post_apply.duration_ms,
+    },
+  };
+
+  await persist({ ...ledger, [id]: next });
+
+  if (outcome.state === 'ALARM') {
+    console.warn(`[airlock] POST-APPLY ALARM on ${id}: ${outcome.reason} — ${outcome.message}`);
+  }
+  if (reverted) {
+    console.warn(`[airlock] POST-APPLY REVERT on ${id}: production did not match the certificate`);
+  }
+
+  return { ok: true, state: outcome.state, message: outcome.message, dossier: next };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -392,6 +471,7 @@ export interface Posture {
  */
 export async function posture(viewer: Viewer): Promise<Posture> {
   const all = await listDossiers();
+  const policy = activePolicy();
   const p: Posture = {
     total: all.length,
     waiting: 0,
@@ -422,7 +502,7 @@ export async function posture(viewer: Viewer): Promise<Posture> {
     }
 
     p.waiting += 1;
-    const gate = openGate(d, viewer);
+    const gate = openGate(d, viewer, { policy });
     if (gate.state === 'OPEN') {
       p.open += 1;
       if (!gate.grant.final) p.awaitingQuorum += 1;

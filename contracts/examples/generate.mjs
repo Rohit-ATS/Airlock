@@ -20,6 +20,11 @@
  *   dos_refund_stripe      SCOPE proven, GBP 41,900            -> POLICY_AMOUNT_CEILING
  *   dos_incident_email     SCOPE proven, 61,400 people         -> POLICY_PEOPLE_CEILING
  *   dos_replica_scaledown  UNDO proven, production moved       -> PRODUCTION_DRIFTED
+ *   dos_orders_backfill    UNDO proven, 9.5s lock vs 2s cap    -> POLICY_LOCK_CEILING
+ *
+ * plus dos_email_unique, which was approved on a good proof, applied, failed
+ * its post-apply health check, and executed the rollback it had already proven
+ * — in 3.4 seconds, without waking anybody.
  *
  * plus three decided records so the ledger has a real hash chain in it.
  *
@@ -759,6 +764,133 @@ const bucketRejected = dossier({
 });
 
 /* ========================================================================== */
+/* 12. The safety net firing: applied, health check failed, reverted itself    */
+/* ========================================================================== */
+
+const constraintPre = h('accounts@412880rows@pre-constraint');
+const constraintPost = h('accounts@412880rows@post-constraint');
+
+const selfReverted = dossier({
+  dossier_id: 'dos_email_unique',
+  change_class: 'SCHEMA_MIGRATION',
+  request: 'Add a unique constraint on accounts(email) now that the duplicate cleanup has finished.',
+  requested_by: 'priya.n@airlock.dev',
+  created_at: '2026-08-23T10:00:00Z',
+  target: { project_ref: 'airlock-demo', branch_ref: 'br_shadow_6d19c', systems: ['postgres'] },
+  magnitude: { records: 412_880, people: 0, amount_minor: 0, undo_window_seconds: 604800 },
+  forward: [
+    {
+      system: 'postgres',
+      op: 'ALTER TABLE accounts ADD CONSTRAINT accounts_email_key UNIQUE (email);',
+      reversible: true,
+      proven: true,
+    },
+  ],
+  rollback: [
+    { system: 'postgres', op: 'ALTER TABLE accounts DROP CONSTRAINT accounts_email_key;', reversible: true, proven: true },
+  ],
+  certificate: {
+    kind: 'UNDO',
+    status: 'PROVEN',
+    checksums: { pre: constraintPre, post: constraintPost, post_rollback: constraintPre, match: true },
+    lock_ms_estimate: 820,
+    table_rewrite: false,
+    verified_at: '2026-08-23T10:14:00Z',
+  },
+  affected_tables: [{ system: 'postgres', name: 'accounts', rows: 412_880, operation: 'add unique constraint' }],
+  recommendation: 'APPLY',
+  risk_notes: [
+    {
+      note: 'The proof held and the change was approved on it. Between verification and apply, two more duplicate rows were written by a signup race, so the constraint took on a table the proof had not seen. The post-apply checksum caught it in under four seconds and the rollback that had already been proven put it back.',
+    },
+    {
+      note: 'This is what the undo certificate is for. It is not a permission slip; it is the thing that made an automatic revert safe enough to run without waking anybody.',
+    },
+  ],
+  signatures: [
+    { approver: 'sam.okafor@airlock.dev', at: '2026-08-23T10:20:00Z', decision: 'approved', reason: null, break_glass: false },
+  ],
+  approval: {
+    approver: 'sam.okafor@airlock.dev',
+    at: '2026-08-23T10:20:00Z',
+    role_required: 'approver',
+    decision: 'approved',
+    reason: null,
+  },
+  audit: { applied_at: '2026-08-23T10:20:30Z', post_apply_checksum: null, applied_by: 'sam.okafor@airlock.dev' },
+  post_apply: {
+    checked_at: '2026-08-23T10:20:31Z',
+    observed_checksum: h('accounts@412882rows@constraint-violation'),
+    expected_checksum: constraintPost,
+    healthy: false,
+    rolled_back_at: '2026-08-23T10:20:34Z',
+    rollback_reason:
+      'Production does not match the state the certificate predicted. Executing the rollback that was already proven to restore it byte-for-byte.',
+    duration_ms: 3_400,
+  },
+  cost: { usd: 0.1544, by_model: { 'openai/gpt-4.1': 0.1544 }, tokens: { input: 61_200, output: 3_880, total: 65_080 } },
+});
+
+/* ========================================================================== */
+/* 13. Proven, permitted by every ceiling but one: the lock                    */
+/* ========================================================================== */
+
+const backfillPre = h('orders@8400000rows@pre-backfill');
+
+const slowBackfill = dossier({
+  dossier_id: 'dos_orders_backfill',
+  change_class: 'DATA_OPERATION',
+  request: 'Backfill the new fulfilment_region column on orders from the shipping address.',
+  requested_by: 'marco.b@airlock.dev',
+  created_at: '2026-08-24T11:52:00Z',
+  target: { project_ref: 'airlock-demo', branch_ref: 'br_shadow_c41f8', systems: ['postgres'] },
+  magnitude: { records: 840_000, people: 0, amount_minor: 0, undo_window_seconds: 604800 },
+  forward: [
+    {
+      system: 'postgres',
+      op: 'UPDATE orders\n   SET fulfilment_region = region_for(shipping_country)\n WHERE fulfilment_region IS NULL;',
+      reversible: true,
+      proven: true,
+    },
+  ],
+  rollback: [
+    { system: 'postgres', op: 'UPDATE orders SET fulfilment_region = NULL WHERE fulfilment_region IS NOT NULL;', reversible: true, proven: true },
+  ],
+  certificate: {
+    kind: 'UNDO',
+    status: 'PROVEN',
+    checksums: {
+      pre: backfillPre,
+      post: h('orders@8400000rows@post-backfill'),
+      post_rollback: backfillPre,
+      match: true,
+    },
+    // Nine and a half seconds against a two-second ceiling.
+    lock_ms_estimate: 9_480,
+    table_rewrite: false,
+    sandbox_artifact_url: 'sandbox://verify/dos_orders_backfill/lock-profile.json',
+    verified_at: '2026-08-24T12:07:30Z',
+  },
+  affected_tables: [{ system: 'postgres', name: 'orders', rows: 840_000, operation: 'backfill fulfilment_region' }],
+  recommendation: 'EXPAND_CONTRACT',
+  risk_notes: [
+    {
+      note: 'The proof is good and the rollback is proven. What refuses it is the lock: a single statement over 840,000 rows holds a row-exclusive lock for an estimated 9.48 seconds, and policy permits two for a DATA_OPERATION. Every write to orders queues behind it for the duration.',
+    },
+    {
+      note: 'The workable version is the same change in batches of 10,000 with a lock_timeout, which holds nothing for more than a few milliseconds at a time and can be resumed if it is interrupted.',
+      source_url: 'https://www.postgresql.org/docs/16/explicit-locking.html',
+      source_title: 'PostgreSQL 16 — Explicit Locking',
+    },
+  ],
+  cost: {
+    usd: 0.2611,
+    by_model: { 'openai/gpt-4.1': 0.2044, 'openai/gpt-4.1-mini': 0.0567 },
+    tokens: { input: 108_400, output: 6_910, total: 115_310 },
+  },
+});
+
+/* ========================================================================== */
 /* Seal the decided records into a hash chain, then write everything out       */
 /* ========================================================================== */
 
@@ -784,7 +916,7 @@ function bodyOf(d) {
 }
 
 /** History, in the order it happened. The chain commits to that order. */
-const history = [indexApplied, gdprApplied, bucketRejected];
+const history = [indexApplied, gdprApplied, bucketRejected, selfReverted];
 
 let prev = GENESIS_HASH;
 history.forEach((d, seq) => {
@@ -807,9 +939,11 @@ const files = [
   ['money-movement.ceiling.json', refund],
   ['comms-blast.quiet-hours.json', incidentEmail],
   ['infra-mutation.drifted.json', scaledown],
+  ['data-operation.lock-ceiling.json', slowBackfill],
   ['history.schema-migration.applied.json', indexApplied],
   ['history.erasure.applied.json', gdprApplied],
   ['history.infra-mutation.rejected.json', bucketRejected],
+  ['history.schema-migration.self-reverted.json', selfReverted],
 ];
 
 for (const [name, value] of files) {
