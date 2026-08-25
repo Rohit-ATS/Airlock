@@ -186,7 +186,7 @@ it and the command that demonstrates it.
 ```bash
 npm test
 ```
-> `201 tests, 0 fail` · `16 fixtures check out.` · `4 agent spec(s) check out.` ·
+> `206 tests, 0 fail` · `16 fixtures check out.` · `4 agent spec(s) check out.` ·
 > `airlock.policy.yaml checks out` · `24 claims, every one anchored to a line that exists.`
 >
 > Included in that: `gate.test.mjs` asserts no non-`PROVEN` certificate opens the gate under
@@ -788,7 +788,7 @@ The last one is the reason the claims table exists at all. It was not a lie anyb
 purpose; it was a sentence that was true of an earlier design, and stayed in the document after
 the design changed, because nothing was checking. Prose does not fail a build. Anchors do.
 
-### Two upstream bugs found
+### Three upstream bugs found
 
 - `@truefoundry/trueforge-ui@0.2.4` has a dependency conflict: `@assistant-ui/core` peer-depends
   on `zustand@^5` while the OpenUI renderers pull `zustand@^4`, which npm hoists. The build
@@ -799,16 +799,36 @@ the design changed, because nothing was checking. Prose does not fail a build. A
   your `.xl\:flex` regardless of the media query — **silently breaking every responsive variant
   in the host app.** Fixed with an explicit `@layer` order statement in
   [`globals.css`](apps/console/app/globals.css).
+- The same stylesheet re-exports its theme as **self-referential** custom properties —
+  `--color-white: var(--color-white)`, and the same for `--color-black` and the greys. A
+  property that references itself is a cycle, which computes to the guaranteed-invalid value,
+  so every `var(--color-white)` downstream is dropped. Because it lands after the host's
+  `@theme`, it poisons the token even when the host defines it correctly. The effect is that
+  **`bg-white` paints nothing and `text-white` colours nothing**, with the class present in the
+  markup and the rule present in the stylesheet. Two chips on the landing page rendered fully
+  transparent and white-on-signal text stayed dark ink at 3.6:1 against a 4.5:1 bar. Fixed by
+  re-declaring both at `:root:root`, which outranks the SDK's `:root` on specificity rather
+  than depending on import order.
+
+That third one is the argument for `npm run check:a11y` existing at all. Nothing about it looks
+wrong in the source, nothing warns at build time, and a control that is invisible is
+indistinguishable from a control that was never added. It was found by axe-core and a
+computed-style probe — which is to say, by measuring rather than by looking.
 
 ---
 
 ## Tests
 
 ```bash
-npm test        # 201 tests, 16 fixtures, 4 agent specs, 1 policy file, 24 claims
+npm test        # 206 tests, 16 fixtures, 4 agent specs, 1 policy file, 24 claims
 ```
 
-Twelve suites, and each pins a property rather than an implementation:
+Those four numbers are **checked, not typed**. `verify-claims.mjs` runs the suite, counts the
+files and compares them against this line, so adding a test and forgetting the README fails the
+build. A reader who counts 206 against a README promising 201 has been handed a reason to
+disbelieve the other twenty-three claims, and that is a lot of damage for a stale integer.
+
+Thirteen suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |
@@ -823,6 +843,7 @@ Twelve suites, and each pins a property rather than an implementation:
 | `provenance.test.mjs` | An unsourced claim says it is unsourced, and a figure the agent merely asserted never acquires a link to a harness event that did not produce it |
 | `quarantine.test.mjs` | An injection finding seals the gate *ahead of* the certificate, because a proof whose subject an attacker chose is proving the wrong thing; and a stored excerpt is neutralised, never the raw payload |
 | `review.test.mjs` | A migration with unreviewed code does not open the gate; a fix that predates the finding is not a fix; nits never block |
+| `ddl.test.mjs` | A column drop or rename is classified destructive; adding a required column is only cautionary *with* a default, and destructive without one; every destructive finding carries an expand/contract alternative rather than a refusal |
 | `mcp/server.test.mjs` | Exactly one tool is destructive and it is the one held for approval; there is no tool that applies a change |
 
 Plus five structural checks. The first four run inside `npm test`; the fifth runs in CI:
