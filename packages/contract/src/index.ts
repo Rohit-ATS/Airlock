@@ -12,3 +12,4 @@ export * from './provenance.js';
 export * from './quarantine.js';
 export * from './review.js';
 export * from './skills.js';
+export * from './ddl.js';

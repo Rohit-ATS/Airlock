@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { parseDossier } from '../packages/contract/dist/index.js';
+import { classifyDdl, expandContractPlan, parseDossier } from '../packages/contract/dist/index.js';
 
 const dbPath = process.env.SQLITE_PATH ?? path.join('data', 'airlock.sqlite');
 const outDir = process.env.AIRLOCK_DATA_DIR ?? '.airlock';
@@ -48,6 +48,9 @@ const rollback = [
   'ALTER TABLE users DROP COLUMN tier;',
   'CREATE INDEX IF NOT EXISTS idx_users_plan_name ON users(plan_name);',
 ];
+
+const ddlFindings = classifyDdl(forward);
+const expandContract = ddlFindings.flatMap((finding) => expandContractPlan(finding));
 
 function quote(name) {
   return `"${String(name).replaceAll('"', '""')}"`;
@@ -199,6 +202,16 @@ const dossier = parseDossier({
     {
       note: 'SQLite shadow verification is the local Day 1 slice. Supabase branch lifecycle can wrap the same checksum flow once credentials are available.',
     },
+    ...ddlFindings.map((finding) => ({
+      note: `${finding.kind}: ${finding.reason}`,
+    })),
+    ...(expandContract.length
+      ? [
+          {
+            note: `Expand/contract alternative generated ${expandContract.length} staged step(s) for review before hosted branch credentials exist.`,
+          },
+        ]
+      : []),
     ...(breakRollback
       ? [
           {
@@ -230,6 +243,8 @@ writeFileSync(
       checksums: certificate.checksums ?? null,
       forward,
       rollback,
+      ddl_findings: ddlFindings,
+      expand_contract_plan: expandContract,
       scenario: breakRollback ? 'break-rollback' : simulateDrift ? 'simulate-drift' : 'happy-path',
       production_drifted: productionDrifted,
       failed: failed ? String(failed.message ?? failed) : null,
