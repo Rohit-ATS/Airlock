@@ -724,6 +724,12 @@ forbid it outright.
 
 ## Architecture
 
+One page on how it fits together, with module boundaries and a diagram:
+**[ARCHITECTURE.md](ARCHITECTURE.md)**. How to run the tests and open a pull request:
+**[CONTRIBUTING.md](CONTRIBUTING.md)**. If you want to see whether the boundaries are real,
+[Add a change class](ARCHITECTURE.md#add-a-change-class) is three steps and the compiler
+enumerates two of them for you.
+
 ```
 contracts/dossier.schema.json     the Change Dossier — the one contract everything shares
 packages/contract/                types, the gate, policy, receipts, capabilities, detectors
