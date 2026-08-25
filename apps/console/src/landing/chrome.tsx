@@ -366,11 +366,16 @@ export function Footer() {
         </div>
 
         <div className="mt-12 flex flex-col gap-2 border-t border-hairline pt-6 text-[11px] text-ink-4 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            <span className="text-ink-3">Rohit Maruri</span> — console, gate, contract, policy, harness panel, agents
-            and skills. <span className="text-ink-3">Damir</span> — verification engine, shadow branches, scope
-            computation, seed data.
-          </p>
+          <div className="space-y-1">
+            <p>
+              <span className="text-ink-3">Rohit Maruri</span> — console, gate, contract, policy, harness panel,
+              agents and skills.
+            </p>
+            <p>
+              <span className="text-ink-3">Damir Mertl</span> — shadow verifier, checksum proof flow, generated
+              dossiers, automated verifier checks, seed data, and the next shadow-branch and scope-computation work.
+            </p>
+          </div>
           <p className="evidence">MIT</p>
         </div>
       </div>

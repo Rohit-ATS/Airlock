@@ -412,6 +412,9 @@ ignore it.
 **Rohit Maruri** — the console, the landing page, the control room, the Harness Panel, the
 certificate card, the gate, the policy engine, the tamper-evident ledger, the MCP server, the
 agent definitions and skills, the contract, the webhook and roles.
-**Damir** — the verification engine, shadow branch lifecycle, scope computation, seed data.
+
+**Damir Mertl** — the verification engine and seed data: the shadow verifier, checksum proof
+flow, generated dossiers and automated verifier checks; next, the hosted shadow branch lifecycle
+and scope computation across the systems the demo connects.
 
 MIT licensed.
