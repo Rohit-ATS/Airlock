@@ -41,6 +41,7 @@ import {
   type Dossier,
   type UntrustedSource,
   RESOLUTION_STATUSES,
+  SystemName,
   describeResolution,
   outstandingFields,
   resolutionFingerprint,
@@ -79,6 +80,31 @@ async function getChange(id: string): Promise<Dossier> {
   const found = all.find((d) => d.dossier_id === id);
   if (!found) throw new Error(`No change with id ${id}. Call airlock_list_changes to see what exists.`);
   return found;
+}
+
+/**
+ * Does this harness have a sandbox right now?
+ *
+ * `GET /api/v1/capabilities` is authoritative and cheap. Returns `null` when the
+ * harness cannot be reached at all, which is deliberately different from
+ * `false`: "there is no sandbox" is grounds to refuse a proof, and "I could not
+ * find out" is not. Refusing on an unreachable harness would make the MCP server
+ * unusable whenever it is run standalone, and silently treating unreachable as
+ * "sandbox present" would put the hole straight back.
+ */
+async function sandboxAvailable(): Promise<boolean | null> {
+  const base = process.env.TRUEFORGE_BASE_URL ?? 'http://localhost:8791';
+  try {
+    const res = await fetch(new URL('/api/v1/capabilities', base), {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data?: { sandbox?: { enabled?: boolean } } };
+    const enabled = body?.data?.sandbox?.enabled;
+    return typeof enabled === 'boolean' ? enabled : null;
+  } catch {
+    return null;
+  }
 }
 
 async function putChange(dossier: unknown): Promise<Dossier> {
@@ -176,14 +202,136 @@ function renderSummary(d: Dossier): string {
 /* Schemas                                                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The systems a change can touch, as a JSON Schema enum.
+ *
+ * Read from the contract rather than typed out, for the ordinary reason — the
+ * two cannot drift — and stated as `enum` rather than prose for a much less
+ * ordinary one.
+ *
+ * A description that lists the valid values is a hint. An enum is part of the
+ * protocol: the harness puts it in the tool definition the model is decoding
+ * against, so an invalid value is unlikely to be generated in the first place.
+ * With only the prose, a model asked to refund a Stripe charge reasonably
+ * proposes `payments`, gets a schema rejection it cannot see the schema for,
+ * and burns turns guessing. That happened — twice on `airlock_open_change` and
+ * twice on `airlock_attach_certificate` in one session, and the model never did
+ * learn the list; it just eventually guessed one that fit.
+ *
+ * A validation error the caller cannot act on is a design defect, not a caller
+ * defect.
+ */
+const SYSTEM_SCHEMA = {
+  type: 'string',
+  enum: [...SystemName.options],
+  description: 'Which system this touches. Must be one of the listed values.',
+} as const;
+
 const OPERATION_SCHEMA = {
   type: 'object',
   required: ['system', 'op'],
   properties: {
-    system: { type: 'string', description: 'postgres, stripe, slack, object_storage, github, iam, email, kubernetes, dns or secrets' },
+    system: SYSTEM_SCHEMA,
     op: { type: 'string', description: 'The operation verbatim — the SQL, the API call, the command. Not a summary of it.' },
     reversible: { type: 'boolean' },
     proven: { type: 'boolean', description: 'Set only after the inverse has actually been executed against the shadow copy.' },
+  },
+} as const;
+
+/**
+ * One thing a SCOPE certificate destroys, and one thing it deliberately spares.
+ *
+ * These were `{ type: 'object' }` — no properties at all — so the model was
+ * asked to produce the most consequential structure in the product with no idea
+ * what shape it took. It guessed, the contract rejected it on a nested path
+ * (`certificate.scope.records.0.system`), and there was nothing in the tool
+ * definition that would have told it otherwise.
+ */
+const SCOPE_RECORD_SCHEMA = {
+  type: 'object',
+  required: ['system', 'id', 'action'],
+  properties: {
+    system: SYSTEM_SCHEMA,
+    table: { type: 'string', description: 'The table or collection, where the system has them.' },
+    id: { type: 'string', description: 'The identifier of the thing being acted on.' },
+    action: {
+      type: 'string',
+      enum: ['delete', 'anonymize', 'update', 'grant', 'transfer', 'send'],
+      description: 'What happens to it.',
+    },
+    count: { type: 'integer', description: 'How many rows this entry stands for. Defaults to 1.' },
+  },
+} as const;
+
+/**
+ * The four structures a change carries that the model was previously asked to
+ * invent unaided.
+ *
+ * Each of these was `items: { type: 'object' }` — a shape with no shape. The
+ * model produced something reasonable, the contract rejected it on a nested
+ * path, and the tool definition contained nothing that would have told it the
+ * right answer. It is not a hard problem to describe an affected table; it was
+ * simply never described.
+ *
+ * Audited by walking every tool's schema and flagging any array of objects with
+ * no `properties`, rather than by fixing the one that happened to fail first.
+ */
+const AFFECTED_TABLE_SCHEMA = {
+  type: 'object',
+  required: ['name', 'rows', 'operation'],
+  properties: {
+    system: SYSTEM_SCHEMA,
+    name: { type: 'string', description: 'The table or collection.' },
+    rows: { type: 'integer', description: 'Row count, measured against the real system. Not an estimate.' },
+    operation: { type: 'string', description: 'What happens to it, e.g. "add column, backfill".' },
+  },
+} as const;
+
+const BLAST_RADIUS_SCHEMA = {
+  type: 'object',
+  required: ['repo', 'file', 'line'],
+  properties: {
+    repo: { type: 'string', description: 'owner/name' },
+    file: { type: 'string' },
+    line: { type: 'integer', description: '1-indexed.' },
+    symbol: { type: 'string', description: 'The function or identifier that reads it.' },
+    excerpt: { type: 'string' },
+  },
+} as const;
+
+const RISK_NOTE_SCHEMA = {
+  type: 'object',
+  required: ['note'],
+  properties: {
+    note: { type: 'string' },
+    source_url: { type: 'string', description: 'Cite it. A claim about lock behaviour needs a URL, not a recollection.' },
+    source_title: { type: 'string' },
+  },
+} as const;
+
+const QUESTION_SCHEMA = {
+  type: 'object',
+  required: ['asked'],
+  properties: {
+    asked: { type: 'string', description: 'The question put to a human. Only for judgement no system of record can answer.' },
+    options: { type: 'array', items: { type: 'string' }, description: 'Candidates, when the answer is a choice.' },
+    answered_by: { type: 'string' },
+    answer: { type: 'string' },
+    at: { type: 'string', description: 'ISO 8601.' },
+  },
+} as const;
+
+const SCOPE_EXCLUSION_SCHEMA = {
+  type: 'object',
+  required: ['system', 'reason'],
+  properties: {
+    system: SYSTEM_SCHEMA,
+    table: { type: 'string' },
+    reason: {
+      type: 'string',
+      description: 'Why this is deliberately NOT touched. An exclusion without a stated reason is not an exclusion.',
+    },
+    count: { type: 'integer' },
   },
 } as const;
 
@@ -284,7 +432,11 @@ export function airlockTools(): ToolDefinition[] {
           change_class: { type: 'string', enum: [...CHANGE_CLASSES] },
           request: { type: 'string', description: 'What was asked for, in the words it was asked in.' },
           requested_by: { type: 'string', description: 'The human who asked. Not you.' },
-          systems: { type: 'array', items: { type: 'string' }, description: 'Every system this touches.' },
+          systems: {
+            type: 'array',
+            items: SYSTEM_SCHEMA,
+            description: 'Every system this change touches. Must be drawn from the listed values.',
+          },
           branch_ref: { type: 'string', description: 'The shadow branch the proof will run against.' },
           forward: { type: 'array', items: OPERATION_SCHEMA },
           rollback: { type: 'array', items: OPERATION_SCHEMA, description: 'The inverse of each forward operation, in reverse order.' },
@@ -314,10 +466,10 @@ export function airlockTools(): ToolDefinition[] {
               },
             },
           },
-          affected_tables: { type: 'array', items: { type: 'object' } },
-          blast_radius: { type: 'array', items: { type: 'object' }, description: 'Code that references what you are changing.' },
-          risk_notes: { type: 'array', items: { type: 'object' } },
-          questions: { type: 'array', items: { type: 'object' }, description: 'Judgement calls you put to a human, with their answers.' },
+          affected_tables: { type: 'array', items: AFFECTED_TABLE_SCHEMA },
+          blast_radius: { type: 'array', items: BLAST_RADIUS_SCHEMA, description: 'Code that references what you are changing.' },
+          risk_notes: { type: 'array', items: RISK_NOTE_SCHEMA },
+          questions: { type: 'array', items: QUESTION_SCHEMA, description: 'Judgement calls you put to a human, with their answers.' },
           recommendation: { type: 'string', enum: ['APPLY', 'EXPAND_CONTRACT', 'BLOCK'] },
         },
       },
@@ -404,8 +556,16 @@ export function airlockTools(): ToolDefinition[] {
             type: 'object',
             description: 'SCOPE only. An exclusion without a stated reason is rejected by the contract.',
             properties: {
-              records: { type: 'array', items: { type: 'object' } },
-              exclusions: { type: 'array', items: { type: 'object' } },
+              records: {
+                type: 'array',
+                items: SCOPE_RECORD_SCHEMA,
+                description: 'Exactly what this destroys, enumerated. Not a summary.',
+              },
+              exclusions: {
+                type: 'array',
+                items: SCOPE_EXCLUSION_SCHEMA,
+                description: 'What is deliberately spared, and why.',
+              },
             },
           },
           lock_ms_estimate: { type: 'number' },
@@ -433,6 +593,87 @@ export function airlockTools(): ToolDefinition[] {
         const status = str(args.status);
         if (status === 'FAILED' && !str(args.failure_reason)) {
           throw new Error('A FAILED certificate must carry a failure_reason. Say what did not come back, precisely.');
+        }
+
+        /* --- a checksum the model typed is not a measurement ---------------
+         *
+         * Observed in a real session, verbatim: "I will generate placeholder
+         * checksums in the required format to proceed with attaching the
+         * certificate." The model asked before doing it, and it was right to,
+         * but asking was the only thing standing between a fabricated proof and
+         * the ledger. A yes would have produced a PROVEN certificate carrying
+         * three digests nobody measured, and every downstream control —
+         * `pre === post_rollback`, the freshness window, the drift re-check —
+         * would have agreed with it, because they all check the digests against
+         * each other rather than against the world.
+         *
+         * That is the one failure this product cannot survive. AIRLOCK's entire
+         * claim is that a certificate is evidence rather than an assertion, and
+         * an assertion in the shape of evidence is worse than no certificate:
+         * it is the shape people are trained to trust.
+         *
+         * So a PROVEN UNDO certificate has to name where it was produced. The
+         * artifact URL is the verifier's receipt; a model that is inventing
+         * digits has no run to point at. This is not a strong cryptographic
+         * binding and does not pretend to be — it is the difference between
+         * "the agent must have run something" and "the agent may type four
+         * numbers", which is the gap that was open.
+         */
+        if (status === 'PROVEN' && str(args.kind) === 'UNDO') {
+          if (!args.checksums) {
+            throw new Error('A PROVEN UNDO certificate is the claim that the data came back byte-identical. It cannot be made without the checksum triple that observed it.');
+          }
+
+          // Asked of the harness, not of the caller.
+          //
+          // The first version of this guard demanded a sandbox_artifact_url,
+          // and the model supplied "https://sandbox.example.com/artifact/…"
+          // alongside checksums of aaaa… and bbbb…. That is the lesson: any
+          // control the model can satisfy by writing a plausible string is not
+          // a control, it is a formatting requirement. Requiring evidence from
+          // the thing being asked for evidence is circular.
+          //
+          // Whether a sandbox exists is a fact about the deployment. The model
+          // cannot assert it into existence, so this is the one question worth
+          // asking. If the harness has no sandbox, there is nowhere those
+          // digests could have come from, and the certificate is refused
+          // regardless of how well-formed it looks.
+          const sandbox = await sandboxAvailable();
+          if (sandbox === false) {
+            throw new Error(
+              [
+                'Refused: this harness has no sandbox configured, so there is nowhere a checksum',
+                'could have been measured. A PROVEN UNDO certificate cannot be produced here.',
+                '',
+                'Do not supply placeholder or illustrative digits. A checksum you generated is not',
+                'a measurement, and AIRLOCK renders it identically to one that is — which is the',
+                'single failure this product cannot survive.',
+                '',
+                'The correct outcomes, both of which are honest:',
+                '  - attach a FAILED certificate whose failure_reason says no sandbox was available;',
+                '  - or re-open the change as one a SCOPE certificate can carry, and enumerate what',
+                '    it touches instead of claiming it is reversible.',
+                '',
+                'An honest "this could not be proven" is a passing result.',
+              ].join('\n'),
+            );
+          }
+
+          // A courtesy, not a control. It catches the exact shape a model
+          // reaches for when it is filling in a field, and — more usefully —
+          // it says why rather than failing schema validation on a nested path.
+          const digits = [args.checksums]
+            .flatMap((c) => Object.values(c as Record<string, unknown>))
+            .filter((v): v is string => typeof v === 'string');
+          if (digits.some((d) => /^sha256:(.)\1{63}$/.test(d))) {
+            throw new Error(
+              'That checksum is a single repeated character, which no real digest is. It was not measured. Run the verification and attach what it returned.',
+            );
+          }
+
+          if (!str(args.sandbox_artifact_url)) {
+            throw new Error('A PROVEN UNDO certificate must name the verification run that produced it: pass sandbox_artifact_url.');
+          }
         }
 
         const certificate = {
