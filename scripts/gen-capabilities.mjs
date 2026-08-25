@@ -58,6 +58,22 @@ lines.push('');
 lines.push('| # | Capability | Why it is load-bearing | Proof | Signal that lights it | Where you see it |');
 lines.push('| --- | --- | --- | --- | --- | --- |');
 
+/**
+ * One markdown table cell.
+ *
+ * Escaping `|` alone was not enough: a value already containing a backslash
+ * came out as `\\|`, which markdown reads as a literal backslash followed by
+ * an unescaped column break, so one stray character silently reshaped the
+ * table. The backslash has to be doubled first — escape the escape, then the
+ * delimiter — and a newline has to go, because a table row ends at one no
+ * matter what is escaped inside it.
+ */
+const cell = (value) =>
+  String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, ' ');
+
 for (const c of CAPABILITIES) {
   const cells = [
     c.id,
@@ -66,7 +82,7 @@ for (const c of CAPABILITIES) {
     `\`${c.proof}\``,
     `\`${c.evidence}\``,
     c.visibleAt,
-  ].map((v) => String(v).replace(/\|/g, '\\|'));
+  ].map(cell);
   lines.push(`| ${cells.join(' | ')} |`);
 }
 

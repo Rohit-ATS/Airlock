@@ -325,6 +325,22 @@ for (const claim of CLAIMS) {
 const BEGIN = '<!-- BEGIN CLAIMS -->';
 const END = '<!-- END CLAIMS -->';
 
+/**
+ * One markdown table cell.
+ *
+ * Escaping `|` alone was not enough: a value already containing a backslash
+ * came out as `\\|`, which markdown reads as a literal backslash followed by
+ * an unescaped column break, so one stray character silently reshaped the
+ * table. The backslash has to be doubled first — escape the escape, then the
+ * delimiter — and a newline has to go, because a table row ends at one no
+ * matter what is escaped inside it.
+ */
+const cell = (value) =>
+  String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, ' ');
+
 if (process.argv.includes('--emit')) {
   if (failures.length > 0) {
     console.error('Refusing to emit a claims table while a claim is unanchored.\n');
@@ -349,7 +365,7 @@ if (process.argv.includes('--emit')) {
       out.push('| --- | --- | --- | --- |');
     }
     const where = `[\`${path.basename(r.file)}:${r.line}\`](${r.file}#L${r.line})`;
-    const cells = [r.claim, where, `\`${r.run}\``, r.sees].map((v) => String(v).replace(/\|/g, '\\|'));
+    const cells = [r.claim, where, `\`${r.run}\``, r.sees].map(cell);
     out.push(`| ${cells.join(' | ')} |`);
   }
 
