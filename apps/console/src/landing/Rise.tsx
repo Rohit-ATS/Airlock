@@ -209,12 +209,12 @@ export function RiseHero() {
           </Chip>
 
           <Chip tone="seal" className="top-[20%] right-[5%] hidden md:block" dur={9} delay={1.2} tilt={5}>
-            <span className="evidence block text-[10px] opacity-70">post-rollback</span>
+            <span className="evidence block text-[10px] text-[#7fecc9]">post-rollback</span>
             <span className="evidence block text-[11px]">= pre ✓</span>
           </Chip>
 
           <Chip tone="signal" className="bottom-[26%] left-[8%] hidden md:block" dur={7.5} delay={0.6} tilt={6}>
-            <span className="block text-[10px] leading-none opacity-85">lock held</span>
+            <span className="block text-[10px] leading-none text-white">lock held</span>
             <span className="evidence block text-[15px] leading-tight font-semibold">4.21 s</span>
           </Chip>
 
