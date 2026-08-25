@@ -41,9 +41,28 @@ freezes evaluated in wall-clock time. Before opening the gate AIRLOCK re-checksu
 against the state the proof was taken from — if somebody else's migration landed in between,
 the change is sealed, *even when the drift checker itself reported everything was fine*.
 
+The proof then has a second life. Once a change lands, production is re-checksummed against
+what the certificate predicted, and a mismatch executes the rollback that was already proven —
+but only where it *was* proven: a change with no demonstrated inverse raises an alarm and
+touches nothing, because running an untested rollback against a database already in an
+unexpected state is how a bad afternoon becomes a bad quarter. And because most bad changes
+are perfectly healthy by every checksum and simply turn out to be the wrong idea, the same
+proven inverse backs a **time-boxed undo**: thirty minutes to take a schema migration back,
+measured on the server from when it landed, offered only where the rollback was proven.
+
 Decided changes are sealed into a hash chain, so editing the audit log is detectable by anyone
 holding an older copy of a single hash. The landing page runs that verification in the reader's
-own browser and lets them rewrite a record to watch it break.
+own browser and lets them rewrite a record to watch it break. The health check and the undo sit
+deliberately *outside* that seal — a receipt commits to a decision and the evidence it was taken
+on, and what production did afterwards is a later fact, not a revision of the decision. Detached
+receipts carry them as explicitly unsealed annotations, and the verifier names what it did not
+verify rather than leaving a reader to notice.
+
+Every figure on a certificate says where it came from. A checksum was measured by a sandbox at a
+recorded instant; a record count was very often simply asserted by the agent in its own dossier.
+Both look identical on a normal dashboard. Here each is graded — measured, computed, declared or
+unsourced — and pressing one opens the harness event behind it, or says plainly that nothing
+backs it.
 
 AIRLOCK ships as an **MCP server**, which is what makes least privilege structural rather than
 aspirational. Production connectors are mounted read-only; the agent can read the policy, open a
@@ -81,12 +100,19 @@ The central idea — **an approval gate that cannot be offered until the agent h
 the thing and undone it** — is not the standard human-in-the-loop pattern. The standard pattern
 approves a plan. This approves a result.
 
-Three consequences that fall out of it and are, as far as we know, not done elsewhere:
+Five consequences that fall out of it and are, as far as we know, not done elsewhere:
 
 - **The invariant is a type.** Not a lint rule, not a code review convention — a private symbol
   that makes the unsafe state unrepresentable, with the forgeries asserted as compile errors.
 - **A proof is treated as perishable.** Certificates expire, and production is re-checksummed
   before the gate opens.
+- **The proof has a second life.** Having demonstrated the inverse, the system can offer a
+  one-press undo on a production database for as long as it is willing to vouch for that
+  demonstration — and refuses to offer one anywhere the inverse was never run. The undo button
+  is not a feature bolted on; it is the certificate being spent a second time.
+- **A figure carries its own provenance.** Measured, computed, declared, or unsourced — because
+  a checksum and a record count the agent asserted about itself should not render identically,
+  and on every dashboard we have seen, they do.
 - **Break-glass exists and cannot become an approval.** It carries a different witness type, so
   the ledger can always tell the two apart. Most systems either forbid the override (and people
   do it out of band with no record) or allow it (and it becomes indistinguishable from an
@@ -103,11 +129,16 @@ Three consequences that fall out of it and are, as far as we know, not done else
   TrueForge's `@read-only` / `@destructive` selectors work.
 - `apps/console/src/server/observedServer.ts` — a passthrough tap on the real event stream that
   cannot synthesise, re-order or drop an event.
+- `packages/contract/src/undo.ts` — the time-boxed reversal, and the three refusals that keep
+  it honest.
+- `packages/contract/src/provenance.ts` — every figure graded by how well founded it is, with
+  the harness event that produced it.
 
-**92 tests, 11 fixtures, 4 agent specs, all checked in CI.** The suites pin properties, not
+**165 tests, 14 fixtures, 4 agent specs, all checked in CI.** The suites pin properties, not
 implementations: no non-`PROVEN` certificate opens the gate under any combination of class,
 status and viewer; a quorum counts people; editing a sealed record is detected at the record
-where it happened; exactly one MCP tool is destructive and it is the one held for approval.
+where it happened; exactly one MCP tool is destructive and it is the one held for approval; no
+arrangement of policy, window and clock produces an available undo without a proven inverse.
 
 Two upstream bugs in `@truefoundry/trueforge-ui@0.2.4` were found, isolated and worked around —
 including a cascade-layer ordering problem that silently breaks **every responsive variant** in
@@ -115,16 +146,16 @@ any host app that imports its stylesheet. Both are written up for the sponsor.
 
 ### Use of sponsor tools
 
-Twenty-two TrueForge capabilities, each one load-bearing, listed with the exact signal that
+Twenty-three TrueForge capabilities, each one load-bearing, listed with the exact signal that
 proves it in [`docs/CAPABILITIES.md`](CAPABILITIES.md).
 
 The honesty rule matters more than the number: **a lamp cannot be lit from application code.**
 The only writer is the detector module, fed by the passthrough tap on the real event stream. A
-run that does not exercise a capability ends below 22, and the panel says so. On the landing
+run that does not exercise a capability ends below 23, and the panel says so. On the landing
 page every lamp is dark, because no run has happened there.
 
 Three detectors depend on signals we could not confirm from the documentation and are listed as
-unverified. **An honest 19/19 beats a padded 22/22 that a judge disproves by clicking one lamp.**
+unverified. **An honest 20/20 beats a padded 23/23 that a judge disproves by clicking one lamp.**
 
 ### Control and safety
 
@@ -138,6 +169,16 @@ This is the whole product, so the list is long, but the four that matter most:
    recomputed server-side. A claim of danger is believed; a claim of safety is checked.
 4. **The audit log is tamper-evident**, and individual receipts verify offline with no access
    to the console.
+
+Two more that only exist because the proof does. **The automatic rollback refuses**: a bad
+health check reverts the change only where the inverse was demonstrated on a shadow copy, and
+raises an alarm otherwise. **The undo window refuses the same way**, is measured on the server
+rather than in the browser that drew the countdown, and records an undo whose result was never
+checksummed as unmeasured rather than as successful.
+
+And one that governs the agent rather than the change: a **run budget** that cancels the turn
+through the harness — the same call the ABORT button makes, so it lands on the executor doing
+the work rather than in the tab that noticed.
 
 Plus: separation of duties (the requester can never approve), a two-person rule on every
 irreversible class, no standing production access, and change freezes that are deliberately
@@ -166,7 +207,7 @@ throughout.
 Stated plainly, because a judge will find it anyway and finding it in this list is much better
 than finding it on screen.
 
-- **The verification engine is the other half of the team's work.** The eleven changes in the
+- **The verification engine is the other half of the team's work.** The fourteen changes in the
   seeded queue are console fixtures — they exercise the card, the queue, the policy engine and
   the ledger. They are not evidence about anybody's database, and the README says so in those
   words.
