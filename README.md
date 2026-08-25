@@ -1,5 +1,10 @@
 # AIRLOCK
 
+[![ci](https://github.com/Rohit-ATS/Airlock/actions/workflows/ci.yml/badge.svg)](https://github.com/Rohit-ATS/Airlock/actions/workflows/ci.yml)
+[![pages](https://github.com/Rohit-ATS/Airlock/actions/workflows/pages.yml/badge.svg)](https://github.com/Rohit-ATS/Airlock/actions/workflows/pages.yml)
+[![CodeQL](https://github.com/Rohit-ATS/Airlock/actions/workflows/codeql.yml/badge.svg)](https://github.com/Rohit-ATS/Airlock/actions/workflows/codeql.yml)
+[![MIT](https://img.shields.io/badge/license-MIT-7dd3fc.svg)](LICENSE)
+
 **Nothing reaches production without passing through the airlock.**
 
 A change-control console for irreversible production work. Every dangerous change — a schema
