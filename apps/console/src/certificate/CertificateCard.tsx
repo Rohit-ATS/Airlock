@@ -20,6 +20,7 @@ import { Button, Chip, Divider, Evidence, Legend, Panel, Readout, cx } from '@/d
 import { ProvenanceInspector, ProvenanceProvider, Traced } from '@/provenance/Provenance';
 import { UndoWindow } from '@/undo/UndoWindow';
 import { QuarantineBlock } from '@/quarantine/QuarantineBlock';
+import { ReviewBlock } from '@/review/ReviewBlock';
 import { ChecksumTriple } from './ChecksumTriple';
 
 /**
@@ -1036,6 +1037,10 @@ export function CertificateCard({
         <DriftBlock dossier={dossier} />
         <ScopeBlock dossier={dossier} />
         <BlastRadius dossier={dossier} />
+        {/* Directly after the blast radius, because the code changes are the
+            answer to it: these are the call sites, and this is what was done
+            about them. */}
+        <ReviewBlock dossier={dossier} />
 
         {dossier.questions.length > 0 ? (
           <div>

@@ -12,14 +12,15 @@
  * The practical consequence: a developer cannot render an Approve button for an
  * unproven change even by mistake. There is no value they could pass to it.
  *
- * The gate asks six questions, in this order, and stops at the first "no":
+ * The gate asks seven questions, in this order, and stops at the first "no":
  *
  *   1. Has this already been decided?        — an audit question
  *   2. Was anything it read steering it?     — prompt injection
  *   3. Is there a finished proof?            — a certificate question
  *   4. Does the proof actually hold?         — recomputed, never trusted
- *   5. Is the proof still true of today?     — freshness and drift
- *   6. Is this permitted, by whom, now?      — policy
+ *   5. Has anyone reviewed the code?        — the other half of the change
+ *   6. Is the proof still true of today?     — freshness and drift
+ *   7. Is this permitted, by whom, now?      — policy
  *
  * Only then does it ask whether *you* may act, because being told "you lack
  * permission" when the real answer is "this change is unprovable" wastes the
@@ -27,6 +28,7 @@
  */
 import type { Certificate, CertificateKind, Dossier } from './dossier.js';
 import { approversFor } from './dossier.js';
+import { reviewBlocks } from './review.js';
 import {
   DEFAULT_POLICY,
   evaluatePolicy,
@@ -79,6 +81,7 @@ export type SealReason =
   | 'SCOPE_NOT_COMPUTED'
   | 'SCOPE_UNBOUNDED'
   | 'ROLLBACK_NOT_PROVEN'
+  | 'REVIEW_OUTSTANDING'
   | 'PRODUCTION_DRIFTED'
   | 'INJECTION_DETECTED'
   | 'CERTIFICATE_STALE'
@@ -110,6 +113,8 @@ export const SEAL_COPY: Record<SealReason, string> = {
   SCOPE_NOT_COMPUTED: 'A scope certificate was claimed without a computed blast radius.',
   SCOPE_UNBOUNDED: 'The scope certificate lists no records and no exclusions, so its blast radius is unbounded.',
   ROLLBACK_NOT_PROVEN: 'At least one rollback operation was never executed against the shadow branch.',
+  REVIEW_OUTSTANDING:
+    'This change carries code the agent wrote, and an independent reviewer has either not looked at it or raised findings nobody has addressed. A migration proven reversible, attached to code that still dereferences the column it removes, is a proof of the wrong thing.',
   PRODUCTION_DRIFTED:
     'Production has changed since this proof was taken. The certificate describes a database that no longer exists.',
   INJECTION_DETECTED:
@@ -225,10 +230,19 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
     if (scope.records.length === 0 && scope.exclusions.length === 0) return sealed('SCOPE_UNBOUNDED');
   }
 
-  /* --- 5. is the proof still true of production as it is now? ------------ */
+  /* --- 5. has anybody looked at the code the agent wrote? ----------------
+   *
+   * The migration being reversible is not the whole change. If the agent also
+   * wrote the application changes that go with it — the expand/contract edits
+   * across every call site the blast radius turned up — then a proof attached
+   * to unreviewed code is a proof of half a thing.
+   */
+  if (reviewBlocks(dossier)) return sealed('REVIEW_OUTSTANDING');
+
+  /* --- 6. is the proof still true of production as it is now? ------------ */
   if (hasDrifted(dossier)) return sealed('PRODUCTION_DRIFTED');
 
-  /* --- 6. is this permitted at all? -------------------------------------- */
+  /* --- 7. is this permitted at all? -------------------------------------- */
   const changeLevel = verdict.findings.filter((f) => !VIEWER_LEVEL_CODES.has(f.code));
   const firstChangeLevel = changeLevel[0];
   if (firstChangeLevel) return sealed(POLICY_SEAL[firstChangeLevel.code], firstChangeLevel);
@@ -447,6 +461,7 @@ const BLOCKED_LABEL: Record<SealReason, string> = {
   CHECKSUM_MISSING: 'BLOCKED — NOTHING TO VERIFY',
   CHECKSUM_MISMATCH: 'BLOCKED — THE DATA DID NOT COME BACK',
   ROLLBACK_NOT_PROVEN: 'BLOCKED — ROLLBACK NEVER EXECUTED',
+  REVIEW_OUTSTANDING: 'BLOCKED — THE CODE HAS NOT BEEN REVIEWED',
   SCOPE_NOT_COMPUTED: 'BLOCKED — SCOPE NOT COMPUTED',
   SCOPE_UNBOUNDED: 'BLOCKED — BLAST RADIUS UNBOUNDED',
   PRODUCTION_DRIFTED: 'STALE — PRODUCTION HAS MOVED',

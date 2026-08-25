@@ -1182,6 +1182,145 @@
         }
       }
     },
+    "code_changes": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "branch": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pr_url": {
+              "type": "string"
+            },
+            "pr_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "files_changed": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "head_sha": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repo",
+            "branch"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "code_review": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": [
+                "qodo",
+                "human",
+                "other"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "NOT_REQUIRED",
+                "NOT_REQUESTED",
+                "PENDING",
+                "CLEAN",
+                "ADDRESSED",
+                "OUTSTANDING"
+              ]
+            },
+            "reviewed_at": {
+              "type": "string"
+            },
+            "findings": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "blocker",
+                      "major",
+                      "minor",
+                      "nit"
+                    ]
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "file": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "raised_at": {
+                    "type": "string"
+                  },
+                  "addressed_by": {
+                    "type": "string"
+                  },
+                  "addressed_at": {
+                    "type": "string"
+                  },
+                  "waived_reason": {
+                    "type": "string"
+                  },
+                  "waived_by": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "severity",
+                  "title",
+                  "raised_at"
+                ]
+              }
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider",
+            "status"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "receipt": {
       "default": null,
       "anyOf": [

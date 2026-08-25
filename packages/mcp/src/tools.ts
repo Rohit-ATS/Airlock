@@ -7,9 +7,10 @@
  * applying is not something an agent does: it is something a human does, in
  * the console, after reading the certificate.
  *
- * Two of these tools carry `readOnlyHint: false`, and exactly one is meant to
- * sit in the agent spec's `require_approval_for_tools`. That is the whole
- * privilege model, and it is four lines of JSON:
+ * Four of these tools carry `readOnlyHint: false` — they write to the change
+ * dossier — and exactly one carries `destructiveHint: true`. That one is meant
+ * to sit in the agent spec's `require_approval_for_tools`, and that is the
+ * whole privilege model, in four lines of JSON:
  *
  *   { "name": "airlock",
  *     "enable_tools": ["@all"],
@@ -22,8 +23,12 @@ import {
   CHANGE_CLASSES,
   CHANGE_CLASS_COPY,
   DEFAULT_POLICY,
+  REVIEW_PROVIDERS,
+  REVIEW_SEVERITIES,
   UNTRUSTED_SOURCES,
   assessQuarantine,
+  describeReview,
+  outstandingFindings,
   openGate,
   resolvedRules,
   ruleFor,
@@ -546,6 +551,157 @@ export function airlockTools(): ToolDefinition[] {
           '',
           renderGate(saved),
         ].join('\n');
+      },
+    },
+
+    {
+      name: 'airlock_attach_code_changes',
+      description:
+        'Record the pull request you opened with the application changes that go with this migration. A schema change is only half a change: dropping a column is not finished until the code that reads it no longer does. Open the PR with the github tools, then record it here. You can open a pull request; you cannot merge one, which is the same rule as the rest of AIRLOCK — propose, never apply.',
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, title: 'Attach code changes' },
+      inputSchema: {
+        type: 'object',
+        required: ['dossier_id', 'repo', 'branch', 'files_changed'],
+        properties: {
+          dossier_id: { type: 'string' },
+          repo: { type: 'string', description: 'owner/name' },
+          branch: { type: 'string' },
+          pr_url: { type: 'string' },
+          pr_number: { type: 'number' },
+          files_changed: { type: 'number' },
+          head_sha: { type: 'string', description: 'Head of the branch right now. Findings raised before it are checked against it.' },
+        },
+      },
+      handler: async (args) => {
+        const dossier = await getChange(str(args.dossier_id));
+        if (dossier.approval.decision !== null || dossier.audit.applied_at !== null) {
+          throw new Error('That change has already been decided.');
+        }
+
+        const next = {
+          ...dossier,
+          code_changes: {
+            repo: str(args.repo),
+            branch: str(args.branch),
+            ...(args.pr_url ? { pr_url: str(args.pr_url) } : {}),
+            ...(args.pr_number !== undefined ? { pr_number: int(args.pr_number) } : {}),
+            files_changed: int(args.files_changed),
+            ...(args.head_sha ? { head_sha: str(args.head_sha) } : {}),
+          },
+        };
+
+        const parsed = safeParseDossier(next);
+        if (!parsed.success) {
+          throw new Error(
+            `The code changes do not match the contract:\n${parsed.error.issues
+              .map((i) => `  ${i.path.join('.')}: ${i.message}`)
+              .join('\n')}`,
+          );
+        }
+        const saved = await putChange(parsed.data);
+        return [
+          `Recorded ${int(args.files_changed)} changed file(s) on ${saved.dossier_id}.`,
+          '',
+          'The gate is now sealed pending review. Nobody will be asked to approve a',
+          'migration whose accompanying code nobody has read. Get the PR reviewed, then',
+          'call airlock_attach_code_review with what came back.',
+          '',
+          renderGate(saved),
+        ].join('\n');
+      },
+    },
+
+    {
+      name: 'airlock_attach_code_review',
+      description:
+        "Record what an independent reviewer said about the code you wrote. Report the findings verbatim, including the ones you disagree with — AIRLOCK decides which block, and a reviewer's own 'resolved' flag is never trusted. A finding counts as addressed only when a commit landed after it was raised, or when a human waived it in writing.",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, title: 'Attach a code review' },
+      inputSchema: {
+        type: 'object',
+        required: ['dossier_id', 'provider', 'status'],
+        properties: {
+          dossier_id: { type: 'string' },
+          provider: { type: 'string', enum: [...REVIEW_PROVIDERS] },
+          status: { type: 'string', enum: ['PENDING', 'CLEAN', 'ADDRESSED', 'OUTSTANDING'] },
+          summary: { type: 'string', description: "The reviewer's own summary line, verbatim." },
+          findings: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['id', 'severity', 'title', 'raised_at'],
+              properties: {
+                id: { type: 'string' },
+                severity: { type: 'string', enum: [...REVIEW_SEVERITIES] },
+                title: { type: 'string' },
+                file: { type: 'string' },
+                line: { type: 'number' },
+                raised_at: { type: 'string', description: 'ISO instant the reviewer raised it.' },
+                addressed_by: { type: 'string', description: 'Commit sha that fixed it.' },
+                addressed_at: { type: 'string', description: 'ISO instant of that commit.' },
+              },
+            },
+          },
+        },
+      },
+      handler: async (args) => {
+        const dossier = await getChange(str(args.dossier_id));
+        if (dossier.approval.decision !== null || dossier.audit.applied_at !== null) {
+          throw new Error('That change has already been decided.');
+        }
+        if (!dossier.code_changes) {
+          throw new Error(
+            'There are no code changes on this dossier to review. Call airlock_attach_code_changes first.',
+          );
+        }
+
+        const findings = list(args.findings).map((f) => {
+          const item = (f ?? {}) as Record<string, unknown>;
+          return {
+            id: str(item.id),
+            severity: str(item.severity),
+            title: str(item.title),
+            ...(item.file ? { file: str(item.file) } : {}),
+            ...(item.line !== undefined ? { line: int(item.line) } : {}),
+            raised_at: str(item.raised_at) || new Date().toISOString(),
+            ...(item.addressed_by ? { addressed_by: str(item.addressed_by) } : {}),
+            ...(item.addressed_at ? { addressed_at: str(item.addressed_at) } : {}),
+          };
+        });
+
+        const next = {
+          ...dossier,
+          code_review: {
+            provider: str(args.provider),
+            status: str(args.status),
+            reviewed_at: new Date().toISOString(),
+            findings,
+            ...(args.summary ? { summary: str(args.summary) } : {}),
+          },
+        };
+
+        const parsed = safeParseDossier(next);
+        if (!parsed.success) {
+          throw new Error(
+            `The review does not match the contract:\n${parsed.error.issues
+              .map((i) => `  ${i.path.join('.')}: ${i.message}`)
+              .join('\n')}`,
+          );
+        }
+        const saved = await putChange(parsed.data);
+
+        const open = outstandingFindings(saved.code_review);
+        const lines = [describeReview(saved), ''];
+        if (open.length > 0) {
+          lines.push(
+            `${open.length} blocking finding(s) still open. Fix them and push, then call this tool`,
+            'again with addressed_by and addressed_at set to the commit that did it.',
+            '',
+            ...open.map((f) => `  [${f.severity}] ${f.title}${f.file ? ` — ${f.file}${f.line ? `:${f.line}` : ''}` : ''}`),
+            '',
+          );
+        }
+        lines.push(renderGate(saved));
+        return lines.join('\n');
       },
     },
 
