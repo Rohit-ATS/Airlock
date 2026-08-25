@@ -346,6 +346,15 @@
         },
         "context_fingerprint": {
           "type": "string"
+        },
+        "shadow_strategy": {
+          "type": "string",
+          "enum": [
+            "NATIVE_BRANCH",
+            "SANDBOX_RESTORE",
+            "READ_REPLICA",
+            "SCHEMA_ONLY"
+          ]
         }
       },
       "required": [
