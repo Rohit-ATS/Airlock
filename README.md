@@ -774,10 +774,11 @@ happened, and because a reader is owed the specifics rather than an assurance.
   exited with instructions instead of a number. They are ordinary devDependencies now — they
   are small and pull no browser — and the claim is verified above, against a clean clone, with
   its output pasted in.
-- It said nothing about `/console` taking **109 seconds** to compile on first open in dev,
-  which is the single most likely reason a reader concludes the project is broken. Silence
-  about a two-minute wait is not a small omission; it is the difference between "loading" and
-  "hung". It is in [Run it](#run-it) now, with the number and the way around it.
+- It said nothing about `/console` taking **a minute or two** to compile on first open in dev
+  — 109s and 97s on two clean clones here, and it will differ on yours. That is the single
+  most likely reason a reader concludes the project is broken. Silence about a two-minute wait
+  is not a small omission; it is the difference between "loading" and "hung". It is in
+  [Run it](#run-it) now, with the way around it.
 - The benchmark section said the scorer **is the same function** the gate uses. It is not. It
   is the same *rule*, implemented twice — `benchmark/run.mjs` compares digests itself rather
   than calling `openGate`. That is still the interesting property, and it is now stated the
