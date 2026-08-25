@@ -71,6 +71,13 @@ jobs:
           if (dossier.certificate.checksums?.match !== true) {
             throw new Error('expected checksum triple to match after rollback');
           }
+          const report = JSON.parse(readFileSync('.airlock/ci_sqlite_tier.verification.json', 'utf8'));
+          if (!report.ddl_findings?.some((finding) => finding.kind === 'DROP_COLUMN')) {
+            throw new Error('expected destructive DDL classifier to flag the plan_name column drop');
+          }
+          if (!report.expand_contract_plan?.length) {
+            throw new Error('expected expand/contract alternative to be generated for the column drop');
+          }
 
           const gate = openGate(dossier, { email: 'ci-approver@airlock.dev', role: 'approver' });
           if (gate.state !== 'OPEN') {

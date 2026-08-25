@@ -113,6 +113,13 @@ Scope verification also writes offloaded artifacts under `.airlock/`:
 - `<dossier>.scope.json`: a small manifest linked from the certificate;
 - `<dossier>.scope.ndjson`: row-level scope details that stay out of the dossier.
 
+Migration verification also records pre-hosted safety analysis under
+`<dossier>.verification.json`:
+
+- `ddl_findings`: destructive or cautionary DDL detected in the forward SQL;
+- `expand_contract_plan`: staged expand/migrate/contract alternatives when a direct
+  destructive change can be made safer.
+
 ## Next Deliverables
 
 After the schema migration works:
@@ -132,6 +139,9 @@ After the schema migration works:
    Started with `npm run verify:sqlite:drift -- --emit-only`: the rollback proof
    still passes, but production changes before approval, so the gate seals as
    `PRODUCTION_DRIFTED`.
+5. destructive-DDL classifier and expand/contract rewriter: started locally for the
+   tier migration, where `DROP COLUMN plan_name` is flagged and a staged alternative
+   is written into the verification artifact.
 
 ## Local Setup Note
 
