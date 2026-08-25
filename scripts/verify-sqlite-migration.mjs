@@ -20,6 +20,7 @@ const requestedBy = process.env.AIRLOCK_REQUESTED_BY ?? 'damir@airlock.dev';
 const keepShadow = process.env.AIRLOCK_KEEP_SHADOW === '1';
 const emitOnly = process.argv.includes('--emit-only') || !consoleUrl;
 const breakRollback = process.argv.includes('--break-rollback') || process.env.AIRLOCK_BREAK_ROLLBACK === '1';
+const simulateDrift = process.argv.includes('--simulate-drift') || process.env.AIRLOCK_SIMULATE_DRIFT === '1';
 
 const forward = [
   'ALTER TABLE users ADD COLUMN tier TEXT;',
@@ -112,7 +113,6 @@ copyFileSync(dbPath, shadowPath);
 
 const started = Date.now();
 const shadow = new DatabaseSync(shadowPath);
-const production = new DatabaseSync(dbPath, { readOnly: true });
 
 let forwardOps = [];
 let rollbackOps = [];
@@ -133,13 +133,21 @@ try {
   shadow.close();
 }
 
+if (simulateDrift) {
+  const drift = new DatabaseSync(dbPath);
+  drift.prepare('UPDATE users SET updated_at = ? WHERE id = 1').run(new Date().toISOString());
+  drift.close();
+}
+
+const production = new DatabaseSync(dbPath, { readOnly: true });
 const productionChecksum = tableChecksum(production, 'users');
 const userRows = tableCount(production, 'users');
 const subscriptionRows = tableCount(production, 'subscriptions');
 production.close();
 
 const verifiedAt = new Date().toISOString();
-const matched = pre !== undefined && postRollback !== undefined && pre === postRollback && productionChecksum === pre;
+const proofMatched = pre !== undefined && postRollback !== undefined && pre === postRollback;
+const productionDrifted = pre !== undefined && productionChecksum !== pre;
 const mismatchReason =
   pre !== undefined && postRollback !== undefined
     ? `Rollback completed, but post-rollback checksum ${postRollback} did not match pre-change checksum ${pre}.`
@@ -154,12 +162,12 @@ const certificate = failed
     }
   : {
       kind: 'UNDO',
-      status: matched ? 'PROVEN' : 'FAILED',
-      checksums: { pre, post, post_rollback: postRollback, match: matched },
+      status: proofMatched ? 'PROVEN' : 'FAILED',
+      checksums: { pre, post, post_rollback: postRollback, match: proofMatched },
       lock_ms_estimate: Date.now() - started,
       table_rewrite: true,
       sandbox_artifact_url: `file://${path.resolve(reportPath)}`,
-      ...(matched
+      ...(proofMatched
         ? {}
         : { failure_reason: mismatchReason }),
       verified_at: verifiedAt,
@@ -181,7 +189,7 @@ const dossier = parseDossier({
     ? rollbackOps
     : rollback.map((op) => ({ system: 'postgres', op, reversible: true, proven: false })),
   certificate,
-  drift: { checked_at: verifiedAt, production_checksum: productionChecksum, drifted: productionChecksum !== pre },
+  drift: { checked_at: verifiedAt, production_checksum: productionChecksum, drifted: productionDrifted },
   affected_tables: [
     { system: 'postgres', name: 'users', rows: userRows, operation: 'add column, backfill, drop column' },
     { system: 'postgres', name: 'subscriptions', rows: subscriptionRows, operation: 'read only (backfill source)' },
@@ -198,8 +206,15 @@ const dossier = parseDossier({
           },
         ]
       : []),
+    ...(simulateDrift
+      ? [
+          {
+            note: 'Drift scenario: rollback proof still passed, but production changed before approval. AIRLOCK must seal the gate until verification is re-run.',
+          },
+        ]
+      : []),
   ],
-  recommendation: matched ? 'APPLY' : 'BLOCK',
+  recommendation: proofMatched && !productionDrifted ? 'APPLY' : 'BLOCK',
 });
 
 writeFileSync(
@@ -215,7 +230,8 @@ writeFileSync(
       checksums: certificate.checksums ?? null,
       forward,
       rollback,
-      scenario: breakRollback ? 'break-rollback' : 'happy-path',
+      scenario: breakRollback ? 'break-rollback' : simulateDrift ? 'simulate-drift' : 'happy-path',
+      production_drifted: productionDrifted,
       failed: failed ? String(failed.message ?? failed) : null,
       verified_at: verifiedAt,
     },

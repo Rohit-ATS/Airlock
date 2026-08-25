@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.14'
           cache: npm
@@ -94,6 +94,28 @@ jobs:
           const gate = openGate(dossier, { email: 'ci-approver@airlock.dev', role: 'approver' });
           if (gate.reason !== 'CERTIFICATE_FAILED') {
             throw new Error(`expected gate to seal as CERTIFICATE_FAILED, got ${gate.reason}`);
+          }
+          NODE
+
+          AIRLOCK_DOSSIER_ID=ci_sqlite_drift node scripts/verify-sqlite-migration.mjs --emit-only --simulate-drift > /tmp/airlock-ci-drift-dossier.json
+          node --input-type=module <<'NODE'
+          import { openGate } from './packages/contract/dist/index.js';
+          import { readFileSync } from 'node:fs';
+
+          const dossier = JSON.parse(readFileSync('.airlock/ci_sqlite_drift.dossier.json', 'utf8'));
+          if (dossier.certificate?.status !== 'PROVEN') {
+            throw new Error(`expected rollback proof to remain PROVEN, got ${dossier.certificate?.status ?? 'missing'}`);
+          }
+          if (dossier.certificate.checksums?.match !== true) {
+            throw new Error('expected checksum triple to remain matched; this scenario is production drift, not proof failure');
+          }
+          if (dossier.drift?.drifted !== true) {
+            throw new Error('expected production drift re-check to mark the dossier drifted');
+          }
+
+          const gate = openGate(dossier, { email: 'ci-approver@airlock.dev', role: 'approver' });
+          if (gate.reason !== 'PRODUCTION_DRIFTED') {
+            throw new Error(`expected gate to seal as PRODUCTION_DRIFTED, got ${gate.reason}`);
           }
           NODE
 
