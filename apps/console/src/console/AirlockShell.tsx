@@ -96,7 +96,7 @@ const THEME = {
   classNames: { markdown: 'aui-markdown' },
 } as const;
 
-export function AirlockShell({ baseUrl }: { baseUrl: string }) {
+export function AirlockShell({ baseUrl, agentName }: { baseUrl: string; agentName: string }) {
   // One store for the lifetime of the page; the observer writes into it from
   // outside React, and components read it through useSyncExternalStore.
   const storeRef = useRef<RunStore>(null);
@@ -111,7 +111,7 @@ export function AirlockShell({ baseUrl }: { baseUrl: string }) {
         // airlock MCP server is always mounted and the gate is always in the
         // loop. A console that could talk to a bare model would be a chat
         // window with an airlock painted on it.
-        agentName: process.env.NEXT_PUBLIC_AIRLOCK_AGENT ?? 'airlock-change-control',
+        agentName,
         hooks: {
           onEvent: (event) => store.ingest(event),
           onStreamOpen: ({ sessionId, resumed }) => {
@@ -125,7 +125,7 @@ export function AirlockShell({ baseUrl }: { baseUrl: string }) {
           onStreamClose: ({ error }) => store.noteStreamClose(error),
         },
       }),
-    [baseUrl, store],
+    [baseUrl, agentName, store],
   );
 
   return (

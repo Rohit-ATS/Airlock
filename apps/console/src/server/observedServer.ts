@@ -60,6 +60,64 @@ export function withAirlockAgent(base: AgentUIServer, agentName: string): AgentU
   return { ...base, createSession };
 }
 
+/**
+ * Return the *same* array for the same answer.
+ *
+ * The SDK reads its catalogs (models, connectors, skills, agents,
+ * capabilities) through `useSyncExternalStore`. React compares snapshots by
+ * identity, so a method that returns a freshly-parsed array on every call —
+ * which any `fetch(...).then(r => r.json())` does — makes every snapshot look
+ * new, and React re-renders, and re-reads, forever:
+ *
+ *   Maximum update depth exceeded.
+ *   The result of getSnapshot should be cached to avoid an infinite loop.
+ *
+ * This is an upstream defect (reproducible with the SDK's own layout and zero
+ * AIRLOCK code) but it is only *fatal* once the calls start succeeding. While
+ * the console was pointed at the wrong port every catalog call failed, the
+ * stores stayed empty, nothing churned, and the bug looked like a harmless
+ * warning. Fixing the connection turned it into a crash — which is a fair
+ * description of how the last two hours went.
+ *
+ * The fix is small and safe: memoise by value. If the payload is unchanged,
+ * hand back the identical reference, and React stops.
+ */
+function withStableCatalogs(base: AgentUIServer): AgentUIServer {
+  const cache = new Map<string, { key: string; value: unknown }>();
+
+  const stabilise = <A extends unknown[], R>(
+    name: string,
+    fn: ((...args: A) => Promise<R>) | undefined,
+  ): ((...args: A) => Promise<R>) | undefined => {
+    if (typeof fn !== 'function') return fn;
+    return async (...args: A): Promise<R> => {
+      const value = await fn(...args);
+      const key = `${name}:${JSON.stringify(args)}`;
+      let serialised: string;
+      try {
+        serialised = JSON.stringify(value);
+      } catch {
+        // Not serialisable, so it cannot be compared — pass it straight on
+        // rather than pretending to stabilise it.
+        return value;
+      }
+      const previous = cache.get(key);
+      if (previous && previous.key === serialised) return previous.value as R;
+      cache.set(key, { key: serialised, value });
+      return value;
+    };
+  };
+
+  const next = { ...base } as Record<string, unknown>;
+  // Read-only catalogs only. Anything that mutates must never be memoised.
+  for (const method of ['getCapabilities', 'getModels', 'getSkills', 'getMcp', 'searchAgents', 'listSessions']) {
+    const original = (base as unknown as Record<string, unknown>)[method];
+    const wrapped = stabilise(method, original as ((...a: unknown[]) => Promise<unknown>) | undefined);
+    if (wrapped) next[method] = wrapped.bind(base);
+  }
+  return next as unknown as AgentUIServer;
+}
+
 export interface AirlockServerOptions {
   baseUrl: string;
   token?: string;
@@ -75,6 +133,7 @@ export function createAirlockServer({ baseUrl, token, hooks, agentName }: Airloc
     ...(token ? { token } : {}),
   }) as unknown as AgentUIServer;
 
-  const pinned = agentName ? withAirlockAgent(base, agentName) : base;
+  const stable = withStableCatalogs(base);
+  const pinned = agentName ? withAirlockAgent(stable, agentName) : stable;
   return withHarnessObserver(pinned, hooks);
 }

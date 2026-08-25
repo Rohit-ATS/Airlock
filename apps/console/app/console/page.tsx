@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { ErrorBoundary } from '@/console/ErrorBoundary';
 
@@ -13,22 +14,79 @@ import { ErrorBoundary } from '@/console/ErrorBoundary';
  */
 const AirlockShell = dynamic(() => import('@/console/AirlockShell').then((m) => m.AirlockShell), {
   ssr: false,
-  loading: () => (
-    <div className="flex h-full items-center justify-center bg-void">
-      <p className="legend">Bringing the airlock online…</p>
-    </div>
-  ),
+  loading: () => <Waiting note="Bringing the airlock online…" />,
 });
 
+function Waiting({ note }: { note: string }) {
+  return (
+    <div className="flex h-full items-center justify-center bg-void">
+      <p className="legend">{note}</p>
+    </div>
+  );
+}
+
+interface Config {
+  /** Path on this origin that proxies the harness. */
+  harnessPath: string;
+  agentName: string;
+}
+
 export default function Page() {
-  const baseUrl = process.env.NEXT_PUBLIC_TRUEFORGE_BASE_URL ?? 'http://localhost:8790';
+  /**
+   * Config is fetched, not inlined.
+   *
+   * It used to come from `process.env.NEXT_PUBLIC_TRUEFORGE_BASE_URL`, baked in
+   * at build time. When that failed to resolve the console quietly used its
+   * `:8790` default and then failed every call to the real harness on `:8791`,
+   * with nothing on screen to say so. Asking the server at runtime removes the
+   * whole class of problem, and means re-pointing the console is a restart
+   * rather than a rebuild.
+   */
+  const [config, setConfig] = useState<Config | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const res = await fetch('/api/config');
+        if (!res.ok) throw new Error(String(res.status));
+        const body = (await res.json()) as Config;
+        if (live) setConfig(body);
+      } catch {
+        if (live) setFailed(true);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (failed) {
+    return (
+      <div className="fixed inset-0 overflow-hidden">
+        <Waiting note="The console could not read its own configuration. Is the server running?" />
+      </div>
+    );
+  }
+
   return (
     // The console owns the viewport. Fixing it here rather than putting
     // `overflow: hidden` on the body keeps the landing page and the control
     // room — which are ordinary scrolling documents — able to scroll.
     <div className="fixed inset-0 overflow-hidden">
       <ErrorBoundary>
-        <AirlockShell baseUrl={baseUrl} />
+        {config ? (
+          <AirlockShell
+            // Absolute, but pointed at this origin: the console proxies the
+            // harness at /harness because TrueForge sends no CORS headers and
+            // a direct browser call fails before it arrives.
+            baseUrl={new URL(config.harnessPath, window.location.origin).toString()}
+            agentName={config.agentName}
+          />
+        ) : (
+          <Waiting note="Reading configuration…" />
+        )}
       </ErrorBoundary>
     </div>
   );

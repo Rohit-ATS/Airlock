@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { airlockAgentName, env, githubWebhookSecret, trueforgeBaseUrl } from '@/data/env';
 import { NextResponse } from 'next/server';
 import { putDossier } from '@/data/dossierStore';
 
@@ -16,9 +17,9 @@ export const dynamic = 'force-dynamic';
  * is specifically an argument about not doing that.
  */
 
-const BASE_URL = process.env.TRUEFORGE_BASE_URL ?? 'http://localhost:8790';
-const AGENT_NAME = process.env.AIRLOCK_AGENT_NAME ?? 'airlock-change-control';
-const SECRET = process.env.GITHUB_WEBHOOK_SECRET;
+const BASE_URL = trueforgeBaseUrl();
+const AGENT_NAME = airlockAgentName();
+const SECRET = githubWebhookSecret();
 
 /** Constant-time compare of `sha256=<hex>` against the body HMAC. */
 function verifySignature(body: string, header: string | null, secret: string): boolean {
@@ -114,7 +115,8 @@ export async function POST(request: Request) {
 async function listChangedFiles(repo: string, number: number | undefined): Promise<string[]> {
   if (!number) return [];
   const headers: Record<string, string> = { accept: 'application/vnd.github+json' };
-  if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const token = env('GITHUB_TOKEN');
+  if (token) headers.authorization = `Bearer ${token}`;
   try {
     const res = await fetch(`https://api.github.com/repos/${repo}/pulls/${number}/files?per_page=100`, {
       headers,

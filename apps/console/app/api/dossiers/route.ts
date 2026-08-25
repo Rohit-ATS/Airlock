@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { listDossiers, putDossier, seedIfEmpty } from '@/data/dossierStore';
+import { seedDisabled } from '@/data/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic';
  * Set AIRLOCK_NO_SEED=1 to start with an empty ledger.
  */
 async function loadExamples(): Promise<unknown[]> {
-  if (process.env.AIRLOCK_NO_SEED === '1') return [];
+  if (seedDisabled()) return [];
   const dir = path.join(process.cwd(), '..', '..', 'contracts', 'examples');
   try {
     const names = (await fs.readdir(dir)).filter((n) => n.endsWith('.json'));

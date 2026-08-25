@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { breakGlassEnabled, dataDir } from './env';
 import {
   Dossier,
   parseDossier,
@@ -31,11 +32,11 @@ import {
  *     this file afterwards is detectable by anyone holding an older head hash.
  */
 
-const DATA_DIR = process.env.AIRLOCK_DATA_DIR ?? path.join(process.cwd(), '.airlock');
+const DATA_DIR = dataDir();
 const LEDGER = path.join(DATA_DIR, 'ledger.json');
 
 /** Break-glass needs two switches. This is the deployment one; policy is the other. */
-export const BREAK_GLASS_ENABLED = process.env.AIRLOCK_BREAK_GLASS === '1';
+export const BREAK_GLASS_ENABLED = breakGlassEnabled();
 
 type Ledger = Record<string, Dossier>;
 
