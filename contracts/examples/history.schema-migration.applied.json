@@ -78,7 +78,7 @@
   "receipt": {
     "seq": 0,
     "prev_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    "hash": "sha256:ba8b1c656b658f7d1d4d149ba70982be3f0713ee12398df9b0da046e5e2df734",
+    "hash": "sha256:26685b93cb2880350bde972eef547d71c9c3c9f484aa631299774051b33c2512",
     "sealed_at": "2026-08-21T09:20:00Z"
   },
   "dossier_id": "dos_orders_index",

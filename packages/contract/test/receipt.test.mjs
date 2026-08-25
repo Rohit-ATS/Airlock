@@ -217,3 +217,61 @@ test('an undecided change has nothing to detach', () => {
   });
   assert.equal(detach(undecided), null);
 });
+
+/* -------------------------------------------------------------------------- */
+/* Skill pinning                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The compliance claim, asserted rather than described.
+ *
+ * "Approved under postgres-safety@1.1.0" is only worth something if editing the
+ * pack afterwards is detectable. That requires the digest to be *inside* the
+ * seal, so a receipt taken in August can be checked against the pack as it
+ * stands in November.
+ */
+test('the skill packs a change was approved under are inside the seal', async () => {
+  const { receiptBody, hashLink, parseDossier, stampSkill } = await import('../dist/index.js');
+
+  const base = parseDossier({
+    dossier_id: 'dos_skills',
+    change_class: 'SCHEMA_MIGRATION',
+    request: 'add a column',
+    requested_by: 'a@b.c',
+    created_at: '2026-08-24T09:00:00Z',
+    target: { systems: ['postgres'] },
+    skills_used: [stampSkill('postgres-safety')],
+  });
+
+  assert.ok(receiptBody(base).skills_used, 'skills_used must be committed to');
+
+  // Same change, same version claim, one character different in the guidance.
+  const edited = parseDossier({
+    ...base,
+    skills_used: [{ name: 'postgres-safety', version: '1.1.0', digest: 'sha256:' + 'ab'.repeat(32) }],
+  });
+
+  const before = await hashLink(base, 0, GENESIS_HASH);
+  const after = await hashLink(edited, 0, GENESIS_HASH);
+  assert.notEqual(before, after, 'an edited pack at the same version must change the receipt');
+});
+
+test('what the reviewer found is sealed with the decision it informed', async () => {
+  const { receiptBody, parseDossier } = await import('../dist/index.js');
+  const d = parseDossier({
+    dossier_id: 'dos_sealed_review',
+    change_class: 'SCHEMA_MIGRATION',
+    request: 'x',
+    requested_by: 'a@b.c',
+    created_at: '2026-08-24T09:00:00Z',
+    target: { systems: ['postgres'] },
+  });
+  const body = receiptBody(d);
+  for (const key of ['code_changes', 'code_review', 'untrusted', 'skills_used']) {
+    assert.ok(key in body, `${key} is evidence the decision was taken on, and must be sealed`);
+  }
+  // And the things that legitimately keep moving afterwards are still outside.
+  for (const key of ['post_apply', 'undo', 'harness_events', 'cost']) {
+    assert.equal(key in body, false, `${key} is a later fact and must stay outside the seal`);
+  }
+});

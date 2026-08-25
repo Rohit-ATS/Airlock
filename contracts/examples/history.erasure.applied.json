@@ -78,8 +78,8 @@
   },
   "receipt": {
     "seq": 1,
-    "prev_hash": "sha256:ba8b1c656b658f7d1d4d149ba70982be3f0713ee12398df9b0da046e5e2df734",
-    "hash": "sha256:b1f92092422ae09bc96a64c60025e00c35af8417ecd7724e04bac1412416078b",
+    "prev_hash": "sha256:26685b93cb2880350bde972eef547d71c9c3c9f484aa631299774051b33c2512",
+    "hash": "sha256:1602beab8290ef5ddab65feb8020df66dab3a6275e3527262641385337669061",
     "sealed_at": "2026-08-22T14:02:00Z"
   },
   "dossier_id": "dos_gdpr_batch",

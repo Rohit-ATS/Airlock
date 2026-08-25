@@ -28,6 +28,7 @@ import {
   UNTRUSTED_SOURCES,
   assessQuarantine,
   describeReview,
+  describeSkills,
   outstandingFindings,
   openGate,
   resolvedRules,
@@ -35,6 +36,7 @@ import {
   safeParseDossier,
   scanAll,
   sealsOutstanding,
+  stampSkill,
   type ChangeClass,
   type Dossier,
   type UntrustedSource,
@@ -404,6 +406,12 @@ export function airlockTools(): ToolDefinition[] {
           lock_ms_estimate: { type: 'number' },
           table_rewrite: { type: 'boolean' },
           sandbox_artifact_url: { type: 'string' },
+          skills: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Names of the skill packs you followed to produce this proof. Names only — AIRLOCK stamps the version and content digest itself, so you cannot report following v3 of a pack that is sitting at v1. Sealed into the receipt, because "what did the guidance say in August" is the question an auditor asks in November.',
+          },
           failure_reason: { type: 'string', description: 'Required when status is FAILED. Say precisely what did not come back.' },
           production_checksum: {
             type: 'string',
@@ -434,10 +442,16 @@ export function airlockTools(): ToolDefinition[] {
           verified_at: new Date().toISOString(),
         };
 
+        // The agent names the packs; AIRLOCK fills in version and digest. An
+        // unknown name is recorded as unknown rather than dropped — a skill the
+        // agent believes it loaded and which does not exist is worth keeping.
+        const skills = list(args.skills).map((n) => stampSkill(str(n)));
+
         const production = str(args.production_checksum);
         const next = {
           ...dossier,
           certificate,
+          ...(skills.length > 0 ? { skills_used: skills } : {}),
           ...(production
             ? { drift: { checked_at: new Date().toISOString(), production_checksum: production, drifted: null } }
             : {}),

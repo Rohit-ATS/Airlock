@@ -499,6 +499,29 @@ export const CodeReview = z.object({
 });
 export type CodeReview = z.infer<typeof CodeReview>;
 
+/**
+ * Which guidance the agent was operating under.
+ *
+ * "Approved under postgres-safety" is worth very little. Skills are prose that
+ * tells an agent how to behave, they get edited, and *"what did the guidance
+ * say in August"* is precisely the question an auditor asks in November.
+ *
+ * Two fields rather than one, deliberately. The version is a human claim
+ * maintained in the pack's frontmatter; the digest is a fact computed from the
+ * file. A skill edited without a version bump keeps its version and changes its
+ * digest, and the record shows it — claiming v1.0.0 does not make a file
+ * v1.0.0.
+ *
+ * The agent supplies names only. AIRLOCK stamps version and digest from its own
+ * manifest, for the same reason the gate recomputes `checksums.match`.
+ */
+export const SkillRef = z.object({
+  name: z.string().min(1),
+  version: z.string().min(1),
+  digest: z.string().min(1),
+});
+export type SkillRef = z.infer<typeof SkillRef>;
+
 export const Audit = z.object({
   applied_at: z.string().nullable().default(null),
   post_apply_checksum: Sha256.nullable().default(null),
@@ -598,6 +621,8 @@ export const Dossier = z.object({
   /** Absent when the change needs no code — most erasures, every refund. */
   code_changes: CodeChanges.nullable().default(null),
   code_review: CodeReview.nullable().default(null),
+  /** The skill packs, pinned by version and digest, that produced this proof. */
+  skills_used: z.array(SkillRef).default([]),
   receipt: Receipt.nullable().default(null),
 });
 

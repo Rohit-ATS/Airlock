@@ -72,6 +72,18 @@ export function receiptBody(dossier: Dossier): Record<string, unknown> {
     signatures: dossier.signatures,
     approval: dossier.approval,
     audit: dossier.audit,
+    // Inside the seal, because "which guidance was this approved under" is a
+    // property of the decision rather than a later fact about it. An auditor
+    // holding a receipt can tell whether the pack has been edited since, by
+    // comparing the digest against the pack as it stands today.
+    skills_used: dossier.skills_used,
+    // Likewise: what the reviewer found on the agent's own code, and whether
+    // anyone dealt with it, is evidence the decision was taken on.
+    code_changes: dossier.code_changes,
+    code_review: dossier.code_review,
+    // The attempt to steer the agent is part of the record of what was
+    // decided, including the judgement that it was a false positive.
+    untrusted: dossier.untrusted,
   };
 }
 

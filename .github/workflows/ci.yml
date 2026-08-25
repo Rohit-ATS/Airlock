@@ -53,6 +53,12 @@ jobs:
       - name: SQLite verifier proves the Day 1 migration
         run: |
           AIRLOCK_SEED_ROWS=1000 npm run seed:sqlite -- --reset
+
+          # The benchmark tasks name real tables, columns and indexes. When one
+          # drifts it does not fail loudly — the SQL errors, the scorer reads it
+          # as a model mistake, and the next quoted number is inflated. Assert
+          # the tasks still match the schema they run against.
+          npm run check:benchmark
           AIRLOCK_DOSSIER_ID=ci_sqlite_tier node scripts/verify-sqlite-migration.mjs --emit-only > /tmp/airlock-ci-dossier.json
           node --input-type=module <<'NODE'
           import { openGate } from './packages/contract/dist/index.js';

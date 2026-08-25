@@ -40,6 +40,11 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+
+// Stamped from the real manifest, so a fixture cannot claim a version or digest
+// the pack does not actually have.
+const { stampSkill } = await import('../../packages/contract/dist/skills.js');
+const under = (...names) => names.map(stampSkill);
 const h = (s) => 'sha256:' + createHash('sha256').update(s).digest('hex');
 
 const EMPTY_COST = { usd: 0, by_model: {}, tokens: { input: 0, output: 0, total: 0 } };
@@ -120,6 +125,7 @@ const tierMigration = dossier({
     verified_at: '2026-08-24T09:06:11Z',
   },
   drift: { checked_at: '2026-08-24T09:06:40Z', production_checksum: tierPre, drifted: false },
+  skills_used: under('postgres-safety', 'expand-contract'),
   affected_tables: [
     { system: 'postgres', name: 'users', rows: 1_200_000, operation: 'add column, backfill, drop column' },
     { system: 'postgres', name: 'subscriptions', rows: 1_180_422, operation: 'read only (backfill source)' },
@@ -1134,6 +1140,7 @@ const reviewed = dossier({
     verified_at: '2026-08-24T15:31:00Z',
   },
   drift: { checked_at: '2026-08-24T15:31:20Z', production_checksum: reviewedPre, drifted: false },
+  skills_used: under('postgres-safety', 'expand-contract', 'code-review-loop'),
   affected_tables: [{ system: 'postgres', name: 'users', rows: 1_200_000, operation: 'drop column' }],
   blast_radius: [
     { repo: 'airlock/app', file: 'src/billing/plan.ts', line: 42, symbol: 'resolvePlanName' },
@@ -1206,26 +1213,23 @@ const reviewed = dossier({
 /* Seal the decided records into a hash chain, then write everything out       */
 /* ========================================================================== */
 
-const { canonicalJson, GENESIS_HASH } = await import('../../packages/contract/dist/receipt.js');
+const { canonicalJson, GENESIS_HASH, receiptBody } = await import('../../packages/contract/dist/receipt.js');
+const { parseDossier } = await import('../../packages/contract/dist/dossier.js');
 
-/** Recomputed exactly as receipt.ts does it, so the fixtures verify at runtime. */
-function bodyOf(d) {
-  return {
-    dossier_id: d.dossier_id,
-    change_class: d.change_class,
-    request: d.request,
-    requested_by: d.requested_by,
-    created_at: d.created_at,
-    certificate: d.certificate ?? null,
-    magnitude: d.magnitude,
-    principals: d.principals,
-    forward: d.forward,
-    rollback: d.rollback,
-    signatures: d.signatures,
-    approval: d.approval,
-    audit: d.audit,
-  };
-}
+/**
+ * The sealed body, computed by the real function rather than a copy of it.
+ *
+ * This used to be a hand-maintained duplicate of `receiptBody`, and it drifted
+ * the moment a field was added to the seal — producing fixtures whose receipts
+ * did not verify at runtime, reported as a broken chain at index 0 rather than
+ * as the stale copy it was.
+ *
+ * Parsed through the contract first, deliberately. A raw fixture object has
+ * `skills_used: undefined` where a loaded one has `[]`, and canonical JSON drops
+ * undefined keys — so hashing the unparsed object produces a digest the runtime
+ * can never reproduce.
+ */
+const bodyOf = (d) => receiptBody(parseDossier(d));
 
 /** History, in the order it happened. The chain commits to that order. */
 const history = [indexApplied, gdprApplied, takenBack, bucketRejected, selfReverted];
