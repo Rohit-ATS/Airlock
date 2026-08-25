@@ -36,3 +36,6 @@ benchmark/results/*.json
 # Isolated copy used to serve the console on a stable port,
 # out of reach of anything that rebuilds apps/console/.next.
 .console-serve/
+
+# Logs from the detached processes that "npm run up" starts.
+.airlock-logs/
