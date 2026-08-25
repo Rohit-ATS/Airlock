@@ -529,3 +529,157 @@ body {
   border-radius: 99px;
   transition: width 700ms var(--ease-instrument);
 }
+
+/* ===========================================================================
+   THE FRONT DOOR — "Clean room"
+
+   The console is a dark instrument panel. The landing page is the room the
+   instrument lives in: light, warm, and deliberately the opposite temperature,
+   because the argument the page makes is about care rather than alarm.
+
+   Every token here is scoped under `.lp`, so nothing below can reach the
+   console, the control room, or the SDK's own surfaces. The two palettes never
+   meet except where a live demo is deliberately embedded as a dark panel — see
+   `.lp-instrument` at the end.
+
+   One rule inherited from the product and honoured here: --hazard still means
+   irreversible and nothing else. The page's warmth comes from --lp-signal,
+   which is a separate token for a separate job. A landing page that spent the
+   alarm colour on a "Get started" button would be undermining the one piece of
+   vocabulary the product cannot afford to blur.
+   =========================================================================== */
+
+.lp {
+  /* --- ground ----------------------------------------------------------- */
+  --lp-backdrop: #cfcecb; /* behind the card, visible as a margin */
+  --lp-paper: #e2e1dd; /* the card itself */
+  --lp-paper-2: #d7d6d2; /* recessed panels within it */
+  --lp-paper-3: #cbc9c5;
+
+  /* --- ink: four steps, all AA on --lp-paper and darker ----------------- */
+  --lp-ink: #14161a;
+  --lp-ink-2: #3b4048;
+  --lp-ink-3: #5b616b;
+  --lp-ink-4: #767c86;
+
+  --lp-line: #bfbdb8;
+  --lp-line-2: #a9a7a1;
+
+  /* --- the one warm accent, and it is NOT the alarm colour --------------- */
+  --lp-signal: #d9641d;
+  --lp-signal-ink: #8f3d0c; /* signal, darkened until it is AA on paper */
+  --lp-signal-wash: #f0d9c6;
+
+  /* --- the instrument, quoted inside the room --------------------------- */
+  --lp-void: #0b0d11;
+
+  --lp-radius: 26px;
+
+  background: var(--lp-backdrop);
+  color: var(--lp-ink);
+}
+
+/* The card. Everything on the page lives inside this rounded plate. */
+.lp-plate {
+  background: var(--lp-paper);
+  border-radius: var(--lp-radius);
+}
+
+/* ---------------------------------------------------------------------------
+   Display type.
+
+   The reference sets its headline in a heavy grotesk with the lines indented
+   unequally, so the block reads as one shape rather than four rows. Tracking is
+   negative and tightens as the size grows, which is what stops a very large
+   heavy face from looking spaced out.
+   --------------------------------------------------------------------------- */
+
+.lp-display {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  line-height: 0.84;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+  color: var(--lp-ink);
+}
+
+.lp-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lp-ink-3);
+}
+
+/* The pill nav group in the reference. */
+.lp-nav {
+  background: color-mix(in oklab, var(--lp-paper-3) 82%, transparent);
+  border: 1px solid var(--lp-line);
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+}
+.lp-nav a,
+.lp-nav button {
+  border-radius: 999px;
+  transition:
+    background 220ms var(--ease-instrument),
+    color 220ms var(--ease-instrument);
+}
+.lp-nav [data-active='true'] {
+  background: color-mix(in oklab, var(--lp-ink) 10%, transparent);
+  color: var(--lp-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   The giant wordmark sitting behind the hero object.
+
+   White, low contrast against the paper, and deliberately clipped by the
+   object in front of it — it is a texture, not a label, and it must never
+   compete with the headline for the first read.
+   --------------------------------------------------------------------------- */
+
+.lp-wordmark rect {
+  fill: #fff;
+}
+
+/* ---------------------------------------------------------------------------
+   Orbiting evidence.
+
+   The reference floats objects around its centrepiece. Here they are the
+   artefacts the product actually produces — a checksum, a seal, a receipt —
+   drifting on long, offset cycles so no two ever line up into a pattern.
+   --------------------------------------------------------------------------- */
+
+@keyframes lp-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--lp-tilt, 0deg));
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) rotate(calc(var(--lp-tilt, 0deg) * -1));
+  }
+}
+
+.lp-chip {
+  animation: lp-drift var(--lp-dur, 7s) ease-in-out infinite;
+  animation-delay: var(--lp-delay, 0s);
+}
+
+/* A dark instrument quoted inside the light room. */
+.lp-instrument {
+  background: var(--lp-void);
+  border-radius: 18px;
+  color: var(--color-ink);
+}
+
+/* Hairline used as a rule between stacked rows. */
+.lp-rule {
+  height: 1px;
+  background: var(--lp-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-chip {
+    animation: none !important;
+  }
+}
