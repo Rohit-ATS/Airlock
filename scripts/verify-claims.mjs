@@ -26,6 +26,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -374,3 +375,86 @@ if (stale.length > 0) {
   process.exit(1);
 }
 console.log('The README table agrees with all of them.');
+
+/* -------------------------------------------------------------------------- */
+/* The counts in the prose, which drift faster than anything else              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * "201 tests" was true when it was typed and wrong a day later.
+ *
+ * Anchors keep the claims table honest, but the numbers scattered through the
+ * prose have nothing holding them down, and they are the most quoted lines in
+ * the document — a reader who runs `npm test`, counts 206 against a README
+ * promising 201, has just been handed a reason to disbelieve the other
+ * twenty-three claims. It is a trivial error that does disproportionate damage,
+ * which is exactly the kind worth spending a check on.
+ *
+ * So the counts are measured here, from the things themselves, and compared
+ * against what the README says. Adding a test is meant to be cheap; forgetting
+ * to update a number should not be the thing that costs.
+ */
+const counts = [];
+
+// The suite is run rather than estimated. Counting `test(` calls would miss
+// subtests and miscount anything built in a loop, and a check that is
+// approximately right is worse than none — it fails on correct edits.
+const testFiles = [
+  ...fs.readdirSync(path.join(root, 'packages/contract/test')).filter((f) => f.endsWith('.test.mjs'))
+    .map((f) => `packages/contract/test/${f}`),
+  ...fs.readdirSync(path.join(root, 'packages/mcp/test')).filter((f) => f.endsWith('.test.mjs'))
+    .map((f) => `packages/mcp/test/${f}`),
+];
+
+// The reporter is pinned. Node picks `spec` or `tap` depending on whether it
+// thinks it has a terminal, and the two print the summary differently — `ℹ pass
+// 206` against `# pass 206`. A check that reads one of them works on a laptop
+// and fails in CI, or the reverse, which is the least useful kind of check.
+const run = spawnSync(process.execPath, ['--test', '--test-reporter=tap', ...testFiles], {
+  cwd: root,
+  encoding: 'utf8',
+});
+const passed = /^# pass (\d+)$/m.exec(run.stdout ?? '');
+if (!passed) {
+  console.error(`\n${RED}Could not read a pass count from the test run.${OFF}`);
+  console.error('Without it the README\'s test count cannot be checked, and an unchecked');
+  console.error('number is the thing this exists to prevent.');
+  process.exit(1);
+}
+
+counts.push({ what: 'tests', actual: Number(passed[1]), pattern: /(\d+) tests, \d+ fixtures/ });
+counts.push({ what: 'test suites', actual: testFiles.length, pattern: /^(\w+) suites, and each pins/m, words: true });
+counts.push({
+  what: 'fixtures',
+  actual: fs.readdirSync(path.join(root, 'contracts/examples')).filter((f) => f.endsWith('.json')).length,
+  pattern: /\d+ tests, (\d+) fixtures/,
+});
+counts.push({ what: 'claims', actual: results.length, pattern: /1 policy file, (\d+) claims/ });
+
+const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+  'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+
+const wrong = [];
+for (const c of counts) {
+  const m = c.pattern.exec(readme);
+  if (!m) {
+    wrong.push(`could not find where the README states its ${c.what} count (expected ${c.actual})`);
+    continue;
+  }
+  const stated = c.words ? WORDS.indexOf(m[1].toLowerCase()) : Number(m[1]);
+  if (stated !== c.actual) {
+    wrong.push(`README says ${m[1]} ${c.what}; there are ${c.actual}`);
+  }
+}
+
+if (wrong.length > 0) {
+  console.error(`\n${RED}The README's counts have drifted:${OFF}\n`);
+  for (const w of wrong) console.error(`  ${w}`);
+  console.error('\nUpdate the numbers in README.md. They are prose, not generated, because');
+  console.error('they read as sentences — but they are checked, so they cannot quietly rot.');
+  process.exit(1);
+}
+
+console.log(
+  `Counts agree: ${counts.map((c) => `${c.actual} ${c.what}`).join(', ')}.`,
+);
