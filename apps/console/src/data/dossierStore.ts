@@ -519,6 +519,107 @@ export async function undoAvailability(id: string) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Clearing a quarantine finding                                               */
+/* -------------------------------------------------------------------------- */
+
+export type ClearResult =
+  | { ok: true; dossier: Dossier; message: string }
+  | { ok: false; status: number; reason: string; message: string };
+
+/** A reason short enough to type, long enough that "ok" does not pass. */
+export const MIN_CLEAR_REASON = 20;
+
+/**
+ * Dismiss injection findings on a change, deliberately and permanently.
+ *
+ * There has to be a way past a detector. Every detector over natural language
+ * has false positives, and a control plane that can be bricked forever by
+ * somebody writing "ignore previous instructions" in their bio — or by a
+ * marketing page quoting an article about prompt injection — is a control plane
+ * that gets switched off within a week.
+ *
+ * What there must not be is a *quiet* way past. So this is attributed,
+ * timestamped, reason-bearing, and the findings themselves are kept: clearing
+ * dismisses them, it does not erase them. All of it lands inside the receipt
+ * body, so an auditor reading a sealed record sees both the attempt and the
+ * judgement that it was not one.
+ *
+ * Only an approver may clear, for the same reason only an approver may open the
+ * gate — this is a decision about whether to trust production input, not a
+ * formality.
+ */
+export async function clearInjection(
+  id: string,
+  viewer: Viewer,
+  reason: string,
+): Promise<ClearResult> {
+  const ledger = { ...(await load()) };
+  const dossier = ledger[id];
+  if (!dossier) return { ok: false, status: 404, reason: 'NOT_FOUND', message: 'No such change.' };
+
+  if (viewer.role !== 'approver') {
+    return {
+      ok: false,
+      status: 403,
+      reason: 'ROLE_NOT_APPROVER',
+      message: 'Deciding that a production input is safe to act on requires an approver.',
+    };
+  }
+
+  if (dossier.untrusted.findings.length === 0) {
+    return {
+      ok: false,
+      status: 409,
+      reason: 'NOTHING_TO_CLEAR',
+      message: 'This change has no injection findings.',
+    };
+  }
+
+  if (dossier.untrusted.cleared_at !== null) {
+    return { ok: false, status: 409, reason: 'ALREADY_CLEARED', message: 'These findings have already been cleared.' };
+  }
+
+  const trimmed = reason.trim();
+  if (trimmed.length < MIN_CLEAR_REASON) {
+    return {
+      ok: false,
+      status: 400,
+      reason: 'REASON_TOO_SHORT',
+      message: `Dismissing a security finding needs a written reason of at least ${MIN_CLEAR_REASON} characters.`,
+    };
+  }
+
+  if (dossier.approval.decision !== null || dossier.audit.applied_at !== null) {
+    return { ok: false, status: 403, reason: 'ALREADY_DECIDED', message: 'This change has already been decided.' };
+  }
+
+  const next: Dossier = {
+    ...dossier,
+    untrusted: {
+      ...dossier.untrusted,
+      cleared_at: new Date().toISOString(),
+      cleared_by: viewer.email,
+      cleared_reason: trimmed,
+    },
+  };
+
+  await persist({ ...ledger, [id]: next });
+
+  // Loud, because somebody has just decided that content which tried to issue
+  // instructions to a production agent is safe to act on. They may well be
+  // right. It should still be trivial to find later.
+  console.warn(
+    `[airlock] INJECTION FINDINGS CLEARED on ${id} by ${viewer.email} (${dossier.untrusted.findings.length} finding(s)): ${trimmed}`,
+  );
+
+  return {
+    ok: true,
+    dossier: next,
+    message: 'Findings cleared. They remain on the record, and this decision is sealed with the change.',
+  };
+}
+
+/* -------------------------------------------------------------------------- */
 /* Seeding                                                                     */
 /* -------------------------------------------------------------------------- */
 

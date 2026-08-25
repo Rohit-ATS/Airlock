@@ -12,13 +12,14 @@
  * The practical consequence: a developer cannot render an Approve button for an
  * unproven change even by mistake. There is no value they could pass to it.
  *
- * The gate asks five questions, in this order, and stops at the first "no":
+ * The gate asks six questions, in this order, and stops at the first "no":
  *
  *   1. Has this already been decided?        — an audit question
- *   2. Is there a finished proof?            — a certificate question
- *   3. Does the proof actually hold?         — recomputed, never trusted
- *   4. Is the proof still true of today?     — freshness and drift
- *   5. Is this permitted, by whom, now?      — policy
+ *   2. Was anything it read steering it?     — prompt injection
+ *   3. Is there a finished proof?            — a certificate question
+ *   4. Does the proof actually hold?         — recomputed, never trusted
+ *   5. Is the proof still true of today?     — freshness and drift
+ *   6. Is this permitted, by whom, now?      — policy
  *
  * Only then does it ask whether *you* may act, because being told "you lack
  * permission" when the real answer is "this change is unprovable" wastes the
@@ -79,6 +80,7 @@ export type SealReason =
   | 'SCOPE_UNBOUNDED'
   | 'ROLLBACK_NOT_PROVEN'
   | 'PRODUCTION_DRIFTED'
+  | 'INJECTION_DETECTED'
   | 'CERTIFICATE_STALE'
   | 'POLICY_WRONG_CERTIFICATE'
   | 'POLICY_RECORD_CEILING'
@@ -110,6 +112,8 @@ export const SEAL_COPY: Record<SealReason, string> = {
   ROLLBACK_NOT_PROVEN: 'At least one rollback operation was never executed against the shadow branch.',
   PRODUCTION_DRIFTED:
     'Production has changed since this proof was taken. The certificate describes a database that no longer exists.',
+  INJECTION_DETECTED:
+    'Content this change read was trying to give the agent instructions. Until a person has looked at it, nothing here can be trusted to be the change it claims to be.',
   CERTIFICATE_STALE: 'This certificate has expired. Re-run verification against production as it is now.',
   POLICY_WRONG_CERTIFICATE: 'Policy requires a different kind of certificate for this class of change.',
   POLICY_RECORD_CEILING: 'This change touches more records than policy permits without a capacity review.',
@@ -185,13 +189,26 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
   if (dossier.audit.applied_at !== null) return sealed('ALREADY_APPLIED');
   if (dossier.approval.decision !== null) return sealed('ALREADY_DECIDED');
 
-  /* --- 2. is there a finished proof? ------------------------------------- */
+  /* --- 2. was anything the agent read trying to steer it? ----------------
+   *
+   * Deliberately checked BEFORE the certificate, which looks like the wrong
+   * order until you ask what a certificate proves. It proves that a particular
+   * set of operations is reversible — it says nothing about who chose those
+   * operations. If an attacker influenced the choice through a poisoned row,
+   * the proof is impeccable and it is proving the wrong thing.
+   *
+   * A proof whose subject was picked by the attacker is not reassuring, so this
+   * has to seal ahead of it.
+   */
+  if (hasUnclearedInjection(dossier)) return sealed('INJECTION_DETECTED');
+
+  /* --- 3. is there a finished proof? ------------------------------------- */
   const cert = dossier.certificate;
   if (!cert) return sealed('NO_CERTIFICATE');
   if (cert.status === 'PENDING') return sealed('CERTIFICATE_PENDING');
   if (cert.status === 'FAILED') return sealed('CERTIFICATE_FAILED');
 
-  /* --- 3. does the proof actually hold? ---------------------------------- */
+  /* --- 4. does the proof actually hold? ---------------------------------- */
   if (cert.kind === 'UNDO') {
     const c = cert.checksums;
     if (!c) return sealed('CHECKSUM_MISSING');
@@ -208,10 +225,10 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
     if (scope.records.length === 0 && scope.exclusions.length === 0) return sealed('SCOPE_UNBOUNDED');
   }
 
-  /* --- 4. is the proof still true of production as it is now? ------------ */
+  /* --- 5. is the proof still true of production as it is now? ------------ */
   if (hasDrifted(dossier)) return sealed('PRODUCTION_DRIFTED');
 
-  /* --- 5. is this permitted at all? -------------------------------------- */
+  /* --- 6. is this permitted at all? -------------------------------------- */
   const changeLevel = verdict.findings.filter((f) => !VIEWER_LEVEL_CODES.has(f.code));
   const firstChangeLevel = changeLevel[0];
   if (firstChangeLevel) return sealed(POLICY_SEAL[firstChangeLevel.code], firstChangeLevel);
@@ -250,6 +267,28 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
  * on the checker's word alone, while `drifted: false` proves nothing — the
  * digests are compared directly.
  */
+/**
+ * Did the agent read something that was trying to steer it, and has nobody
+ * looked at it yet?
+ *
+ * The same asymmetry that governs drift and `checksums.match`, applied to a
+ * third thing: a finding is believed on sight, and only an explicit, attributed
+ * human clearance dismisses it. There is deliberately no "confidence" score and
+ * no threshold to tune. A detector that decides for itself which attacks are
+ * serious enough to mention is a detector that will one day decide wrongly, and
+ * quietly.
+ *
+ * Clearing exists because every detector over natural language has false
+ * positives, and a control plane that can be permanently bricked by someone
+ * writing "ignore previous instructions" in their bio is a control plane that
+ * gets switched off. What clearing is not is quiet: it is attributed,
+ * timestamped, reason-bearing, and sealed into the receipt with everything else.
+ */
+export function hasUnclearedInjection(dossier: Dossier): boolean {
+  if (dossier.untrusted.findings.length === 0) return false;
+  return dossier.untrusted.cleared_at === null;
+}
+
 export function hasDrifted(dossier: Dossier): boolean {
   const { drift, certificate } = dossier;
   if (drift.drifted === true) return true;
@@ -411,6 +450,7 @@ const BLOCKED_LABEL: Record<SealReason, string> = {
   SCOPE_NOT_COMPUTED: 'BLOCKED — SCOPE NOT COMPUTED',
   SCOPE_UNBOUNDED: 'BLOCKED — BLAST RADIUS UNBOUNDED',
   PRODUCTION_DRIFTED: 'STALE — PRODUCTION HAS MOVED',
+  INJECTION_DETECTED: 'QUARANTINED — THE DATA TRIED TO GIVE ORDERS',
   CERTIFICATE_STALE: 'EXPIRED — PROOF OUT OF DATE',
   POLICY_WRONG_CERTIFICATE: 'REFUSED — WRONG KIND OF PROOF',
   POLICY_RECORD_CEILING: 'REFUSED — OVER THE RECORD CEILING',
