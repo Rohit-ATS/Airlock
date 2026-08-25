@@ -107,6 +107,11 @@ The SQLite seed already supports the Day 1 proof:
 The seed is reproducible from one command and requires no external accounts. Generated
 `.sqlite` files are ignored by git.
 
+Scope verification also writes offloaded artifacts under `.airlock/`:
+
+- `<dossier>.scope.json`: a small manifest linked from the certificate;
+- `<dossier>.scope.ndjson`: row-level scope details that stay out of the dossier.
+
 ## Next Deliverables
 
 After the schema migration works:
@@ -119,7 +124,9 @@ After the schema migration works:
    scope shape to Postgres/Supabase and add Stripe, object storage and Slack test
    connectors. Started with `npm run verify:sqlite:scope -- --emit-only`, which
    computes a PROVEN Scope Certificate with records and retention exclusions;
-3. artifact output: write large diffs as files and put only the summary into the dossier;
+3. artifact output: write large diffs as files and put only the summary into the dossier.
+   Started for erasure scope: the dossier carries aggregate counts, while row-level
+   details are written to `.airlock/*.scope.ndjson`;
 4. drift re-check: recompute production checksum just before asking for approval.
 
 ## Local Setup Note

@@ -115,6 +115,14 @@ jobs:
           if (!dossier.target.systems.includes('stripe') || !dossier.target.systems.includes('slack')) {
             throw new Error(`expected cross-system scope, got ${dossier.target.systems.join(',')}`);
           }
+          const manifest = JSON.parse(readFileSync('.airlock/ci_sqlite_erasure_scope.scope.json', 'utf8'));
+          const detailRows = readFileSync('.airlock/ci_sqlite_erasure_scope.scope.ndjson', 'utf8').trim().split('\n');
+          if (detailRows.length !== manifest.artifacts.rows) {
+            throw new Error(`expected offloaded detail artifact to contain ${manifest.artifacts.rows} row(s), got ${detailRows.length}`);
+          }
+          if (!detailRows.some((line) => line.includes('"action":"retain"'))) {
+            throw new Error('expected detail artifact to include retained rows as explicit exclusions');
+          }
 
           const gate = openGate(dossier, { email: 'ci-approver@airlock.dev', role: 'approver' });
           if (gate.state !== 'OPEN' || gate.grant?.irreversible !== true || gate.grant?.final !== false) {
