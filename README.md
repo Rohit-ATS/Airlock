@@ -1008,6 +1008,57 @@ changed.
 
 ---
 
+## Qodo Code Review Evidence
+
+Two review trails, because AIRLOCK produces one of its own.
+
+### 1. This repository — human-authored, Qodo-reviewed
+
+Every substantive change goes through a branch, a Qodo review, a human reviewer, and a merge.
+The pull request template asks three questions, and the third — *what the review said, and what
+I did about it* — is the one a diff cannot answer.
+
+| Pull request | What Qodo surfaced | What we did |
+| --- | --- | --- |
+| [#7 — review workflow and the two docs a stranger needs](https://github.com/Rohit-ATS/Airlock/pull/7) | _filled in once the review lands_ | _filled in once the review lands_ |
+
+**How findings are handled here.** Every valid High-severity finding is fixed in a follow-up
+commit on the same PR, and the review is re-run so the thread records what was resolved. A High
+finding that is wrong, deferred, or deliberate is **dismissed in the Qodo thread with the reason
+written down** rather than merged over silently. Medium and Low are an engineering call, made
+explicitly rather than by default.
+
+Branches are not hand-polished to zero findings before opening. A trail where the reviewer never
+found anything is evidence of nothing — either the changes were trivial or nobody engaged with
+the review. The trail is the artifact, so the work goes up honest.
+
+### 2. The target repository — agent-authored, Qodo-reviewed
+
+This is the trail worth looking at, and it exists because of what AIRLOCK is.
+
+A schema migration is only half a change. Dropping `users.plan_name` is not finished when the
+column is gone — it is finished when the fourteen places that read it no longer do. So AIRLOCK's
+agent writes the expand/contract changes, **opens a pull request on the target codebase, and
+Qodo reviews the agent's own code.** The findings are addressed *before* the certificate
+completes and before any human is asked to approve anything:
+
+> Code changes prepared · reviewed by Qodo · 2 findings addressed
+
+Qodo is a **gate condition inside the product**, not a review of this repository. The rule is
+enforced in [`review.ts`](packages/contract/src/review.ts) and asserted by
+[`review.test.mjs`](packages/contract/test/review.test.mjs): a migration whose accompanying code
+is unreviewed does not open the gate, and a "fix" whose commit predates the finding does not
+count as addressing it — because a fix that arrives before the complaint fixes something else.
+
+The privilege model survives this because of one distinction: **the agent may open a pull
+request and may not merge one.** Propose, never apply — the same rule as the gate itself, one
+layer out. Granting `@write` on GitHub would have handed the agent `merge_pull_request`, a
+second route to production past every control here, so
+[`check-agents.mjs`](scripts/check-agents.mjs) enforces a deny-list independently of the
+allow-list, and CI runs it on every push.
+
+---
+
 ## Team
 
 **Rohit Maruri** — the console, the landing page, the control room, the Harness Panel, the
