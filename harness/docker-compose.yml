@@ -1,0 +1,91 @@
+# TrueForge, hosted mode, for AIRLOCK.
+#
+#   cd harness && cp .env.example .env   # add your model key
+#   docker compose up -d                 # http://localhost:8791
+#
+# Self-contained on purpose. The upstream compose builds TrueForge from monorepo
+# source, which cannot be done from a Windows checkout — `git clone` fails to
+# materialise ~1700 files on filename and path constraints, and the build then
+# dies compiling the SDK against a half-empty tree. This installs the published
+# npm package instead and copies nothing from the context, so the host filesystem
+# is irrelevant.
+#
+# Postgres and Redis are deliberately NOT published to the host. Nothing needs
+# them there — only the server talks to them, over this network, by service name
+# — and publishing them collides with whatever else you happen to be running.
+# (On this machine, 5433 and 6380 were already taken by an unrelated project.)
+name: airlock-harness
+
+services:
+  postgres:
+    image: postgres:17
+    env_file: [.env]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Peers executors across replicas. This is the mechanism behind session
+  # durability, replica failover, and cross-replica turn cancellation — which is
+  # what AIRLOCK's ABORT control rides on.
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      args:
+        APP_VERSION: '0.1.4'
+    image: airlock/trueforge:0.1.4
+    ports:
+      - '8791:8790'
+    environment:
+      NODE_ENV: production
+      PORT: 8790
+      HOST: 0.0.0.0
+      PUBLIC_BASE_URL: http://localhost:8791
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      # false => Postgres + Redis, and the peered cancel path stays exercised.
+      # AIRLOCK's ABORT depends on it, so it is not worth turning off to save a
+      # container.
+      STANDALONE: 'false'
+      REDIS_URL: redis://redis:6379
+      # The AIRLOCK MCP server and console run on the host. `localhost` inside a
+      # container is the container; this is how the harness reaches out.
+      AIRLOCK_CONSOLE_URL: http://host.docker.internal:3000
+    env_file: [.env]
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8790/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    # Above the app's default GRACEFUL_TIMEOUT_SECONDS (30) so SIGKILL does not
+    # cut off a turn mid-drain.
+    stop_grace_period: 35s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
