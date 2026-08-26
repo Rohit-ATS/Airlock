@@ -364,8 +364,31 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
  * timestamped, reason-bearing, and sealed into the receipt with everything else.
  */
 export function hasUnclearedInjection(dossier: Dossier): boolean {
-  if (dossier.untrusted.findings.length === 0) return false;
-  return dossier.untrusted.cleared_at === null;
+  const { findings, cleared_at, cleared_by, cleared_reason } = dossier.untrusted;
+  if (findings.length === 0) return false;
+  if (cleared_at === null) return true;
+
+  // A clearance is somebody putting their name to a judgement that content
+  // which tried to give the agent instructions is safe to proceed on. Recorded
+  // without a name or without a reason it is not a judgement, it is a flag —
+  // and the two fields existed but had no reader, so setting `cleared_at`
+  // alone was enough to open the door.
+  if (!cleared_by || !cleared_reason) return true;
+
+  // Clearance covers what existed when it was granted, and nothing after.
+  //
+  // Without this, clearing one benign finding cleared the dossier permanently:
+  // every finding reported afterwards arrived pre-cleared, including one raised
+  // a minute before the gate. An undated finding predates this rule and is
+  // treated as covered — it cannot be newer than anything.
+  const clearedAt = Date.parse(cleared_at);
+  if (!Number.isFinite(clearedAt)) return true;
+
+  return findings.some((f) => {
+    if (!f.at) return false;
+    const raised = Date.parse(f.at);
+    return Number.isFinite(raised) && raised > clearedAt;
+  });
 }
 
 export function hasDrifted(dossier: Dossier): boolean {

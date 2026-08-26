@@ -551,7 +551,48 @@ export function evaluatePolicy(
     });
   }
 
-  /* --- a proof has a shelf life ------------------------------------------ */
+  /* --- a proof has a shelf life ------------------------------------------
+   *
+   * Three ways this used to read as fresh, all of them wrong:
+   *
+   *   - `verified_at` absent. The guard was `if (cert?.verified_at)`, so a
+   *     certificate that never recorded when it was taken skipped the check
+   *     entirely and stayed valid forever.
+   *   - `verified_at` unparseable. `new Date('nonsense').getTime()` is NaN,
+   *     `Number.isFinite(NaN)` is false, and the finding was skipped — an
+   *     undated proof again, this time with something in the field.
+   *   - `verified_at` in the future. A negative age is not greater than the
+   *     window, so a certificate dated next week never expires.
+   *
+   * All three share one shape: a check that could not be performed was treated
+   * as a check that passed. The rule everywhere else in this codebase is the
+   * opposite, and it applies here.
+   */
+  if (cert && cert.status === 'PROVEN') {
+    const verifiedAt = cert.verified_at ? Date.parse(cert.verified_at) : Number.NaN;
+
+    if (!Number.isFinite(verifiedAt)) {
+      findings.push({
+        code: 'CERTIFICATE_STALE',
+        message:
+          'This certificate does not record when it was taken, so its freshness cannot be checked. A proof of unknown age is not a fresh proof. Re-run verification.',
+        limit: `${rule.freshness_seconds}s`,
+        observed: cert.verified_at ? `unparseable: ${cert.verified_at}` : 'no verified_at',
+      });
+    } else if (verifiedAt > now.getTime() + 60_000) {
+      // A minute of tolerance for clock skew between the verifier and here.
+      // Beyond that it is not skew, and a proof dated in the future would never
+      // age out of its window.
+      findings.push({
+        code: 'CERTIFICATE_STALE',
+        message:
+          'This certificate is dated in the future. A proof cannot have been taken at a time that has not happened, and a future date never expires. Re-run verification.',
+        limit: `${rule.freshness_seconds}s`,
+        observed: `verified_at is ${Math.round((verifiedAt - now.getTime()) / 1000)}s ahead`,
+      });
+    }
+  }
+
   if (cert?.verified_at) {
     const ageMs = now.getTime() - new Date(cert.verified_at).getTime();
     const ageSeconds = Math.floor(ageMs / 1000);
