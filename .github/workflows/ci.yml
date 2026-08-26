@@ -177,6 +177,12 @@ jobs:
       - name: No agent can write to production without holding the gate
         run: npm run check:agents
 
+      # The README's banners are animated SVGs committed to the repo, which
+      # makes them code. An SVG with one unescaped ampersand does not degrade —
+      # it renders as a broken image, on the first thing a judge looks at.
+      - name: The README's assets parse and reference each other correctly
+        run: npm run check:assets
+
       # airlock.policy.yaml is authored, not generated — a team is meant to edit
       # it. This asserts it still resolves to exactly the shipped default, so the
       # console enforcing one thing while the docs and tests describe another
