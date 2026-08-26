@@ -1,9 +1,26 @@
-# AIRLOCK
+<div align="center">
 
-[![ci](https://github.com/Rohit-ATS/Airlock/actions/workflows/ci.yml/badge.svg)](https://github.com/Rohit-ATS/Airlock/actions/workflows/ci.yml)
-[![pages](https://github.com/Rohit-ATS/Airlock/actions/workflows/pages.yml/badge.svg)](https://github.com/Rohit-ATS/Airlock/actions/workflows/pages.yml)
-[![CodeQL](https://github.com/Rohit-ATS/Airlock/actions/workflows/codeql.yml/badge.svg)](https://github.com/Rohit-ATS/Airlock/actions/workflows/codeql.yml)
-[![MIT](https://img.shields.io/badge/license-MIT-7dd3fc.svg)](LICENSE)
+<img src="assets/hero.svg" alt="AIRLOCK — an agent that proves a change against a shadow copy before it is allowed to ask you anything" width="880">
+
+<p>
+  <a href="https://github.com/Rohit-ATS/Airlock/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/Rohit-ATS/Airlock/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/Rohit-ATS/Airlock/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/Rohit-ATS/Airlock/actions/workflows/codeql.yml/badge.svg"></a>
+  <a href="https://rohit-ats.github.io/Airlock/"><img alt="live demo" src="https://img.shields.io/badge/live_demo-rohit--ats.github.io%2FAirlock-d2691e?style=flat"></a>
+  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-7dd3fc?style=flat"></a>
+</p>
+
+<p>
+  <img alt="tests" src="https://img.shields.io/badge/tests-228%20passing-35d6a4?style=flat">
+  <img alt="claims" src="https://img.shields.io/badge/README%20claims-28%20anchored%20to%20code-4fc3f7?style=flat">
+  <img alt="capabilities" src="https://img.shields.io/badge/harness%20capabilities-23-f7942f?style=flat">
+  <img alt="write path" src="https://img.shields.io/badge/tools%20that%20write%20to%20production-0-ff5257?style=flat">
+</p>
+
+**[Live demo](https://rohit-ats.github.io/Airlock/)** &nbsp;·&nbsp; **[Run it](#run-it)** &nbsp;·&nbsp; **[Verify every claim](#verify-it)** &nbsp;·&nbsp; **[The benchmark](docs/BENCHMARK.md)** &nbsp;·&nbsp; **[Three-minute demo](docs/DEMO.md)**
+
+</div>
+
+---
 
 **Nothing reaches production without passing through the airlock.**
 
@@ -15,14 +32,92 @@ with the evidence attached.
 
 Built on [TrueForge](https://trueforge.dev) for the Agent Harness Hackathon, 24–30 August 2026.
 
-**→ [rohit-ats.github.io/Airlock](https://rohit-ats.github.io/Airlock/)** — the landing page,
-live, nothing to install. The gate on it is the real `openGate()` compiled to the browser, not
-a recording: every combination you set is a genuine evaluation. Try to find one that opens a
-door it shouldn't.
+> **Try it without installing anything.** The gate on the
+> [live page](https://rohit-ats.github.io/Airlock/) is the real `openGate()` compiled to the
+> browser, not a recording. Every combination you set is a genuine evaluation.
+> **See if you can find one that opens a door it shouldn't.**
 
-To run the console and the API — the parts a static page cannot host — see
-[Run it](#run-it), four commands below. To check any claim in this document against the code
-that implements it, see [Verify it](#verify-it).
+---
+
+## The rule, as an animation
+
+`certificate.status !== "PROVEN"` → the approval gate is **never offered**. Not greyed out,
+not hidden behind a warning — never rendered, because the value that would represent
+permission cannot be constructed.
+
+<div align="center">
+  <img src="assets/gate.svg" alt="Three states of the gate: with no certificate and with a failed certificate the approve control does not exist; only a proven certificate causes it to appear" width="880">
+</div>
+
+<sub>Watch the space where the button would be. In the first two states it is deliberately,
+visibly empty — that absence is the entire argument.</sub>
+
+---
+
+## How a change reaches production
+
+<div align="center">
+  <img src="assets/flow.svg" alt="The pipeline: request, shadow copy, apply and undo, three checksums, the gate, sealed ledger" width="880">
+</div>
+
+The same pipeline as a diagram you can read the source of:
+
+```mermaid
+flowchart LR
+  R["Request<br/>in English"] --> S["Shadow copy<br/>branch the DB"]
+  S --> A["Apply + undo<br/>in a sandbox"]
+  A --> C{"pre == post_rollback?"}
+  C -- "no" --> X["SEALED<br/>certificate failed"]
+  C -- "yes" --> P["Certificate<br/>PROVEN"]
+  P --> Q{"Policy:<br/>quorum, ceilings,<br/>freshness, freeze"}
+  Q -- "refuses" --> X
+  Q -- "permits" --> G["The gate opens"]
+  G --> H["A human decides"]
+  H --> L["Sealed into the<br/>hash-chained ledger"]
+  L --> U["Undo window<br/>30 min"]
+
+  classDef sealed fill:#2a1416,stroke:#ff5257,color:#ffb3b5
+  classDef proven fill:#0b3729,stroke:#35d6a4,color:#8ff0d2
+  classDef gate fill:#3a220c,stroke:#d2691e,color:#ffc48a
+  class X sealed
+  class P,L proven
+  class G,H gate
+```
+
+**The agent cannot skip a step**, because it has no tool that reaches production. Its entire
+vocabulary is: read the policy, open a change, attach a proof, look a fact up, and ask a human.
+
+---
+
+## What the agent is allowed to do
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as Human
+  participant A as Agent
+  participant M as AIRLOCK (MCP)
+  participant D as Sandbox + shadow DB
+  participant P as Production
+
+  U->>A: "Drop users.plan_name"
+  A->>M: airlock_read_policy
+  M-->>A: SCHEMA_MIGRATION needs an UNDO certificate
+  A->>D: apply → checksum → rollback → checksum
+  D-->>A: pre, post, post_rollback
+  A->>M: airlock_attach_certificate
+  M->>M: recompute pre == post_rollback
+  Note over M: the verifier's own `match` flag is never trusted
+  A->>M: airlock_request_approval
+  M-->>U: held by the harness for a human
+  U->>M: approve
+  M->>M: re-run the gate server-side, seal a receipt
+  Note over A,P: the agent never touches production — it has no tool that can
+```
+
+<sub>Step 9 is the one that matters: the tool that moves a change forward is listed in
+<code>require_approval_for_tools</code>, so the <b>harness</b> holds it. Not a UI state, not a
+promise in a prompt.</sub>
 
 ---
 
@@ -220,6 +315,9 @@ every anchor to a line number and **fails the build if it cannot find it exactly
 table is generated from that file, so the line numbers you are about to click were produced by
 reading the code rather than typed in and left to rot.
 
+<details>
+<summary><b>All 28 claims, each anchored to a line of code</b> — click to expand</summary>
+
 <!-- BEGIN CLAIMS -->
 
 <!-- Generated by scripts/verify-claims.mjs. Do not edit by hand: run `npm run verify:claims -- --emit`. -->
@@ -289,6 +387,8 @@ reading the code rather than typed in and left to rot.
 | Forward SQL that does not run is scored as neither a pass nor a refusal, so a model cannot be rewarded for writing SQL that never parsed. | [`run.mjs:292`](benchmark/run.mjs#L292) | `node scripts/check-benchmark.mjs` | The `Unscored` column in docs/BENCHMARK.md is that outcome, reported rather than averaged away. |
 
 <!-- END CLAIMS -->
+
+</details>
 
 If a claim in this README is not in that table, it is prose — an argument for why something is
 built the way it is — and should be read as such. Several claims were **removed** rather than
@@ -445,6 +545,10 @@ re-verifies the ledger **in the browser** rather than trusting a server that say
 
 ### The Harness Panel
 
+<div align="center">
+  <img src="assets/lamps.svg" alt="Twenty-three capability lamps igniting one by one as real harness events prove them" width="880">
+</div>
+
 A persistent rail listing all 23 TrueForge capabilities. Each is dim until a **real harness
 event** proves it, then lights with a timestamp and a link to the step that proved it.
 
@@ -453,7 +557,7 @@ event** proves it, then lights with a timestamp and a link to the step that prov
 around the real TrueForge event stream in
 [`observedServer.ts`](apps/console/src/server/observedServer.ts). Events are observed and
 yielded onward unmodified — never synthesised, re-ordered or dropped. A run that does not
-exercise a capability ends below 22, and that is the correct outcome.
+exercise a capability ends below 23, and that is the correct outcome.
 
 Unlit rows stay legible on purpose. Hiding what did not happen would make the counter
 meaningless; showing it is what makes the lit ones worth believing. On the landing page every
@@ -883,7 +987,7 @@ computed-style probe — which is to say, by measuring rather than by looking.
 ## Tests
 
 ```bash
-npm test        # 228 tests, 18 fixtures, 4 agent specs, 1 policy file, 28 claims
+npm test        # 228 tests, 18 fixtures, 4 agent specs, 1 policy file, 28 claims, 4 SVG assets
 ```
 
 Those four numbers are **checked, not typed**. `verify-claims.mjs` runs the suite, counts the
@@ -1004,12 +1108,51 @@ changed.
 
 ## Team
 
-**Rohit Maruri** — the console, the landing page, the control room, the Harness Panel, the
-certificate card, the gate, the policy engine, the tamper-evident ledger, the MCP server, the
-agent definitions and skills, the contract, the webhook and roles.
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="https://github.com/Rohit-ATS">
+        <img src="https://github.com/Rohit-ATS.png?size=120" width="110" alt="Rohit Maruri">
+      </a>
+      <br>
+      <b>Rohit Maruri</b>
+      <br>
+      <a href="https://github.com/Rohit-ATS"><sub>@Rohit-ATS</sub></a>
+      <br><br>
+      <sub><b>The gate and everything that judges a change</b></sub>
+      <br>
+      <sub>
+        The contract · the invariant as a type · the policy engine · the tamper-evident
+        ledger · the MCP server · the console, control room and landing page · the Harness
+        Panel · agent definitions and skill packs · quarantine, undo, budget and review
+      </sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="https://github.com/k1lst1x">
+        <img src="https://github.com/k1lst1x.png?size=120" width="110" alt="Damir Mertl">
+      </a>
+      <br>
+      <b>Damir Mertl</b>
+      <br>
+      <a href="https://github.com/k1lst1x"><sub>@k1lst1x</sub></a>
+      <br><br>
+      <sub><b>The verification engine — everything that produces the proof</b></sub>
+      <br>
+      <sub>
+        The SQLite shadow verifier · the checksum proof flow · generated dossiers ·
+        the erasure scope verifier · production drift re-checks · the automated
+        verifier checks that run in CI
+      </sub>
+    </td>
+  </tr>
+</table>
 
-**Damir Mertl** — the verification engine and seed data: the shadow verifier, checksum proof
-flow, generated dossiers and automated verifier checks; next, the hosted shadow branch lifecycle
-and scope computation across the systems the demo connects.
+<div align="center">
+  <sub>
+    The split is clean and deliberate: one half <b>produces</b> evidence, the other half
+    <b>refuses to believe it</b> without recomputing. The gate never trusts the verifier's
+    own <code>match</code> flag — it recomputes <code>pre === post_rollback</code> itself.
+  </sub>
+</div>
 
 MIT licensed.
