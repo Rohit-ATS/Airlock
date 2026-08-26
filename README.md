@@ -10,8 +10,8 @@
 </p>
 
 <p>
-  <img alt="tests" src="https://img.shields.io/badge/tests-228%20passing-35d6a4?style=flat">
-  <img alt="claims" src="https://img.shields.io/badge/README%20claims-28%20anchored%20to%20code-4fc3f7?style=flat">
+  <img alt="tests" src="https://img.shields.io/badge/tests-293%20passing-35d6a4?style=flat">
+  <img alt="claims" src="https://img.shields.io/badge/README%20claims-32%20anchored%20to%20code-4fc3f7?style=flat">
   <img alt="capabilities" src="https://img.shields.io/badge/harness%20capabilities-23-f7942f?style=flat">
   <img alt="write path" src="https://img.shields.io/badge/tools%20that%20write%20to%20production-0-ff5257?style=flat">
 </p>
