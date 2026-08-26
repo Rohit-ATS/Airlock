@@ -27,15 +27,45 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
 
-  let body: { observed_checksum?: string | null; duration_ms?: number } = {};
+  let body: { observed_checksum?: unknown; duration_ms?: unknown } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
     /* an empty body is a check that observed nothing, which is a valid answer */
   }
 
-  const result = await recordPostApply(id, body.observed_checksum ?? null, {
-    ...(typeof body.duration_ms === 'number' ? { durationMs: Math.trunc(body.duration_ms) } : {}),
+  /*
+   * Validate the digest before it can reach the ledger.
+   *
+   * `as typeof body` is a compile-time assertion and does nothing at runtime, so
+   * whatever JSON arrived went straight through. A non-string `observed_checksum`
+   * — an object, a number, an array — was written into the dossier, failed the
+   * contract on the next read, and was then *skipped* by the loader as a
+   * malformed entry. The record did not error; it disappeared. On a sealed
+   * change that is the hash chain losing a link, which is the one property this
+   * ledger exists to have.
+   *
+   * Null stays legal and means NOT_CHECKED. A check that observed nothing is a
+   * valid and important answer; a check that observed nonsense is not.
+   */
+  const observed = body.observed_checksum;
+  if (observed !== undefined && observed !== null) {
+    if (typeof observed !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(observed)) {
+      return NextResponse.json(
+        {
+          error: 'INVALID_CHECKSUM',
+          message:
+            'observed_checksum must be null, or "sha256:" followed by 64 lowercase hex characters. It is compared against the certificate, so a value that is not a digest cannot be compared to one.',
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  const result = await recordPostApply(id, (observed as string | null | undefined) ?? null, {
+    ...(typeof body.duration_ms === 'number' && Number.isFinite(body.duration_ms)
+      ? { durationMs: Math.trunc(body.duration_ms) }
+      : {}),
   });
 
   if (!result.ok) {
