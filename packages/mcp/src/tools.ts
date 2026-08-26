@@ -349,6 +349,103 @@ const SCOPE_EXCLUSION_SCHEMA = {
   },
 } as const;
 
+/**
+ * One thing a SCOPE certificate destroys, and one thing it deliberately spares.
+ *
+ * These were `{ type: 'object' }` — no properties at all — so the model was
+ * asked to produce the most consequential structure in the product with no idea
+ * what shape it took. It guessed, the contract rejected it on a nested path
+ * (`certificate.scope.records.0.system`), and there was nothing in the tool
+ * definition that would have told it otherwise.
+ */
+const SCOPE_RECORD_SCHEMA = {
+  type: 'object',
+  required: ['system', 'id', 'action'],
+  properties: {
+    system: SYSTEM_SCHEMA,
+    table: { type: 'string', description: 'The table or collection, where the system has them.' },
+    id: { type: 'string', description: 'The identifier of the thing being acted on.' },
+    action: {
+      type: 'string',
+      enum: ['delete', 'anonymize', 'update', 'grant', 'transfer', 'send'],
+      description: 'What happens to it.',
+    },
+    count: { type: 'integer', description: 'How many rows this entry stands for. Defaults to 1.' },
+  },
+} as const;
+
+/**
+ * The four structures a change carries that the model was previously asked to
+ * invent unaided.
+ *
+ * Each of these was `items: { type: 'object' }` — a shape with no shape. The
+ * model produced something reasonable, the contract rejected it on a nested
+ * path, and the tool definition contained nothing that would have told it the
+ * right answer. It is not a hard problem to describe an affected table; it was
+ * simply never described.
+ *
+ * Audited by walking every tool's schema and flagging any array of objects with
+ * no `properties`, rather than by fixing the one that happened to fail first.
+ */
+const AFFECTED_TABLE_SCHEMA = {
+  type: 'object',
+  required: ['name', 'rows', 'operation'],
+  properties: {
+    system: SYSTEM_SCHEMA,
+    name: { type: 'string', description: 'The table or collection.' },
+    rows: { type: 'integer', description: 'Row count, measured against the real system. Not an estimate.' },
+    operation: { type: 'string', description: 'What happens to it, e.g. "add column, backfill".' },
+  },
+} as const;
+
+const BLAST_RADIUS_SCHEMA = {
+  type: 'object',
+  required: ['repo', 'file', 'line'],
+  properties: {
+    repo: { type: 'string', description: 'owner/name' },
+    file: { type: 'string' },
+    line: { type: 'integer', description: '1-indexed.' },
+    symbol: { type: 'string', description: 'The function or identifier that reads it.' },
+    excerpt: { type: 'string' },
+  },
+} as const;
+
+const RISK_NOTE_SCHEMA = {
+  type: 'object',
+  required: ['note'],
+  properties: {
+    note: { type: 'string' },
+    source_url: { type: 'string', description: 'Cite it. A claim about lock behaviour needs a URL, not a recollection.' },
+    source_title: { type: 'string' },
+  },
+} as const;
+
+const QUESTION_SCHEMA = {
+  type: 'object',
+  required: ['asked'],
+  properties: {
+    asked: { type: 'string', description: 'The question put to a human. Only for judgement no system of record can answer.' },
+    options: { type: 'array', items: { type: 'string' }, description: 'Candidates, when the answer is a choice.' },
+    answered_by: { type: 'string' },
+    answer: { type: 'string' },
+    at: { type: 'string', description: 'ISO 8601.' },
+  },
+} as const;
+
+const SCOPE_EXCLUSION_SCHEMA = {
+  type: 'object',
+  required: ['system', 'reason'],
+  properties: {
+    system: SYSTEM_SCHEMA,
+    table: { type: 'string' },
+    reason: {
+      type: 'string',
+      description: 'Why this is deliberately NOT touched. An exclusion without a stated reason is not an exclusion.',
+    },
+    count: { type: 'integer' },
+  },
+} as const;
+
 /* -------------------------------------------------------------------------- */
 /* The tools                                                                   */
 /* -------------------------------------------------------------------------- */
