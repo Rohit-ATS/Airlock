@@ -262,6 +262,8 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
   // whose every individual number survives inspection.
   if (operationsChanged(cert.operations_fingerprint, dossier.operations_fingerprint)) {
     return sealed('OPERATIONS_CHANGED');
+  }
+
   //
   // Before the checksums, because a checksum triple is only meaningful if
   // something executed to produce it. Under SCHEMA_ONLY no rows were ever
