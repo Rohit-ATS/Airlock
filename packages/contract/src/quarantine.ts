@@ -239,6 +239,16 @@ const RULES: Rule[] = [
 /* -------------------------------------------------------------------------- */
 
 export interface InjectionFinding {
+  /**
+   * When this was recorded, stamped by whoever stores it rather than by the
+   * scanner.
+   *
+   * The scanner stays pure — the same text scans to the same findings, which is
+   * what makes a fixture able to assert a detection. The timestamp is a fact
+   * about the *reporting*, and the gate needs it because clearance is granted
+   * per dossier: a finding raised after a clearance must not be covered by it.
+   */
+  at: string | null;
   source: UntrustedSource;
   /** Where exactly: `users.bio#id=4821`, `src/billing/plan.ts:42`, a PR URL. */
   locator: string;
@@ -314,6 +324,7 @@ export function scanUntrusted(
     const match = rule.test.exec(input);
     if (!match) continue;
     findings.push({
+      at: null,
       source,
       locator,
       kind: rule.kind,

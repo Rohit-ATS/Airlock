@@ -437,6 +437,20 @@ export const InjectionFindingSchema = z.object({
   rule: z.string().min(1),
   /** Neutralised — never the raw payload. See `neutralise()`. */
   excerpt: z.string(),
+  /**
+   * When this was reported.
+   *
+   * Load-bearing, not metadata. Clearance is recorded once per dossier, so
+   * without a timestamp a human who cleared one benign finding on Monday had
+   * silently pre-cleared every finding reported afterwards — including one that
+   * arrived a minute before the gate. The gate now refuses any finding newer
+   * than the clearance that supposedly covers it.
+   *
+   * Nullable because findings written before this existed have no timestamp.
+   * Those are treated as covered, which is what they always were; a null cannot
+   * be newer than anything.
+   */
+  at: z.string().nullable().default(null),
 });
 
 /**

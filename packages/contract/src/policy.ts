@@ -16,7 +16,7 @@
  * reason and told so precisely.
  */
 import { z } from 'zod';
-import type { ChangeClass, CertificateKind, Dossier } from './dossier.js';
+import type { Certificate, ChangeClass, CertificateKind, Dossier } from './dossier.js';
 import { CERTIFICATE_KINDS, CHANGE_CLASSES, approversFor } from './dossier.js';
 
 /* -------------------------------------------------------------------------- */
@@ -521,6 +521,39 @@ export interface PolicyVerdict {
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
+
+/**
+ * What the certificate itself says this change touches.
+ *
+ * A SCOPE certificate enumerates exactly what will be destroyed, so it is a
+ * measurement of the blast radius rather than a summary of one. `count`
+ * defaults to 1 per record in the contract, so a scope listing individual rows
+ * still adds up correctly.
+ *
+ * Returns zeros for an UNDO certificate, which enumerates nothing — its claim
+ * is about reversibility, not size, and reading zero from it would be reading
+ * an absence as a measurement. The caller takes the larger of this and the
+ * declaration, so zeros are inert.
+ */
+function scopeMagnitude(cert: Certificate | undefined): {
+  records: number;
+  people: number;
+  amount_minor: number;
+} {
+  const empty = { records: 0, people: 0, amount_minor: 0 };
+  const scope = cert?.scope;
+  if (!scope) return empty;
+
+  const records = scope.records.reduce((total: number, r) => total + (r.count ?? 1), 0);
+
+  // People are not rows. A scope touching one person across four systems is
+  // four records and one person, so distinct subjects are counted by identity
+  // — the same rule `approversFor` applies to signatures.
+  const subjects = new Set(scope.records.map((r) => `${r.system}:${r.id}`));
+
+  return { records, people: subjects.size, amount_minor: empty.amount_minor };
+}
+
 /**
  * Evaluate policy against a dossier for a specific viewer at a specific moment.
  *
@@ -551,7 +584,48 @@ export function evaluatePolicy(
     });
   }
 
-  /* --- a proof has a shelf life ------------------------------------------ */
+  /* --- a proof has a shelf life ------------------------------------------
+   *
+   * Three ways this used to read as fresh, all of them wrong:
+   *
+   *   - `verified_at` absent. The guard was `if (cert?.verified_at)`, so a
+   *     certificate that never recorded when it was taken skipped the check
+   *     entirely and stayed valid forever.
+   *   - `verified_at` unparseable. `new Date('nonsense').getTime()` is NaN,
+   *     `Number.isFinite(NaN)` is false, and the finding was skipped — an
+   *     undated proof again, this time with something in the field.
+   *   - `verified_at` in the future. A negative age is not greater than the
+   *     window, so a certificate dated next week never expires.
+   *
+   * All three share one shape: a check that could not be performed was treated
+   * as a check that passed. The rule everywhere else in this codebase is the
+   * opposite, and it applies here.
+   */
+  if (cert && cert.status === 'PROVEN') {
+    const verifiedAt = cert.verified_at ? Date.parse(cert.verified_at) : Number.NaN;
+
+    if (!Number.isFinite(verifiedAt)) {
+      findings.push({
+        code: 'CERTIFICATE_STALE',
+        message:
+          'This certificate does not record when it was taken, so its freshness cannot be checked. A proof of unknown age is not a fresh proof. Re-run verification.',
+        limit: `${rule.freshness_seconds}s`,
+        observed: cert.verified_at ? `unparseable: ${cert.verified_at}` : 'no verified_at',
+      });
+    } else if (verifiedAt > now.getTime() + 60_000) {
+      // A minute of tolerance for clock skew between the verifier and here.
+      // Beyond that it is not skew, and a proof dated in the future would never
+      // age out of its window.
+      findings.push({
+        code: 'CERTIFICATE_STALE',
+        message:
+          'This certificate is dated in the future. A proof cannot have been taken at a time that has not happened, and a future date never expires. Re-run verification.',
+        limit: `${rule.freshness_seconds}s`,
+        observed: `verified_at is ${Math.round((verifiedAt - now.getTime()) / 1000)}s ahead`,
+      });
+    }
+  }
+
   if (cert?.verified_at) {
     const ageMs = now.getTime() - new Date(cert.verified_at).getTime();
     const ageSeconds = Math.floor(ageMs / 1000);
@@ -566,8 +640,35 @@ export function evaluatePolicy(
     }
   }
 
-  /* --- ceilings ---------------------------------------------------------- */
-  const m = dossier.magnitude;
+  /* --- ceilings ----------------------------------------------------------
+   *
+   * Measured against the larger of what the agent declared and what the
+   * certificate actually enumerated.
+   *
+   * `magnitude` is agent-authored and every field defaults to zero, so a change
+   * could declare `records: 0, people: 0, amount_minor: 0` and clear every
+   * ceiling in this function — while its own SCOPE certificate listed fifty
+   * thousand rows it was about to destroy. The ceilings were reading the
+   * agent's summary of the blast radius rather than the blast radius, and the
+   * two live in the same dossier.
+   *
+   * The reconciliation is deliberately one-directional: the *larger* number
+   * wins, never the certificate alone. A declaration above the enumerated scope
+   * is not a contradiction — an agent may know the change affects people the
+   * scope does not enumerate, and taking the smaller number there would let a
+   * modest scope wave through a large claim. Understating is the failure worth
+   * catching; overstating is caution.
+   */
+  const scoped = scopeMagnitude(cert);
+  const m = {
+    ...dossier.magnitude,
+    records: Math.max(dossier.magnitude.records, scoped.records),
+    people: Math.max(dossier.magnitude.people, scoped.people),
+    amount_minor:
+      Math.abs(dossier.magnitude.amount_minor) >= Math.abs(scoped.amount_minor)
+        ? dossier.magnitude.amount_minor
+        : scoped.amount_minor,
+  };
 
   if (rule.max_records !== null && m.records > rule.max_records) {
     findings.push({
