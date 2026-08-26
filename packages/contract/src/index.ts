@@ -16,3 +16,5 @@ export * from './ddl.js';
 export * from './resolve.js';
 export * from './operations.js';
 export * from './activity.js';
+export * from './connection.js';
+export * from './shadow.js';

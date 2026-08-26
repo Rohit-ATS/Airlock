@@ -281,8 +281,8 @@ it and the command that demonstrates it.
 ```bash
 npm test
 ```
-> `228 tests, 0 fail` · `18 fixtures check out.` · `4 agent spec(s) check out.` ·
-> `airlock.policy.yaml checks out` · `28 claims, every one anchored to a line that exists.`
+> `263 tests, 0 fail` · `18 fixtures check out.` · `4 agent spec(s) check out.` ·
+> `airlock.policy.yaml checks out` · `32 claims, every one anchored to a line that exists.`
 >
 > Included in that: `gate.test.mjs` asserts no non-`PROVEN` certificate opens the gate under
 > any combination of class, status and viewer, and building the contract asserts the
@@ -327,7 +327,7 @@ reading the code rather than typed in and left to rot.
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| An approval for an unproven change cannot be constructed: `ApprovalGrant` carries a module-private symbol only `openGate` can mint. | [`gate.ts:56`](packages/contract/src/gate.ts#L56) | `npm run build --workspace @airlock/contract` | Compiles. Weaken the type and the build fails — see the next row. |
+| An approval for an unproven change cannot be constructed: `ApprovalGrant` carries a module-private symbol only `openGate` can mint. | [`gate.ts:57`](packages/contract/src/gate.ts#L57) | `npm run build --workspace @airlock/contract` | Compiles. Weaken the type and the build fails — see the next row. |
 | Six attempts to forge a grant are asserted as compile errors. Weaken the type and `tsc` fails on the now-unused `@ts-expect-error`. | [`gate.typetest.ts:27`](packages/contract/src/gate.typetest.ts#L27) | `npm run build --workspace @airlock/contract` | Six `@ts-expect-error` lines, each a forgery the compiler rejects. |
 | A detected injection seals the gate **before** the certificate is examined — step 2 of 8, ahead of proof integrity. | [`gate.ts:225`](packages/contract/src/gate.ts#L225) | `node --test packages/contract/test/quarantine.test.mjs` | The ordering is pinned by test, not left to code review. |
 | The verifier's own `match` flag is never trusted. AIRLOCK recomputes `pre === post_rollback` itself. | [`gate.ts:255`](packages/contract/src/gate.ts#L255) | `node --test packages/contract/test/gate.test.mjs` | A dossier claiming `match:true` over differing checksums is still sealed. |
@@ -360,6 +360,20 @@ reading the code rather than typed in and left to rot.
 | An ambiguous fact seals the gate ahead of the certificate, and is asked with its candidates listed rather than as an empty box. | [`gate.ts:241`](packages/contract/src/gate.ts#L241) | `npm run check:fixtures` | `dos_refund_ambiguous` — a flawless SCOPE proof, refused because two customers matched one email. |
 | Resolved facts are fingerprinted into the certificate and re-checked before the gate, so a fact that moved seals the door. | [`resolve.ts:239`](packages/contract/src/resolve.ts#L239) | `npm run check:fixtures` | `dos_payout_context_drift` — no row changed, no checksum noticed, the pin caught it. |
 | A pinned proof nobody re-checked is refused rather than waved through: an absent check is not a passed check. | [`resolve.ts:276`](packages/contract/src/resolve.ts#L276) | `node --test packages/contract/test/resolve.test.mjs` | CONTEXT_UNVERIFIED, kept distinct from CONTEXT_DRIFTED so neither hides inside the other. |
+
+**Real databases**
+
+| The claim | The code | Run this | What you see |
+| --- | --- | --- | --- |
+| A strategy that never executed against real rows cannot issue an UNDO certificate. SCHEMA_ONLY is downgraded, not caveated. | [`shadow.ts:109`](packages/contract/src/shadow.ts#L109) | `node --test packages/contract/test/shadow.test.mjs` | An UNDO under SCHEMA_ONLY is sealed STRATEGY_CANNOT_PROVE, even with three matching checksums. |
+| A superuser credential is refused rather than warned about, and the refusal carries the SQL for a correctly scoped read-only role. | [`connection.ts:332`](packages/contract/src/connection.ts#L332) | `node --test packages/contract/test/connection.test.mjs` | The generated role grants no write privilege on any GRANT line, and never invents a password. |
+| The connection string never survives a round trip into a transcript, a log, an error message or a stack trace. | [`connection.ts:125`](packages/contract/src/connection.ts#L125) | `node --test packages/contract/test/connection.test.mjs` | A realistic transcript is scanned for the password: zero hits, and the host deliberately survives so errors stay diagnosable. |
+| Nothing on the connect-to-apply path can import a seed, a fixture, a mock or a generator. The boundary is enforced, not documented. | [`check-no-simulation.mjs:36`](scripts/check-no-simulation.mjs#L36) | `npm run check:simulation` | The import graph is walked from every module on that path; a violation fails the build with the chain that reached it. |
+
+**The agent**
+
+| The claim | The code | Run this | What you see |
+| --- | --- | --- | --- |
 | Untrusted excerpts are neutralised before storage, so a finding cannot carry the injection into the next prompt that summarises it. | [`quarantine.ts:277`](packages/contract/src/quarantine.ts#L277) | `node --test packages/contract/test/quarantine.test.mjs` | The stored excerpt is defanged; the raw payload is never persisted. |
 
 **Evidence**
@@ -1001,7 +1015,7 @@ files and compares them against this line, so adding a test and forgetting the R
 build. A reader who counts 206 against a README promising 201 has been handed a reason to
 disbelieve the other twenty-three claims, and that is a lot of damage for a stale integer.
 
-Fourteen suites, and each pins a property rather than an implementation:
+Sixteen suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |
@@ -1016,6 +1030,8 @@ Fourteen suites, and each pins a property rather than an implementation:
 | `provenance.test.mjs` | An unsourced claim says it is unsourced, and a figure the agent merely asserted never acquires a link to a harness event that did not produce it |
 | `quarantine.test.mjs` | An injection finding seals the gate *ahead of* the certificate, because a proof whose subject an attacker chose is proving the wrong thing; and a stored excerpt is neutralised, never the raw payload |
 | `review.test.mjs` | A migration with unreviewed code does not open the gate; a fix that predates the finding is not a fix; nits never block |
+| `connection.test.mjs` | A superuser credential is refused and the refusal carries the fix; the generated role grants no write privilege on any line; and a full session transcript — tool arguments, a driver error carrying the DSN, a stack trace, log lines — contains no trace of the password |
+| `shadow.test.mjs` | A strategy that never executed against real rows cannot issue an UNDO certificate, however well its three checksums agree; and every rejected strategy explains itself in a sentence a user could act on |
 | `resolve.test.mjs` | An ambiguous fact seals the gate ahead of the certificate; a fact that moved between the proof and the door seals it; a pinned proof nobody re-checked is refused rather than assumed fine; and re-resolving the same fact a minute later is not drift |
 | `ddl.test.mjs` | A column drop or rename is classified destructive; adding a required column is only cautionary *with* a default, and destructive without one; every destructive finding carries an expand/contract alternative rather than a refusal |
 | `mcp/server.test.mjs` | Exactly one tool is destructive and it is the one held for approval; there is no tool that applies a change |
