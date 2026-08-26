@@ -616,6 +616,16 @@ export function airlockTools(): ToolDefinition[] {
           // genuinely measured certificate cannot be carried by a dossier whose
           // SQL was swapped afterwards.
           operations_fingerprint: await operationsFingerprint(dossier.forward, dossier.rollback),
+          // The resolved facts this proof was taken against.
+          //
+          // Nothing wrote this before, so CONTEXT_DRIFTED and CONTEXT_UNVERIFIED
+          // were seal reasons that could never fire — the gate read a field no
+          // production path ever set. Pinned here, from the facts as they stand
+          // at the moment of measurement, which is exactly what the proof is
+          // about.
+          ...(dossier.resolved_context?.fingerprint
+            ? { context_fingerprint: dossier.resolved_context.fingerprint }
+            : {}),
           ...(result.failure_reason ? { failure_reason: result.failure_reason } : {}),
           verified_at: new Date().toISOString(),
         };
@@ -884,7 +894,13 @@ export function airlockTools(): ToolDefinition[] {
         // The agent reports; the scanner decides. Deliberately not the other way
         // round — an agent that has already been successfully injected is the
         // last thing that should be deciding whether it was.
-        const findings = scanAll(items);
+        const findings = scanAll(items).map((f) => ({
+          // Stamped here rather than in the scanner, which stays pure so a
+          // fixture can assert a detection. The gate needs it because a
+          // clearance covers what existed when it was granted and nothing after.
+          ...f,
+          at: new Date().toISOString(),
+        }));
         const verdict = assessQuarantine(findings);
 
         const next = {
@@ -1002,7 +1018,7 @@ export function airlockTools(): ToolDefinition[] {
         // Anything a person could have typed goes through the injection
         // scanner on the way in — the existing one, so a payload cannot be
         // caught on one path and missed on this one.
-        const findings = scanResolvedFacts(facts);
+        const findings = scanResolvedFacts(facts).map((f) => ({ ...f, at: new Date().toISOString() }));
 
         const next = {
           ...dossier,
