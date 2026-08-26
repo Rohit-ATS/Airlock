@@ -140,11 +140,11 @@ const CLAIMS = [
 
   {
     group: 'The agent',
-    claim: 'There is no tool that applies a change to production. Eleven tools ship; exactly one is destructive, and the harness holds it for a human.',
+    claim: 'There is no tool that applies a change to production. Twelve tools ship; exactly one is destructive, and the harness holds it for a human.',
     file: 'packages/mcp/src/tools.ts',
     anchor: "name: 'airlock_request_approval',",
     run: 'node --test packages/mcp/test/server.test.mjs',
-    sees: 'The tool list is asserted whole — a twelfth tool fails the test.',
+    sees: 'The tool list is asserted whole — a thirteenth tool fails the test.',
   },
   {
     group: 'The agent',
@@ -160,7 +160,7 @@ const CLAIMS = [
     file: 'packages/mcp/src/tools.ts',
     anchor: "name: 'airlock_resolve_context',",
     run: 'node --test packages/contract/test/resolve.test.mjs',
-    sees: 'Eleven tools; this is the one that records what was resolved and where from.',
+    sees: 'Twelve tools; this is the one that records what was resolved and where from.',
   },
   {
     group: 'The agent',
