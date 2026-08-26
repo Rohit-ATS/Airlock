@@ -17,6 +17,7 @@ const outDir = process.env.AIRLOCK_DATA_DIR ?? '.airlock';
 const consoleUrl = process.env.AIRLOCK_CONSOLE_URL ?? '';
 const dossierId = process.env.AIRLOCK_DOSSIER_ID ?? `dos_sqlite_erasure_${Date.now()}`;
 const requestedBy = process.env.AIRLOCK_REQUESTED_BY ?? 'damir@airlock.dev';
+const apiToken = process.env.AIRLOCK_API_TOKEN ?? '';
 const userId = Number(process.env.AIRLOCK_ERASURE_USER_ID ?? process.argv.find((arg) => /^\d+$/.test(arg)) ?? 17);
 const emitOnly = process.argv.includes('--emit-only') || !consoleUrl;
 
@@ -40,7 +41,7 @@ function writeNdjson(file, rows) {
 async function postDossier(dossier) {
   const res = await fetch(new URL('/api/dossiers', consoleUrl), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...(apiToken ? { authorization: `Bearer ${apiToken}` } : {}) },
     body: JSON.stringify(dossier),
   });
   const text = await res.text();

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { recordPostApply } from '@/data/dossierStore';
+import { requireMachineWriter } from '@/server/machineAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,8 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  const auth = requireMachineWriter(request);
+  if (auth) return auth;
 
   let body: { observed_checksum?: unknown; duration_ms?: unknown } = {};
   try {

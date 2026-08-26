@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { breakGlass, BREAK_GLASS_ENABLED } from '@/data/dossierStore';
 import { resolveViewer } from '@/data/viewer';
+import { requireSameOrigin } from '@/server/machineAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  const origin = requireSameOrigin(request);
+  if (origin) return origin;
+
   const viewer = await resolveViewer(request);
 
   let body: { justification?: string } = {};
