@@ -23,6 +23,34 @@ export interface ResolvedViewer extends Viewer {
 /** Resolved through the shared loader so the repo-root .env is actually read. */
 const BASE_URL = trueforgeBaseUrl();
 
+/**
+ * When the harness cannot answer, the caller is a requester.
+ *
+ * This is the fail-closed side of the two fallbacks below, and the distinction
+ * between them is the whole point. "Login is switched off" is something the
+ * harness *told* us, and local admin is then the honest answer — it is what a
+ * developer running `npx @truefoundry/trueforge` genuinely has. "The auth
+ * service returned 401" and "the auth service is unreachable" are not that:
+ * they are the absence of an answer, and answering them with `approver` grants
+ * the one permission this product exists to withhold.
+ *
+ * An audit put it plainly: anyone who can make the harness unreachable — a
+ * dropped container, a wrong TRUEFORGE_BASE_URL, a network blip during a demo —
+ * became an approver. Separation of duties that evaporates when a dependency is
+ * down is not separation of duties.
+ *
+ * A requester can still read every change and every certificate. They simply
+ * cannot open the gate, which is the correct posture when nobody can say who
+ * they are.
+ */
+const UNKNOWN_VIEWER: ResolvedViewer = {
+  email: 'unknown',
+  role: 'requester',
+  authenticated: false,
+  type: 'default',
+  evidence: 'GET /api/v1/auth/me did not answer — role withheld',
+};
+
 /** When login is off (local mode), TrueForge reports a single shared admin. */
 const LOCAL_ADMIN: ResolvedViewer = {
   email: 'local-admin',
@@ -41,7 +69,9 @@ export async function resolveViewer(request: Request): Promise<ResolvedViewer> {
 
   try {
     const res = await fetch(new URL('/api/v1/auth/me', BASE_URL), { headers, cache: 'no-store' });
-    if (!res.ok) return LOCAL_ADMIN;
+    // A rejection is not a report that login is disabled. It is a refusal to
+    // identify the caller, and the caller does not get to be an approver.
+    if (!res.ok) return UNKNOWN_VIEWER;
 
     const me = (await res.json()) as { type?: string; email?: string; role?: string };
     const type = me.type === 'oidc-connected' ? 'oidc-connected' : 'default';
@@ -56,9 +86,8 @@ export async function resolveViewer(request: Request): Promise<ResolvedViewer> {
       evidence: `GET /api/v1/auth/me -> oidc-connected, role=${me.role ?? 'user'}`,
     };
   } catch {
-    // The console must stay usable when the harness is briefly unreachable, but
-    // it must not silently promote anyone: fall back to local mode only, which
-    // is what a developer running `npx @truefoundry/trueforge` actually has.
-    return LOCAL_ADMIN;
+    // Unreachable. The console stays usable — a requester can read everything —
+    // but nobody is promoted on the strength of a failed request.
+    return UNKNOWN_VIEWER;
   }
 }
