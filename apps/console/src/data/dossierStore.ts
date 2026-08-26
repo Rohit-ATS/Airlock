@@ -19,6 +19,7 @@ import {
   ruleFor,
   sealsOutstanding,
   sealReceipt,
+  operationsFingerprint,
   GENESIS_HASH,
   type Signature,
   type Viewer,
@@ -142,7 +143,25 @@ export async function getDossier(id: string): Promise<Dossier | null> {
 
 /** Upsert. The contract is enforced here, so bad data never enters the ledger. */
 export async function putDossier(input: unknown): Promise<Dossier> {
-  const dossier = parseDossier(input);
+  const parsed = parseDossier(input);
+
+  /*
+   * Stamp what the statements are NOW, ignoring anything the caller sent.
+   *
+   * This is the half of the operations binding that has to live at the write
+   * seam. The certificate carries the fingerprint of the SQL it was measured
+   * against; this carries the fingerprint of the SQL as it currently stands,
+   * and the gate refuses when they differ.
+   *
+   * Recomputed rather than read, always. If a posted value were trusted, the
+   * whole control would reduce to "the caller must send a matching string",
+   * which is the same mistake as trusting `checksums.match` — and this endpoint
+   * is reachable by the agent.
+   */
+  const dossier = {
+    ...parsed,
+    operations_fingerprint: await operationsFingerprint(parsed.forward, parsed.rollback),
+  };
   const existing = await getDossier(dossier.dossier_id);
 
   // A decided change is part of the record. Overwriting one would break its

@@ -14,3 +14,5 @@ export * from './review.js';
 export * from './skills.js';
 export * from './ddl.js';
 export * from './resolve.js';
+export * from './operations.js';
+export * from './activity.js';
