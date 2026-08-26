@@ -51,6 +51,8 @@ import { verifyOnSqliteShadow } from '@airlock/verifier';
 import path from 'node:path';
 import type { ToolDefinition } from './protocol.js';
 
+const NEWLINE = String.fromCharCode(10);
+
 const CONSOLE_URL = process.env.AIRLOCK_CONSOLE_URL ?? 'http://localhost:3000';
 
 /** The real database a proof is measured against. */
@@ -745,67 +747,41 @@ export function airlockTools(): ToolDefinition[] {
          * "the agent must have run something" and "the agent may type four
          * numbers", which is the gap that was open.
          */
+        // A PROVEN UNDO certificate cannot be attached through this tool.
+        //
+        // Checksums are not accepted here — not validated, not present. The
+        // only writer of a digest in this product is `airlock_verify_change`,
+        // which obtains one by executing the migration and hashing the result.
+        //
+        // The previous attempt removed `checksums` from the input schema and
+        // left the handler reading `args.checksums`. That fixed nothing: the
+        // MCP layer passed `params.arguments` through untouched, so a schema
+        // was a decoding hint to the model and never a gate on the caller. A
+        // hand-written request carrying three invented digests still produced a
+        // PROVEN certificate, and provenance.ts went on to grade it MEASURED.
+        // Removing the property removed the suggestion, not the capability.
+        // protocol.ts now validates arguments against the schema, and this
+        // refuses the claim outright rather than relying on that alone.
         if (status === 'PROVEN' && str(args.kind) === 'UNDO') {
-          if (!args.checksums) {
-            throw new Error('A PROVEN UNDO certificate is the claim that the data came back byte-identical. It cannot be made without the checksum triple that observed it.');
-          }
-
-          // Asked of the harness, not of the caller.
-          //
-          // The first version of this guard demanded a sandbox_artifact_url,
-          // and the model supplied "https://sandbox.example.com/artifact/…"
-          // alongside checksums of aaaa… and bbbb…. That is the lesson: any
-          // control the model can satisfy by writing a plausible string is not
-          // a control, it is a formatting requirement. Requiring evidence from
-          // the thing being asked for evidence is circular.
-          //
-          // Whether a sandbox exists is a fact about the deployment. The model
-          // cannot assert it into existence, so this is the one question worth
-          // asking. If the harness has no sandbox, there is nowhere those
-          // digests could have come from, and the certificate is refused
-          // regardless of how well-formed it looks.
-          const sandbox = await sandboxAvailable();
-          if (sandbox === false) {
-            throw new Error(
-              [
-                'Refused: this harness has no sandbox configured, so there is nowhere a checksum',
-                'could have been measured. A PROVEN UNDO certificate cannot be produced here.',
-                '',
-                'Do not supply placeholder or illustrative digits. A checksum you generated is not',
-                'a measurement, and AIRLOCK renders it identically to one that is — which is the',
-                'single failure this product cannot survive.',
-                '',
-                'The correct outcomes, both of which are honest:',
-                '  - attach a FAILED certificate whose failure_reason says no sandbox was available;',
-                '  - or re-open the change as one a SCOPE certificate can carry, and enumerate what',
-                '    it touches instead of claiming it is reversible.',
-                '',
-                'An honest "this could not be proven" is a passing result.',
-              ].join('\n'),
-            );
-          }
-
-          // A courtesy, not a control. It catches the exact shape a model
-          // reaches for when it is filling in a field, and — more usefully —
-          // it says why rather than failing schema validation on a nested path.
-          const digits = [args.checksums]
-            .flatMap((c) => Object.values(c as Record<string, unknown>))
-            .filter((v): v is string => typeof v === 'string');
-          if (digits.some((d) => /^sha256:(.)\1{63}$/.test(d))) {
-            throw new Error(
-              'That checksum is a single repeated character, which no real digest is. It was not measured. Run the verification and attach what it returned.',
-            );
-          }
-
-          if (!str(args.sandbox_artifact_url)) {
-            throw new Error('A PROVEN UNDO certificate must name the verification run that produced it: pass sandbox_artifact_url.');
-          }
+          throw new Error(
+            [
+              'A PROVEN UNDO certificate cannot be attached. It is the one claim in this',
+              'product that must be measured rather than asserted, so it is written only by',
+              'the tool that measures it.',
+              '',
+              'Call airlock_verify_change with the tables this change touches. It copies the',
+              'real database, runs your forward statements, hashes every table, runs your',
+              'rollback, hashes again, and writes the certificate from what it observed.',
+              '',
+              'Use this tool for a SCOPE certificate, or a FAILED one when a change could not',
+              'be proven. An honest "this could not be proven" is a passing result.',
+            ].join(String.fromCharCode(10)),
+          );
         }
 
         const certificate = {
           kind: str(args.kind),
           status,
-          ...(args.checksums ? { checksums: args.checksums } : {}),
           ...(args.scope ? { scope: args.scope } : {}),
           ...(args.lock_ms_estimate !== undefined ? { lock_ms_estimate: int(args.lock_ms_estimate) } : {}),
           ...(args.table_rewrite !== undefined ? { table_rewrite: Boolean(args.table_rewrite) } : {}),
