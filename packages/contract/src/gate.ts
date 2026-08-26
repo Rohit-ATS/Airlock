@@ -36,6 +36,7 @@
 import type { Certificate, CertificateKind, Dossier } from './dossier.js';
 import { approversFor } from './dossier.js';
 import { reviewBlocks } from './review.js';
+import { operationsChanged } from './operations.js';
 import { contextDrifted, contextRecheckMissing, contextUnresolved } from './resolve.js';
 import {
   DEFAULT_POLICY,
@@ -89,6 +90,7 @@ export type SealReason =
   | 'SCOPE_NOT_COMPUTED'
   | 'SCOPE_UNBOUNDED'
   | 'ROLLBACK_NOT_PROVEN'
+  | 'OPERATIONS_CHANGED'
   | 'REVIEW_OUTSTANDING'
   | 'PRODUCTION_DRIFTED'
   | 'INJECTION_DETECTED'
@@ -124,6 +126,8 @@ export const SEAL_COPY: Record<SealReason, string> = {
   SCOPE_NOT_COMPUTED: 'A scope certificate was claimed without a computed blast radius.',
   SCOPE_UNBOUNDED: 'The scope certificate lists no records and no exclusions, so its blast radius is unbounded.',
   ROLLBACK_NOT_PROVEN: 'At least one rollback operation was never executed against the shadow branch.',
+  OPERATIONS_CHANGED:
+    'The statements in this change are not the ones the proof was taken against. The certificate is genuine and it is about a different migration. Re-run verification.',
   REVIEW_OUTSTANDING:
     'This change carries code the agent wrote, and an independent reviewer has either not looked at it or raised findings nobody has addressed. A migration proven reversible, attached to code that still dereferences the column it removes, is a proof of the wrong thing.',
   PRODUCTION_DRIFTED:
@@ -248,6 +252,14 @@ export function openGate(dossier: Dossier, viewer: Viewer, options: GateOptions 
   if (cert.status === 'FAILED') return sealed('CERTIFICATE_FAILED');
 
   /* --- 5. does the proof actually hold? ---------------------------------- */
+  // Before the checksums, because a checksum triple is only meaningful once you
+  // know which statements produced it. A proof measured against a trivial
+  // migration and carried by a dossier containing a destructive one is a proof
+  // whose every individual number survives inspection.
+  if (operationsChanged(cert.operations_fingerprint, dossier.operations_fingerprint)) {
+    return sealed('OPERATIONS_CHANGED');
+  }
+
   if (cert.kind === 'UNDO') {
     const c = cert.checksums;
     if (!c) return sealed('CHECKSUM_MISSING');
@@ -514,6 +526,7 @@ const BLOCKED_LABEL: Record<SealReason, string> = {
   CHECKSUM_MISSING: 'BLOCKED — NOTHING TO VERIFY',
   CHECKSUM_MISMATCH: 'BLOCKED — THE DATA DID NOT COME BACK',
   ROLLBACK_NOT_PROVEN: 'BLOCKED — ROLLBACK NEVER EXECUTED',
+  OPERATIONS_CHANGED: 'STALE — THE SQL CHANGED AFTER THE PROOF',
   REVIEW_OUTSTANDING: 'BLOCKED — THE CODE HAS NOT BEEN REVIEWED',
   SCOPE_NOT_COMPUTED: 'BLOCKED — SCOPE NOT COMPUTED',
   SCOPE_UNBOUNDED: 'BLOCKED — BLAST RADIUS UNBOUNDED',

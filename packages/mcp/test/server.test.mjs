@@ -72,7 +72,7 @@ test('nothing but the protocol is written to stdout', async () => {
   const { responses, stderr } = await converse([INIT]);
   assert.equal(responses.length, 1, 'exactly one response, no stray output');
   // The readiness line must go to stderr, or it would corrupt the stream.
-  assert.match(stderr, /ready — 11 tools/);
+  assert.match(stderr, /ready — 12 tools/);
 });
 
 test('exactly one tool is destructive, and it is the approval request', async () => {
@@ -98,6 +98,7 @@ test('exactly one tool is destructive, and it is the approval request', async ()
     'airlock_report_untrusted',
     'airlock_request_approval',
     'airlock_resolve_context',
+    'airlock_verify_change',
   ]);
 });
 
