@@ -37,6 +37,80 @@ export interface ToolDefinition {
   handler: (args: Record<string, unknown>) => Promise<string>;
 }
 
+/**
+ * Check arguments against the tool's own advertised schema.
+ *
+ * Until this existed, `inputSchema` was advertising rather than enforcement:
+ * `params.arguments` reached the handler exactly as it arrived, so a schema told
+ * the model what to send and told the server nothing at all. That is a
+ * reasonable default for a permissive API and a poor one here, because it means
+ * *removing a field from a schema does not remove the capability*. AIRLOCK
+ * deleted `checksums` from `airlock_attach_certificate` on exactly that
+ * assumption, and a hand-written request carrying three invented digests still
+ * wrote a PROVEN certificate which the console then rendered as MEASURED.
+ *
+ * Deliberately small: required, unknown properties, enums, coarse types. That is
+ * the subset which turns "the model should not send this" into "this server will
+ * not accept it", and it is the subset a tool author relies on when they take a
+ * property out. It is not a general JSON Schema implementation and should not
+ * grow into one — anything subtler belongs in the contract's zod parse, which
+ * every write already passes through.
+ *
+ * Unknown properties are rejected rather than stripped. Silently dropping an
+ * argument the caller believed it sent is how a model ends up confidently
+ * reporting work that never happened.
+ */
+export function validateArguments(
+  schema: Record<string, unknown>,
+  args: Record<string, unknown>,
+): string[] {
+  const problems: string[] = [];
+  const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const required = (schema.required ?? []) as string[];
+
+  for (const name of required) {
+    if (args[name] === undefined || args[name] === null) problems.push(`${name} is required`);
+  }
+
+  for (const [name, value] of Object.entries(args)) {
+    const spec = properties[name];
+    if (!spec) {
+      problems.push(
+        `${name} is not an argument of this tool. If you expected it to be accepted, read the tool description — the field was removed deliberately.`,
+      );
+      continue;
+    }
+    if (value === undefined || value === null) continue;
+
+    const expected = spec.type as string | undefined;
+    const actual = Array.isArray(value) ? 'array' : typeof value;
+    if (expected === 'integer' || expected === 'number') {
+      if (actual !== 'number') problems.push(`${name} must be a ${expected}, got ${actual}`);
+    } else if (expected && expected !== actual) {
+      problems.push(`${name} must be ${expected}, got ${actual}`);
+    }
+
+    const enumeration = spec.enum as unknown[] | undefined;
+    if (enumeration && !enumeration.includes(value)) {
+      problems.push(`${name} must be one of: ${enumeration.join(', ')}. Got ${JSON.stringify(value)}`);
+    }
+
+    // One level into arrays, which is where the enums that matter live:
+    // `systems`, and the `system` on each scope record.
+    const items = spec.items as Record<string, unknown> | undefined;
+    if (expected === 'array' && items && Array.isArray(value)) {
+      const itemEnum = items.enum as unknown[] | undefined;
+      value.forEach((entry, i) => {
+        if (itemEnum && !itemEnum.includes(entry)) {
+          problems.push(`${name}[${i}] must be one of: ${itemEnum.join(', ')}. Got ${JSON.stringify(entry)}`);
+        }
+      });
+    }
+  }
+
+  return problems;
+}
+
 /** JSON-RPC error codes used here. -32000 upward is the implementation-defined range. */
 const PARSE_ERROR = -32700;
 const INVALID_REQUEST = -32600;
@@ -102,6 +176,25 @@ export class McpServer {
           };
         }
         const args = (request.params?.arguments as Record<string, unknown>) ?? {};
+
+        // Checked before the handler sees them, so a property absent from the
+        // schema is absent from the server's behaviour and not merely absent
+        // from the model's prompt.
+        const problems = validateArguments(tool.inputSchema, args);
+        if (problems.length > 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: [`${name} was called with arguments this tool does not accept:`]
+                  .concat(problems.map((p) => `  - ${p}`))
+                  .join(String.fromCharCode(10)),
+              },
+            ],
+            isError: true,
+          };
+        }
+
         try {
           const text = await tool.handler(args);
           return { content: [{ type: 'text', text }], isError: false };
