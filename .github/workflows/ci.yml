@@ -196,6 +196,12 @@ jobs:
       # claim, and this resolves each anchor against the code. A claim that no
       # longer points at anything is a failure here rather than a discovery a
       # judge makes with a broken link, which is the whole reason it exists.
+      # Rule R1. A seeded row that can reach a certificate turns every number on
+      # the card into a claim about a database that does not exist, and it will
+      # still look exactly right. The boundary is enforced rather than trusted.
+      - name: No simulated data can reach the certificate path
+        run: npm run check:simulation
+
       - name: Every claim in the README still points at the code
         run: npm run verify:claims
 
