@@ -50,8 +50,37 @@ type Ledger = Record<string, Dossier>;
 
 let cache: Ledger | null = null;
 
+/**
+ * The ledger's mtime as of the last read, so a change on disk is noticed.
+ *
+ * Without this the cache was permanent: `load()` returned early forever, and the
+ * file was re-read only by the process that happened to write it. That is not a
+ * caching subtlety, it is the reason the console looked dead. AIRLOCK's whole
+ * argument is that an *agent* opens changes, and the agent does not come through
+ * this process — the MCP server posts to `AIRLOCK_CONSOLE_URL`, and any other
+ * process serving the same `ledger.json` kept showing whatever it read at boot.
+ * A genuinely proven change could sit on disk, in the very file the page is
+ * serving from, and never appear until somebody restarted the server.
+ *
+ * One `stat` per read is the cost, and it makes the store honest: what the
+ * console shows is what is on disk now, not what was there when it started.
+ */
+let cachedMtimeMs = -1;
+
+async function currentMtime(): Promise<number> {
+  try {
+    return (await fs.stat(LEDGER)).mtimeMs;
+  } catch {
+    // No file yet. -1 is distinct from any real mtime, so the first write is
+    // seen as a change rather than mistaken for an unchanged empty ledger.
+    return -1;
+  }
+}
+
 async function load(): Promise<Ledger> {
-  if (cache) return cache;
+  const mtime = await currentMtime();
+  if (cache && mtime === cachedMtimeMs) return cache;
+  cachedMtimeMs = mtime;
   try {
     const raw = await fs.readFile(LEDGER, 'utf8');
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -128,6 +157,9 @@ async function persist(ledger: Ledger): Promise<void> {
   cache = ledger;
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(LEDGER, JSON.stringify(ledger, null, 2), 'utf8');
+  // Record the mtime we just produced, so our own write does not read back as
+  // somebody else's change on the very next request.
+  cachedMtimeMs = await currentMtime();
 }
 
 export async function listDossiers(): Promise<Dossier[]> {
