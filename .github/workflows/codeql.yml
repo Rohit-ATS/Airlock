@@ -41,6 +41,7 @@ jobs:
       - name: Build contract and MCP surfaces
         run: |
           npm run build --workspace @airlock/contract
+          npm run build --workspace @airlock/verifier
           npm run build --workspace @airlock/mcp
 
       - uses: github/codeql-action/analyze@v4

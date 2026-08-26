@@ -50,6 +50,17 @@ jobs:
       - name: Build the contract (this is also the compile-time gate proof)
         run: npm run build --workspace @airlock/contract
 
+      # The MCP server imports the verifier's types, so this cannot come after
+      # it. Without this step tsc cannot resolve '@airlock/verifier', every
+      # value from verifyOnSqliteShadow degrades to `unknown`, and the failure
+      # surfaces as a dozen unrelated implicit-any errors in tools.ts.
+      #
+      # The steps here are enumerated by hand rather than calling the root
+      # `npm run build`, which is why fixing the order in package.json did not
+      # fix it here as well.
+      - name: Build the verifier
+        run: npm run build --workspace @airlock/verifier
+
       - name: SQLite verifier proves the Day 1 migration
         run: |
           AIRLOCK_SEED_ROWS=1000 npm run seed:sqlite -- --reset
