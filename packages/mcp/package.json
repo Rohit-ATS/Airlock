@@ -25,7 +25,8 @@
     "start": "node bin/airlock-mcp.mjs"
   },
   "dependencies": {
-    "@airlock/contract": "*"
+    "@airlock/contract": "*",
+    "@airlock/verifier": "*"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
