@@ -1,0 +1,160 @@
+{
+  "data": [
+    {
+      "turn_id": "01m0zezzc9cgw50fts68pr09c3.hh8bck",
+      "event": {
+        "id": "01m0zf0617h5sn2fq0wam2hh58",
+        "type": "turn.done",
+        "state": {
+          "output": {
+            "id": "01m0zf02zdacctysw89kgq46dr",
+            "type": "model.message",
+            "usage": {
+              "input_tokens": 6304,
+              "output_tokens": 97,
+              "cache_read_tokens": 0,
+              "cache_write_tokens": 0,
+              "input_tokens_breakdown": {
+                "skills": 0,
+                "harness": 1844,
+                "messages": 0,
+                "instructions": 1934,
+                "tool_definitions": 4401
+              }
+            },
+            "content": "The policy for SCHEMA_MIGRATION is as follows:\n\n- Certificate required: UNDO (must prove the change is reversible)\n- Approvers required: 1\n- Certificate validity: 1800 seconds (30 minutes) after verification\n- Rationale: Structural changes must be proven reversible. A schema change without a proven rollback is not permitted. The rollback must be proven within the last 30 minutes to ensure the schema has not changed since.\n\nStopping as requested.",
+            "thread_id": "main",
+            "created_at": "2026-08-26T16:38:37.338Z",
+            "finish_reason": "stop"
+          },
+          "status": "done",
+          "metrics": {
+            "total_tokens": 12594,
+            "total_input_tokens": 12475,
+            "total_output_tokens": 119,
+            "total_reasoning_tokens": 0,
+            "total_cache_read_tokens": 0,
+            "total_cache_write_tokens": 0
+          },
+          "completed_at": "2026-08-26T16:38:37.351Z",
+          "required_actions": []
+        },
+        "thread_id": null,
+        "created_at": "2026-08-26T16:38:37.351Z"
+      }
+    },
+    {
+      "turn_id": "01m0zezzc9cgw50fts68pr09c3.hh8bck",
+      "event": {
+        "id": "01m0zf02zdacctysw89kgq46dr",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 6304,
+          "output_tokens": 97,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "content": "The policy for SCHEMA_MIGRATION is as follows:\n\n- Certificate required: UNDO (must prove the change is reversible)\n- Approvers required: 1\n- Certificate validity: 1800 seconds (30 minutes) after verification\n- Rationale: Structural changes must be proven reversible. A schema change without a proven rollback is not permitted. The rollback must be proven within the last 30 minutes to ensure the schema has not changed since.\n\nStopping as requested.",
+        "thread_id": "main",
+        "created_at": "2026-08-26T16:38:37.338Z",
+        "finish_reason": "stop"
+      }
+    },
+    {
+      "turn_id": "01m0zezzc9cgw50fts68pr09c3.hh8bck",
+      "event": {
+        "id": "01m0zf02z0ty8az0tva8280ee3",
+        "type": "tool.response",
+        "content": "SCHEMA_MIGRATION — Schema migration\n  Structural change to a live database: columns, indexes, constraints, types.\n  certificate required : UNDO\n  approvers required   : 1\n  certificate valid for: 1800s after verification\n  why                  : Structural change must be proven reversible. A schema change with no proven rollback is not a migration, it is a bet. Thirty minutes to take it back, because the inverse was proven half an hour ago and the table has not moved.",
+        "thread_id": "main",
+        "created_at": "2026-08-26T16:38:34.207Z",
+        "tool_call_id": "call_sZnIjav6iDqbIk2czrxsYuMU"
+      }
+    },
+    {
+      "turn_id": "01m0zezzc9cgw50fts68pr09c3.hh8bck",
+      "event": {
+        "id": "01m0zezzf8786jfbm86ek2yvht",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 6171,
+          "output_tokens": 22,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "thread_id": "main",
+        "created_at": "2026-08-26T16:38:34.155Z",
+        "tool_calls": [
+          {
+            "id": "call_sZnIjav6iDqbIk2czrxsYuMU",
+            "type": "function",
+            "function": {
+              "name": "airlock_read_policy",
+              "arguments": "{\"change_class\":\"SCHEMA_MIGRATION\"}"
+            },
+            "tool_info": {
+              "name": "airlock_read_policy",
+              "type": "mcp",
+              "server_id": "airlock",
+              "server_name": "airlock"
+            }
+          }
+        ],
+        "finish_reason": "tool_calls"
+      }
+    },
+    {
+      "turn_id": "01m0zezzc9cgw50fts68pr09c3.hh8bck",
+      "event": {
+        "id": "01m0zezzezf5ea61e8k27nwd6g",
+        "type": "mcp.initialize",
+        "thread_id": "main",
+        "created_at": "2026-08-26T16:38:30.623Z",
+        "mcp_servers": [
+          {
+            "id": "airlock",
+            "name": "airlock",
+            "transport_type": "streamable-http"
+          }
+        ]
+      }
+    },
+    {
+      "turn_id": "01m0zezzc9cgw50fts68pr09c3.hh8bck",
+      "event": {
+        "id": "01m0zezzdjdgrs1dpacwhh0ts8",
+        "type": "turn.created",
+        "input": [
+          {
+            "type": "user.message",
+            "content": "Call airlock_read_policy for SCHEMA_MIGRATION, then stop."
+          }
+        ],
+        "state": {
+          "status": "running"
+        },
+        "turn_id": "01m0zezzc9cgw50fts68pr09c3.hh8bck",
+        "thread_id": null,
+        "created_at": "2026-08-26T16:38:30.553Z",
+        "previous_turn_id": null
+      }
+    }
+  ],
+  "pagination": {
+    "limit": 100
+  }
+}
