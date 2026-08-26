@@ -36,10 +36,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     );
   }
 
+  const filenameId = id.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) || 'change';
   return new NextResponse(JSON.stringify(receipt, null, 2), {
     headers: {
       'content-type': 'application/json',
-      'content-disposition': `attachment; filename="airlock-receipt-${id}.json"`,
+      'content-disposition': `attachment; filename="airlock-receipt-${filenameId}.json"`,
     },
   });
 }

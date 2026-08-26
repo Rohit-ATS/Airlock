@@ -1,4 +1,5 @@
 import { trueforgeBaseUrl } from '@/data/env';
+import { requireSameOrigin } from '@/server/machineAuth';
 
 export const dynamic = 'force-dynamic';
 // Streaming a turn is the whole point; a cached or statically-optimised route
@@ -55,6 +56,11 @@ function forwardHeaders(source: Headers): Headers {
 }
 
 async function proxy(request: Request, path: string[]): Promise<Response> {
+  if (request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS') {
+    const origin = requireSameOrigin(request);
+    if (origin) return origin;
+  }
+
   const base = trueforgeBaseUrl();
   const incoming = new URL(request.url);
   const target = new URL(`/${path.join('/')}${incoming.search}`, base);

@@ -55,6 +55,7 @@ import type { ToolDefinition } from './protocol.js';
 const NEWLINE = String.fromCharCode(10);
 
 const CONSOLE_URL = process.env.AIRLOCK_CONSOLE_URL ?? 'http://localhost:3000';
+const API_TOKEN = process.env.AIRLOCK_API_TOKEN ?? '';
 
 /** The real database a proof is measured against. */
 const SQLITE_PATH = process.env.SQLITE_PATH ?? path.resolve(process.cwd(), 'data/airlock.sqlite');
@@ -72,7 +73,11 @@ const AGENT_IDENTITY = process.env.AIRLOCK_AGENT_IDENTITY ?? 'agent@airlock';
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(new URL(path, CONSOLE_URL), {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'content-type': 'application/json',
+      ...(API_TOKEN ? { authorization: `Bearer ${API_TOKEN}` } : {}),
+      ...(init?.headers ?? {}),
+    },
   });
   const text = await res.text();
   if (!res.ok) {

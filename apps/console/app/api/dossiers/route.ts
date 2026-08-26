@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listDossiers, putDossier } from '@/data/dossierStore';
+import { requireMachineWriter } from '@/server/machineAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,9 @@ export async function GET() {
  * shape the gate cannot evaluate.
  */
 export async function POST(request: Request) {
+  const auth = requireMachineWriter(request);
+  if (auth) return auth;
+
   let body: unknown;
   try {
     body = await request.json();

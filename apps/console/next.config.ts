@@ -41,7 +41,6 @@ const githubPagesBasePath = isGithubPages && repoName ? `/${repoName}` : undefin
 const nextConfig: NextConfig = {
   reactStrictMode: false,
   transpilePackages: ['@airlock/contract'],
-  eslint: { ignoreDuringBuilds: true },
 
   /*
    * Type-checking is a separate gate, not a build step.
@@ -55,8 +54,7 @@ const nextConfig: NextConfig = {
    *
    * Nothing is being waved through. `npm run typecheck` runs the identical
    * check across every workspace, and CI runs it. This says only that bundling
-   * and type-checking are different jobs, which is already the position this
-   * config takes on ESLint one line above.
+   * and type-checking are different jobs.
    */
   typescript: { ignoreBuildErrors: true },
   ...(isGithubPages
