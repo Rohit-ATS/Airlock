@@ -24,6 +24,7 @@ import {
   type Signature,
   type Viewer,
 } from '@airlock/contract';
+import { deliverCertificate } from '@/github/deliver';
 
 /**
  * The change ledger, server-side.
@@ -250,6 +251,27 @@ async function putDossier__inner(input: unknown): Promise<Dossier> {
   const ledger = { ...(await load()) };
   ledger[dossier.dossier_id] = dossier;
   await persist(ledger);
+
+  /*
+   * A certificate that has just arrived goes back to where the change came
+   * from.
+   *
+   * This is the one place every write lands — the console UI, the webhook and
+   * the agent's own `airlock_attach_certificate` all come through here — so it
+   * is the only place the delivery can be hooked without it being possible to
+   * attach a certificate by some other route and have it go unreported.
+   *
+   * It is deliberately not allowed to fail the write. Persisting the proof is
+   * the important half; telling GitHub about it is best-effort, and a dossier
+   * that is saved but undelivered is recoverable, while the reverse is not.
+   */
+  const delivered = await deliverCertificate(dossier).catch(() => null);
+  if (delivered) {
+    ledger[delivered.dossier_id] = delivered;
+    await persist(ledger);
+    return delivered;
+  }
+
   return dossier;
 }
 

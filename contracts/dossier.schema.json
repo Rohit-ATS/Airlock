@@ -39,6 +39,64 @@
         "schedule"
       ]
     },
+    "origin": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "pull_request",
+                "sweep"
+              ]
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pr_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "head_sha": {
+              "type": "string"
+            },
+            "paths": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "detected_at": {
+              "type": "string"
+            },
+            "notified_at": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "repo",
+            "detected_at"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "created_at": {
       "type": "string"
     },
