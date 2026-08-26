@@ -402,6 +402,9 @@
         "verified_at": {
           "type": "string"
         },
+        "operations_fingerprint": {
+          "type": "string"
+        },
         "context_fingerprint": {
           "type": "string"
         },
@@ -511,6 +514,17 @@
           "subject"
         ]
       }
+    },
+    "operations_fingerprint": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "affected_tables": {
       "default": [],
@@ -1338,6 +1352,17 @@
               },
               "excerpt": {
                 "type": "string"
+              },
+              "at": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
