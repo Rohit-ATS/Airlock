@@ -208,6 +208,16 @@ export const Certificate = z.object({
   failure_reason: z.string().optional(),
   verified_at: z.string().optional(),
   /**
+   * The statements this proof was actually taken against.
+   *
+   * Without it a certificate answers "did the data come back?" and nothing
+   * answers "come back from what?". A genuinely measured proof could be earned
+   * on a trivial migration and then carried, untouched, by a dossier whose SQL
+   * had been replaced with something destructive. Every number on the card
+   * survived inspection; only the subject had changed.
+   */
+  operations_fingerprint: z.string().optional(),
+  /**
    * The fingerprint of the resolved facts this proof was taken against.
    *
    * Pinning it here is what makes auto-resolution part of what the certificate
@@ -612,6 +622,16 @@ export const Dossier = z.object({
     undo_window_seconds: null,
   }),
   principals: z.array(Principal).default([]),
+
+  /**
+   * Fingerprint of the forward and rollback statements as they stand now.
+   *
+   * Stamped by the store on every write and never read from the input, so it
+   * cannot be forged by posting one. The gate compares it against the copy
+   * inside the certificate — the same shape as production drift, where
+   * `drift.production_checksum` is compared against `certificate.checksums.pre`.
+   */
+  operations_fingerprint: z.string().nullable().default(null),
 
   affected_tables: z.array(AffectedTable).default([]),
   blast_radius: z.array(BlastRadiusHit).default([]),

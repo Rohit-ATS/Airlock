@@ -46,6 +46,7 @@ import {
   outstandingFields,
   resolutionFingerprint,
   scanResolvedFacts,
+  operationsFingerprint,
 } from '@airlock/contract';
 import { verifyOnSqliteShadow } from '@airlock/verifier';
 import path from 'node:path';
@@ -244,7 +245,10 @@ const OPERATION_SCHEMA = {
     system: SYSTEM_SCHEMA,
     op: { type: 'string', description: 'The operation verbatim — the SQL, the API call, the command. Not a summary of it.' },
     reversible: { type: 'boolean' },
-    proven: { type: 'boolean', description: 'Set only after the inverse has actually been executed against the shadow copy.' },
+    // `proven` is not accepted here. It is one of the two conditions the gate
+    // checks for an UNDO certificate, and it was agent-writable — so a dossier
+    // could arrive claiming its rollback had been executed when nothing had
+    // run. airlock_verify_change derives it from what actually executed.
   },
 } as const;
 
@@ -607,6 +611,11 @@ export function airlockTools(): ToolDefinition[] {
           // host, and a certificate that implied an isolated sandbox would be
           // claiming a blast-radius guarantee nobody provided.
           sandbox_artifact_url: `local-shadow://${runId}`,
+          // The statements this proof is about. The gate recomputes the
+          // dossier's own fingerprint and refuses if they have diverged, so a
+          // genuinely measured certificate cannot be carried by a dossier whose
+          // SQL was swapped afterwards.
+          operations_fingerprint: await operationsFingerprint(dossier.forward, dossier.rollback),
           ...(result.failure_reason ? { failure_reason: result.failure_reason } : {}),
           verified_at: new Date().toISOString(),
         };
