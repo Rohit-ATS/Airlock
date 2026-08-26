@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="300" viewBox="0 0 880 300" role="img" aria-labelledby="ttl desc">
+<title id="ttl">How a change reaches production — the AIRLOCK pipeline</title>
+<desc id="desc">Six stages left to right: request, shadow copy, apply and undo, checksum times three, the gate, sealed ledger. Proof is attached before the human gate, and the sealed ledger opens a thirty minute undo window.</desc>
+<style>
+.ttl{fill:#f0efec;font-weight:700}
+.tag{fill:#868c96}
+.rule{stroke:#1f2530;stroke-width:1}
+.box{fill:#12151b;stroke:#1f2530;stroke-width:1;animation:boxLit 10s linear infinite both}
+.led{fill:#1f2530;animation:ledLit 10s linear infinite both}
+.lbl{fill:#f0efec;letter-spacing:.4px;animation:lblLit 10s linear infinite both}
+.idx{fill:#868c96;letter-spacing:.4px}
+.cap{fill:#868c96}
+.arw{fill:none;stroke:#1f2530;stroke-width:1;animation:arwLit 10s linear infinite both}
+.arh{fill:#1f2530;animation:arhLit 10s linear infinite both}
+.pulse{animation:pulse 10s linear infinite both}
+.proof{animation:proof 10s linear infinite both}
+.pk{fill:none;stroke:#d2691e;stroke-width:1}
+.ph{fill:#d2691e}
+.pt{fill:#d2691e;letter-spacing:.3px}
+.undo{animation:undo 10s linear infinite both}
+.dash{fill:none;stroke:#35d6a4;stroke-width:1;stroke-dasharray:4 4;animation:march 10s linear infinite both}
+.ubox{fill:#12151b;stroke:#35d6a4;stroke-width:1}
+.utxt{fill:#35d6a4;letter-spacing:.3px}
+.p1{animation-delay:.30s}
+.p2{animation-delay:1.67s}
+.p3{animation-delay:3.05s}
+.p4{animation-delay:4.42s}
+.p5{animation-delay:5.79s}
+.p6{animation-delay:7.17s}
+.g1{animation-delay:1.53s}
+.g2{animation-delay:2.91s}
+.g3{animation-delay:4.28s}
+.g4{animation-delay:5.65s}
+.g5{animation-delay:7.03s}
+@keyframes boxLit{0%,100%{stroke:#1f2530}2%,13%{stroke:#d2691e}17%{stroke:#1f2530}}
+@keyframes ledLit{0%,100%{fill:#1f2530}2%,13%{fill:#d2691e}17%{fill:#1f2530}}
+@keyframes lblLit{0%,100%{fill:#868c96}2%,13%{fill:#f0efec}17%{fill:#868c96}}
+@keyframes arwLit{0%,100%{stroke:#1f2530}1%,5%{stroke:#d2691e}8%{stroke:#1f2530}}
+@keyframes arhLit{0%,100%{fill:#1f2530}1%,5%{fill:#d2691e}8%{fill:#1f2530}}
+@keyframes pulse{0%{transform:translateX(0);opacity:0}4%{transform:translateX(0);opacity:1}5%{transform:translateX(0);opacity:1}85%{transform:translateX(833px);opacity:1}88%{transform:translateX(833px);opacity:1}92%{transform:translateX(833px);opacity:0}100%{transform:translateX(0);opacity:0}}
+@keyframes proof{0%,52%{opacity:.22}58%,88%{opacity:1}97%,100%{opacity:.22}}
+@keyframes undo{0%,84%{opacity:.3}89%,96%{opacity:1}100%{opacity:.3}}
+@keyframes march{from{stroke-dashoffset:0}to{stroke-dashoffset:-80}}
+@media (prefers-reduced-motion: reduce) {
+  /* resting state = the final, readable state (animation off) */
+  * { animation: none !important; }
+  .box { stroke: #1f2530 }
+  .led { fill: #d2691e }
+  .lbl { fill: #f0efec }
+  .arw { stroke: #868c96 }
+  .arh { fill: #868c96 }
+  .proof { opacity: 1 }
+  .undo { opacity: 1 }
+}
+</style>
+<rect width="880" height="300" fill="#0b0d11"/>
+<text class="ttl" x="24" y="34" font-size="16" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif">How a change reaches production</text>
+<text class="tag" x="856" y="34" font-size="11" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">nothing reaches production without passing through the airlock</text>
+<path class="rule" d="M24 52.5H856"/>
+
+<g class="stage">
+<rect class="box p1" x="24.5" y="124.5" width="117" height="53"/>
+<rect class="led p1" x="128.5" y="137.5" width="6" height="6"/>
+<text class="idx" x="34.5" y="143" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">01</text>
+<text class="lbl p1" x="83" y="166" font-size="12" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">REQUEST</text>
+<text class="cap" x="83" y="196" font-size="11" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">in English</text>
+</g>
+<g class="stage">
+<rect class="box p2" x="167.5" y="124.5" width="117" height="53"/>
+<rect class="led p2" x="271.5" y="137.5" width="6" height="6"/>
+<text class="idx" x="177.5" y="143" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">02</text>
+<text class="lbl p2" x="226" y="166" font-size="12" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">SHADOW COPY</text>
+<text class="cap" x="226" y="196" font-size="11" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">branch the database</text>
+</g>
+<g class="stage">
+<rect class="box p3" x="310.5" y="124.5" width="117" height="53"/>
+<rect class="led p3" x="414.5" y="137.5" width="6" height="6"/>
+<text class="idx" x="320.5" y="143" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">03</text>
+<text class="lbl p3" x="369" y="166" font-size="12" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">APPLY + UNDO</text>
+<text class="cap" x="369" y="196" font-size="11" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">in a sandbox</text>
+</g>
+<g class="stage">
+<rect class="box p4" x="453.5" y="124.5" width="117" height="53"/>
+<rect class="led p4" x="557.5" y="137.5" width="6" height="6"/>
+<text class="idx" x="463.5" y="143" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">04</text>
+<text class="lbl p4" x="512" y="166" font-size="12" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">CHECKSUM &#215;3</text>
+<text class="cap" x="512" y="196" font-size="11" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">pre = post-rollback</text>
+</g>
+<g class="stage">
+<rect class="box p5" x="596.5" y="124.5" width="117" height="53"/>
+<rect class="led p5" x="700.5" y="137.5" width="6" height="6"/>
+<text class="idx" x="606.5" y="143" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">05</text>
+<text class="lbl p5" x="655" y="166" font-size="12" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">THE GATE</text>
+<text class="cap" x="655" y="196" font-size="11" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">human decides</text>
+</g>
+<g class="stage">
+<rect class="box p6" x="739.5" y="124.5" width="117" height="53"/>
+<rect class="led p6" x="843.5" y="137.5" width="6" height="6"/>
+<text class="idx" x="749.5" y="143" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">06</text>
+<text class="lbl p6" x="798" y="166" font-size="12" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">SEALED LEDGER</text>
+<text class="cap" x="798" y="196" font-size="11" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">hash-chained receipt</text>
+</g>
+
+<path class="arw g1" d="M146 151.5H159.5"/><polygon class="arh g1" points="159.5,147.5 166,151.5 159.5,155.5"/>
+<path class="arw g2" d="M289 151.5H302.5"/><polygon class="arh g2" points="302.5,147.5 309,151.5 302.5,155.5"/>
+<path class="arw g3" d="M432 151.5H445.5"/><polygon class="arh g3" points="445.5,147.5 452,151.5 445.5,155.5"/>
+<path class="arw g4" d="M575 151.5H588.5"/><polygon class="arh g4" points="588.5,147.5 595,151.5 588.5,155.5"/>
+<path class="arw g5" d="M718 151.5H731.5"/><polygon class="arh g5" points="731.5,147.5 738,151.5 731.5,155.5"/>
+
+<g class="proof">
+<path class="pk" d="M583.5 151.5V113"/>
+<polygon class="ph" points="583.5,106.5 578.5,114.5 588.5,114.5"/>
+<text class="pt" x="583.5" y="99" font-size="11" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">proof attached</text>
+</g>
+
+<g class="undo">
+<path class="dash" d="M856.5 151.5H868.5V213.5H797.5V227.5"/>
+<rect class="ubox" x="722.5" y="227.5" width="150" height="34"/>
+<text class="utxt" x="797.5" y="248.5" font-size="11" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">UNDO WINDOW &#183; 30 min</text>
+</g>
+
+<g class="pulse">
+<rect x="4" y="150" width="18" height="2" fill="#d2691e" opacity="0.25"/>
+<circle cx="24" cy="151" r="9" fill="#d2691e" opacity="0.14"/>
+<circle cx="24" cy="151" r="3.6" fill="#d2691e"/>
+</g>
+</svg>
