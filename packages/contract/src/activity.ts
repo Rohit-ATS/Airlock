@@ -144,6 +144,44 @@ function statusOf(event: SessionEvent): string | null {
   return str(state?.status);
 }
 
+/**
+ * Get the events out of whatever `/api/v1/sessions/{id}/events` actually returns.
+ *
+ * Three things about that response were not guessable and all three were got
+ * wrong first time, so they are handled explicitly and asserted in the tests:
+ *
+ *   - The body is `{ data, pagination }`, and each element of `data` is an
+ *     **envelope** — `{ turn_id, event: { … } }`. The event is nested. Reading
+ *     the elements directly gives `type === undefined` for every one of them,
+ *     which produces a confidently empty summary rather than an error.
+ *   - It comes back **newest first**. A timeline rendered in that order tells
+ *     the story backwards, opening with "turn complete".
+ *   - `thread_id` is absent on run-level events (`turn.created`, `turn.done`)
+ *     and `"main"` on the rest.
+ *
+ * Also accepts a bare array, and elements that are already unwrapped, so the
+ * SDK and the HTTP surface can both be fed to it.
+ */
+export function unwrapEvents(payload: unknown): SessionEvent[] {
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as { data?: unknown } | null)?.data)
+      ? ((payload as { data: unknown[] }).data)
+      : [];
+
+  const events = rows
+    .map((row) => {
+      const inner = (row as { event?: unknown } | null)?.event;
+      return (inner && typeof inner === 'object' ? inner : row) as SessionEvent;
+    })
+    .filter((event) => typeof event?.type === 'string');
+
+  // Oldest first, so the feed reads forwards. `id` is a monotonic ULID, which
+  // is a sounder sort key than a timestamp that can tie at millisecond
+  // resolution — two events in the same millisecond is normal here.
+  return events.sort((a, b) => String(a.id ?? '').localeCompare(String(b.id ?? '')));
+}
+
 export function summariseEvents(events: readonly SessionEvent[]): ActivitySummary {
   const steps: ActivityStep[] = [];
   const tools = new Set<string>();
