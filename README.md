@@ -333,13 +333,13 @@ reading the code rather than typed in and left to rot.
 | The verifier's own `match` flag is never trusted. AIRLOCK recomputes `pre === post_rollback` itself. | [`gate.ts:284`](packages/contract/src/gate.ts#L284) | `node --test packages/contract/test/gate.test.mjs` | A dossier claiming `match:true` over differing checksums is still sealed. |
 | A claim of danger is believed; a claim of safety is recomputed. Drift seals the gate even when the drift checker reported everything fine. | [`gate.ts:388`](packages/contract/src/gate.ts#L388) | `node --test packages/contract/test/policy.test.mjs` | `drifted:false` with a production checksum that does not match still seals. |
 | Break-glass is not an approval: `BreakGlassOverride` carries a different private symbol, and no function accepts both. | [`gate.ts:431`](packages/contract/src/gate.ts#L431) | `node --test packages/contract/test/policy.test.mjs` | Two of the six compile-error forgeries are exactly this swap. |
-| The same rule runs server-side. Approving over HTTP with no browser involved is refused identically. | [`dossierStore.ts:396`](apps/console/src/data/dossierStore.ts#L396) | `curl -s -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision -H 'Content-Type: application/json' -d '{"decision":"approved"}'` | `{"error":"CERTIFICATE_FAILED"}` and HTTP 403. |
+| The same rule runs server-side. Approving over HTTP with no browser involved is refused identically. | [`dossierStore.ts:418`](apps/console/src/data/dossierStore.ts#L418) | `curl -s -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision -H 'Content-Type: application/json' -d '{"decision":"approved"}'` | `{"error":"CERTIFICATE_FAILED"}` and HTTP 403. |
 
 **Policy**
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| A quorum counts people, not clicks — signatures collapse by identity, so one approver signing twice is one approver. | [`dossier.ts:724`](packages/contract/src/dossier.ts#L724) | `node --test packages/contract/test/policy.test.mjs` | Two signatures from one identity leave the change still waiting. |
+| A quorum counts people, not clicks — signatures collapse by identity, so one approver signing twice is one approver. | [`dossier.ts:760`](packages/contract/src/dossier.ts#L760) | `node --test packages/contract/test/policy.test.mjs` | Two signatures from one identity leave the change still waiting. |
 | No standing production access: every access grant must carry an expiry, so the default state is that nobody holds the keys. | [`policy.ts:85`](packages/contract/src/policy.ts#L85) | `npm run check:fixtures` | `access-grant.standing.json` is refused for `GRANT_WITHOUT_EXPIRY`. |
 | The shipped `airlock.policy.yaml` is byte-identical to the compiled default, so the documented policy and the enforced one cannot disagree. | [`check-policy.mjs:53`](scripts/check-policy.mjs#L53) | `npm run check:policy` | `airlock.policy.yaml checks out — 7 classes, identical to the shipped default.` |
 
@@ -1007,7 +1007,7 @@ computed-style probe — which is to say, by measuring rather than by looking.
 ## Tests
 
 ```bash
-npm test        # 276 tests, 18 fixtures, 4 agent specs, 1 policy file, 32 claims, 4 SVG assets
+npm test        # 293 tests, 18 fixtures, 4 agent specs, 1 policy file, 32 claims, 4 SVG assets
 ```
 
 Those four numbers are **checked, not typed**. `verify-claims.mjs` runs the suite, counts the
@@ -1015,7 +1015,7 @@ files and compares them against this line, so adding a test and forgetting the R
 build. A reader who counts 206 against a README promising 201 has been handed a reason to
 disbelieve the other twenty-three claims, and that is a lot of damage for a stale integer.
 
-Seventeen suites, and each pins a property rather than an implementation:
+Eighteen suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |
