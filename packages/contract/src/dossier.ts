@@ -583,12 +583,48 @@ export const Receipt = z.object({
 });
 export type Receipt = z.infer<typeof Receipt>;
 
+/**
+ * Where the change came from, when nobody typed it.
+ *
+ * Deliberately not `code_changes`: that is the pull request the agent *opens*,
+ * downstream of the proof. This is the pull request that opened AIRLOCK — the
+ * reason the run exists at all, and the address the certificate has to be
+ * delivered back to.
+ *
+ * Recording it is what makes the autonomy checkable rather than asserted. A
+ * dossier with an origin and `started_by: 'webhook'` is a change that no human
+ * asked for in words; the paths are the evidence of what tripped it, and
+ * `notified_at` is the proof the certificate went back to where the engineer
+ * already was, exactly once.
+ */
+export const Origin = z.object({
+  kind: z.enum(['pull_request', 'sweep']),
+  repo: z.string().min(1),
+  pr_number: z.number().int().positive().optional(),
+  /** Head of the branch as it was when the trigger fired. */
+  head_sha: z.string().optional(),
+  /** The files that caused it to fire. */
+  paths: z.array(z.string()).default([]),
+  detected_at: z.string(),
+  /**
+   * When the certificate was delivered back to the origin.
+   *
+   * Nullable and written once, so a re-run, a retry or a second webhook for the
+   * same head cannot post the same certificate twice onto someone's pull
+   * request.
+   */
+  notified_at: z.string().nullable().default(null),
+});
+export type Origin = z.infer<typeof Origin>;
+
 export const Dossier = z.object({
   dossier_id: z.string().min(1),
   change_class: z.enum(CHANGE_CLASSES),
   request: z.string().min(1),
   requested_by: z.string(),
   started_by: z.enum(['ui', 'webhook', 'api', 'agent', 'schedule']).default('ui'),
+  /** Set when something other than a person started this. */
+  origin: Origin.nullable().default(null),
   created_at: z.string(),
   session_id: z.string().nullable().default(null),
   turn_id: z.string().nullable().default(null),
