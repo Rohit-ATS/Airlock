@@ -316,7 +316,7 @@ table is generated from that file, so the line numbers you are about to click we
 reading the code rather than typed in and left to rot.
 
 <details>
-<summary><b>All 28 claims, each anchored to a line of code</b> — click to expand</summary>
+<summary><b>All 32 claims, each anchored to a line of code</b> — click to expand</summary>
 
 <!-- BEGIN CLAIMS -->
 
@@ -327,19 +327,19 @@ reading the code rather than typed in and left to rot.
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| An approval for an unproven change cannot be constructed: `ApprovalGrant` carries a module-private symbol only `openGate` can mint. | [`gate.ts:57`](packages/contract/src/gate.ts#L57) | `npm run build --workspace @airlock/contract` | Compiles. Weaken the type and the build fails — see the next row. |
+| An approval for an unproven change cannot be constructed: `ApprovalGrant` carries a module-private symbol only `openGate` can mint. | [`gate.ts:58`](packages/contract/src/gate.ts#L58) | `npm run build --workspace @airlock/contract` | Compiles. Weaken the type and the build fails — see the next row. |
 | Six attempts to forge a grant are asserted as compile errors. Weaken the type and `tsc` fails on the now-unused `@ts-expect-error`. | [`gate.typetest.ts:27`](packages/contract/src/gate.typetest.ts#L27) | `npm run build --workspace @airlock/contract` | Six `@ts-expect-error` lines, each a forgery the compiler rejects. |
-| A detected injection seals the gate **before** the certificate is examined — step 2 of 8, ahead of proof integrity. | [`gate.ts:225`](packages/contract/src/gate.ts#L225) | `node --test packages/contract/test/quarantine.test.mjs` | The ordering is pinned by test, not left to code review. |
-| The verifier's own `match` flag is never trusted. AIRLOCK recomputes `pre === post_rollback` itself. | [`gate.ts:255`](packages/contract/src/gate.ts#L255) | `node --test packages/contract/test/gate.test.mjs` | A dossier claiming `match:true` over differing checksums is still sealed. |
-| A claim of danger is believed; a claim of safety is recomputed. Drift seals the gate even when the drift checker reported everything fine. | [`gate.ts:359`](packages/contract/src/gate.ts#L359) | `node --test packages/contract/test/policy.test.mjs` | `drifted:false` with a production checksum that does not match still seals. |
-| Break-glass is not an approval: `BreakGlassOverride` carries a different private symbol, and no function accepts both. | [`gate.ts:402`](packages/contract/src/gate.ts#L402) | `node --test packages/contract/test/policy.test.mjs` | Two of the six compile-error forgeries are exactly this swap. |
-| The same rule runs server-side. Approving over HTTP with no browser involved is refused identically. | [`dossierStore.ts:324`](apps/console/src/data/dossierStore.ts#L324) | `curl -s -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision -H 'Content-Type: application/json' -d '{"decision":"approved"}'` | `{"error":"CERTIFICATE_FAILED"}` and HTTP 403. |
+| A detected injection seals the gate **before** the certificate is examined — step 2 of 8, ahead of proof integrity. | [`gate.ts:233`](packages/contract/src/gate.ts#L233) | `node --test packages/contract/test/quarantine.test.mjs` | The ordering is pinned by test, not left to code review. |
+| The verifier's own `match` flag is never trusted. AIRLOCK recomputes `pre === post_rollback` itself. | [`gate.ts:284`](packages/contract/src/gate.ts#L284) | `node --test packages/contract/test/gate.test.mjs` | A dossier claiming `match:true` over differing checksums is still sealed. |
+| A claim of danger is believed; a claim of safety is recomputed. Drift seals the gate even when the drift checker reported everything fine. | [`gate.ts:388`](packages/contract/src/gate.ts#L388) | `node --test packages/contract/test/policy.test.mjs` | `drifted:false` with a production checksum that does not match still seals. |
+| Break-glass is not an approval: `BreakGlassOverride` carries a different private symbol, and no function accepts both. | [`gate.ts:431`](packages/contract/src/gate.ts#L431) | `node --test packages/contract/test/policy.test.mjs` | Two of the six compile-error forgeries are exactly this swap. |
+| The same rule runs server-side. Approving over HTTP with no browser involved is refused identically. | [`dossierStore.ts:396`](apps/console/src/data/dossierStore.ts#L396) | `curl -s -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision -H 'Content-Type: application/json' -d '{"decision":"approved"}'` | `{"error":"CERTIFICATE_FAILED"}` and HTTP 403. |
 
 **Policy**
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| A quorum counts people, not clicks — signatures collapse by identity, so one approver signing twice is one approver. | [`dossier.ts:729`](packages/contract/src/dossier.ts#L729) | `node --test packages/contract/test/policy.test.mjs` | Two signatures from one identity leave the change still waiting. |
+| A quorum counts people, not clicks — signatures collapse by identity, so one approver signing twice is one approver. | [`dossier.ts:724`](packages/contract/src/dossier.ts#L724) | `node --test packages/contract/test/policy.test.mjs` | Two signatures from one identity leave the change still waiting. |
 | No standing production access: every access grant must carry an expiry, so the default state is that nobody holds the keys. | [`policy.ts:85`](packages/contract/src/policy.ts#L85) | `npm run check:fixtures` | `access-grant.standing.json` is refused for `GRANT_WITHOUT_EXPIRY`. |
 | The shipped `airlock.policy.yaml` is byte-identical to the compiled default, so the documented policy and the enforced one cannot disagree. | [`check-policy.mjs:53`](scripts/check-policy.mjs#L53) | `npm run check:policy` | `airlock.policy.yaml checks out — 7 classes, identical to the shipped default.` |
 
@@ -354,10 +354,10 @@ reading the code rather than typed in and left to rot.
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| There is no tool that applies a change to production. Twelve tools ship; exactly one is destructive, and the harness holds it for a human. | [`tools.ts:1222`](packages/mcp/src/tools.ts#L1222) | `node --test packages/mcp/test/server.test.mjs` | The tool list is asserted whole — a thirteenth tool fails the test. |
+| There is no tool that applies a change to production. Twelve tools ship; exactly one is destructive, and the harness holds it for a human. | [`tools.ts:1207`](packages/mcp/src/tools.ts#L1207) | `node --test packages/mcp/test/server.test.mjs` | The tool list is asserted whole — a thirteenth tool fails the test. |
 | The agent may open a pull request and may not merge one. `merge_pull_request` is on a deny-list checked independently of the allow-list. | [`check-agents.mjs:73`](scripts/check-agents.mjs#L73) | `npm run check:agents` | Four specs check out; `airlock-scout` reports no path to production at all. |
-| The agent looks facts up instead of asking. A fact lives in a system of record; only judgement is put to a human. | [`tools.ts:944`](packages/mcp/src/tools.ts#L944) | `node --test packages/contract/test/resolve.test.mjs` | Twelve tools; this is the one that records what was resolved and where from. |
-| An ambiguous fact seals the gate ahead of the certificate, and is asked with its candidates listed rather than as an empty box. | [`gate.ts:241`](packages/contract/src/gate.ts#L241) | `npm run check:fixtures` | `dos_refund_ambiguous` — a flawless SCOPE proof, refused because two customers matched one email. |
+| The agent looks facts up instead of asking. A fact lives in a system of record; only judgement is put to a human. | [`tools.ts:929`](packages/mcp/src/tools.ts#L929) | `node --test packages/contract/test/resolve.test.mjs` | Twelve tools; this is the one that records what was resolved and where from. |
+| An ambiguous fact seals the gate ahead of the certificate, and is asked with its candidates listed rather than as an empty box. | [`gate.ts:249`](packages/contract/src/gate.ts#L249) | `npm run check:fixtures` | `dos_refund_ambiguous` — a flawless SCOPE proof, refused because two customers matched one email. |
 | Resolved facts are fingerprinted into the certificate and re-checked before the gate, so a fact that moved seals the door. | [`resolve.ts:239`](packages/contract/src/resolve.ts#L239) | `npm run check:fixtures` | `dos_payout_context_drift` — no row changed, no checksum noticed, the pin caught it. |
 | A pinned proof nobody re-checked is refused rather than waved through: an absent check is not a passed check. | [`resolve.ts:276`](packages/contract/src/resolve.ts#L276) | `node --test packages/contract/test/resolve.test.mjs` | CONTEXT_UNVERIFIED, kept distinct from CONTEXT_DRIFTED so neither hides inside the other. |
 
@@ -1007,7 +1007,7 @@ computed-style probe — which is to say, by measuring rather than by looking.
 ## Tests
 
 ```bash
-npm test        # 228 tests, 18 fixtures, 4 agent specs, 1 policy file, 28 claims, 4 SVG assets
+npm test        # 276 tests, 18 fixtures, 4 agent specs, 1 policy file, 32 claims, 4 SVG assets
 ```
 
 Those four numbers are **checked, not typed**. `verify-claims.mjs` runs the suite, counts the
@@ -1015,7 +1015,7 @@ files and compares them against this line, so adding a test and forgetting the R
 build. A reader who counts 206 against a README promising 201 has been handed a reason to
 disbelieve the other twenty-three claims, and that is a lot of damage for a stale integer.
 
-Sixteen suites, and each pins a property rather than an implementation:
+Seventeen suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |
