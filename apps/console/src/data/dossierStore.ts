@@ -173,8 +173,51 @@ export async function getDossier(id: string): Promise<Dossier | null> {
   return ledger[id] ?? null;
 }
 
+
+/* -------------------------------------------------------------------------- */
+/* The write lock                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Every read-modify-write of the ledger runs one at a time.
+ *
+ * Without this, two approvals arriving together forked the hash chain. Each
+ * one snapshotted the ledger, computed `seq` as the count of records already
+ * sealed and `prev` as the last hash, then awaited `sealReceipt` — a genuine
+ * yield, because it awaits `subtle.digest`. Both resumed holding the same `seq`
+ * and the same `prev`, and each wrote its whole stale snapshot back.
+ *
+ * The result was two records claiming the same position in the chain, and the
+ * second write silently discarding the first approval entirely. A tamper-evident
+ * ledger that can fork under ordinary concurrent use is not tamper-evident; it
+ * is a log with a hash column.
+ *
+ * The lock is a promise chain rather than a flag, so callers queue instead of
+ * failing, and it survives a rejection — `operation` is passed as both handlers
+ * so one failed write cannot wedge every subsequent one. Each operation loads
+ * the ledger *inside* the critical section, which is the part that actually
+ * matters: `persist` updates the cache, so the next holder reads what the
+ * previous one wrote.
+ *
+ * In-process only, and that is a real limit worth naming. Two Node processes
+ * serving the same ledger.json would still race, and the fix for that is a lock
+ * file or a database rather than a bigger promise chain. One process is what
+ * this deployment is, and a correct guarantee for it beats an imagined one for
+ * a topology that does not exist yet.
+ */
+let ledgerLock: Promise<unknown> = Promise.resolve();
+
+function withLedgerLock<T>(operation: () => Promise<T>): Promise<T> {
+  const result = ledgerLock.then(operation, operation);
+  ledgerLock = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 /** Upsert. The contract is enforced here, so bad data never enters the ledger. */
-export async function putDossier(input: unknown): Promise<Dossier> {
+async function putDossier__inner(input: unknown): Promise<Dossier> {
   const parsed = parseDossier(input);
 
   /*
@@ -339,7 +382,7 @@ async function commit(
  * distinct approvers ourselves, because a flag on an object the client touched
  * is a claim, not a fact.
  */
-export async function decide(
+async function decide__inner(
   id: string,
   viewer: Viewer,
   decision: 'approved' | 'rejected',
@@ -393,7 +436,7 @@ export async function decide(
  * them with. What makes this survivable is that it is loud, attributed and
  * sealed into the same chain as everything else.
  */
-export async function breakGlass(
+async function breakGlass__inner(
   id: string,
   viewer: Viewer,
   justification: string,
@@ -481,7 +524,7 @@ export type PostApplyResult =
  * decided record is otherwise immutable, and `post_apply` sits outside the
  * receipt body precisely so recording it cannot break the hash chain.
  */
-export async function recordPostApply(
+async function recordPostApply__inner(
   id: string,
   observed: string | null,
   options: { durationMs?: number; rolledBack?: boolean } = {},
@@ -562,7 +605,7 @@ export type UndoResult =
  * nothing here is entitled to claim production came back just because no error
  * was thrown.
  */
-export async function undoChange(
+async function undoChange__inner(
   id: string,
   viewer: Viewer,
   reason: string,
@@ -653,7 +696,7 @@ export const MIN_CLEAR_REASON = 20;
  * gate — this is a decision about whether to trust production input, not a
  * formality.
  */
-export async function clearInjection(
+async function clearInjection__inner(
   id: string,
   viewer: Viewer,
   reason: string,
@@ -862,3 +905,38 @@ export async function posture(viewer: Viewer): Promise<Posture> {
 }
 
 export { approversFor, sealsOutstanding };
+
+/* -------------------------------------------------------------------------- */
+/* The serialised surface                                                      */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Every mutation of the ledger, wrapped in the lock.
+ *
+ * Exported through wrappers rather than by locking inside each body, so that
+ * the guarantee is visible in one place — a reader can see the complete list of
+ * things that write, and a new one added without a wrapper is conspicuous.
+ * The casts preserve each original signature exactly; the wrapper adds
+ * ordering and nothing else.
+ *
+ * `seedIfEmpty` is deliberately NOT here. It is called from `load()`, so taking
+ * the lock would deadlock the first read that triggers seeding. It is already
+ * single-flighted by the `seeding` promise above.
+ */
+export const putDossier = ((...args: Parameters<typeof putDossier__inner>) =>
+  withLedgerLock(() => putDossier__inner(...args))) as typeof putDossier__inner;
+
+export const decide = ((...args: Parameters<typeof decide__inner>) =>
+  withLedgerLock(() => decide__inner(...args))) as typeof decide__inner;
+
+export const breakGlass = ((...args: Parameters<typeof breakGlass__inner>) =>
+  withLedgerLock(() => breakGlass__inner(...args))) as typeof breakGlass__inner;
+
+export const recordPostApply = ((...args: Parameters<typeof recordPostApply__inner>) =>
+  withLedgerLock(() => recordPostApply__inner(...args))) as typeof recordPostApply__inner;
+
+export const undoChange = ((...args: Parameters<typeof undoChange__inner>) =>
+  withLedgerLock(() => undoChange__inner(...args))) as typeof undoChange__inner;
+
+export const clearInjection = ((...args: Parameters<typeof clearInjection__inner>) =>
+  withLedgerLock(() => clearInjection__inner(...args))) as typeof clearInjection__inner;
