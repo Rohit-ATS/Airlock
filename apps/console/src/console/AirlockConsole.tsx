@@ -17,6 +17,7 @@ import { useRun, useRunControls, useRunStore } from '@/harness/HarnessProvider';
 import { CertificateCard } from '@/certificate/CertificateCard';
 import { Wordmark } from './Mark';
 import { Lanes, SandboxLog } from './Lanes';
+import { LiveActivity, useActivity } from './LiveActivity';
 import { DidZone, WaitingZone } from './Zones';
 
 type Zone = 'DOING' | 'WAITING' | 'DID';
@@ -394,6 +395,14 @@ function ConsoleBody({ className }: { className?: string }) {
     };
   }, []);
 
+  /*
+   * What the harness is doing, for runs this browser did not start.
+   *
+   * Polled on the same cadence as the change queue so the two panels cannot
+   * disagree about whether something is happening.
+   */
+  const activity = useActivity();
+
   /* --- the change queue --------------------------------------------------- */
   const refresh = useCallback(async () => {
     try {
@@ -553,7 +562,19 @@ function ConsoleBody({ className }: { className?: string }) {
   const didCount = dossiers.length - waitingCount;
 
   const zones: Array<{ id: Zone; label: string; hint: string; count: number; tone: 'ice' | 'hazard' | 'neutral' }> = [
-    { id: 'DOING', label: 'DOING', hint: 'what the agent is doing', count: run.lanes.length, tone: 'ice' },
+    {
+      id: 'DOING',
+      label: 'DOING',
+      hint: 'what the agent is doing',
+      /*
+       * Lanes when this tab is driving the run, otherwise the harness's own
+       * count. Reading only `run.lanes` is why this tab showed no number at
+       * all while the agent was demonstrably working: the lanes belong to a
+       * turn posted from here, and the runs that matter are not.
+       */
+      count: run.lanes.length > 0 ? run.lanes.length : (activity?.runs[0]?.steps.length ?? 0),
+      tone: 'ice',
+    },
     { id: 'WAITING', label: 'WAITING', hint: 'what it is waiting on', count: waitingCount, tone: 'hazard' },
     { id: 'DID', label: 'DID', hint: 'what it did', count: didCount, tone: 'neutral' },
   ];
@@ -676,7 +697,24 @@ function ConsoleBody({ className }: { className?: string }) {
             <>
               <Lanes />
               <div className="min-h-0 flex-1 overflow-hidden">
-                {started || run.status !== 'idle' ? <ThreadContainer /> : <GuidedStart onPick={startExample} />}
+                {/*
+                 * Three states, in order of who is driving.
+                 *
+                 * A turn posted from this tab streams through the SDK, so the
+                 * transcript is the truthful view. Otherwise the interesting
+                 * runs are the ones nobody here started — webhook, schedule,
+                 * the HTTP API — and those are read back from the harness.
+                 * GuidedStart is the last resort, for a harness with nothing on
+                 * it at all, because offering somebody a prompt to type is the
+                 * wrong first answer in a product about not typing prompts.
+                 */}
+                {started || run.status !== 'idle' ? (
+                  <ThreadContainer />
+                ) : activity && activity.runs.length > 0 ? (
+                  <LiveActivity feed={activity} />
+                ) : (
+                  <GuidedStart onPick={startExample} />
+                )}
               </div>
               <SandboxLog
                 collapsed={logCollapsed}
