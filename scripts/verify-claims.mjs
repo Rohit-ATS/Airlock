@@ -511,6 +511,21 @@ counts.push({
 });
 counts.push({ what: 'claims', actual: results.length, pattern: /1 policy file, (\d+) claims/ });
 
+// The badges at the top of the page. These are the first numbers anyone reads
+// and they were the last ones checked, which is how both of them came to be
+// wrong at once. A number rendered as an image rots exactly like a number
+// rendered as prose; it just looks more official while it does it.
+counts.push({
+  what: 'tests in the badge',
+  actual: Number(passed[1]),
+  pattern: /badge\/tests-(\d+)%20passing/,
+});
+counts.push({
+  what: 'claims in the badge',
+  actual: results.length,
+  pattern: /badge\/README%20claims-(\d+)%20anchored/,
+});
+
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
   'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
 
