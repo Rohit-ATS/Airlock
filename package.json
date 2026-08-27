@@ -51,7 +51,8 @@
     "check:assets": "node scripts/check-assets.mjs",
     "demo:refresh": "node scripts/demo-refresh.mjs",
     "check:diagrams": "node scripts/check-diagrams.mjs",
-    "check:simulation": "node scripts/check-no-simulation.mjs"
+    "check:simulation": "node scripts/check-no-simulation.mjs",
+    "register:connector": "node scripts/register-connector.mjs"
   },
   "overrides": {
     "zustand": "^5.0.15",
