@@ -76,7 +76,7 @@ export function RuleSection() {
       <Reveal>
         <pre className="overflow-x-auto bg-[var(--lp-void)] p-8 text-[13px] leading-relaxed sm:p-10">
           <code className="evidence">
-            <span className="text-[var(--lp-pale-3)]">// packages/contract/src/gate.ts</span>
+            <span className="text-[var(--lp-pale-3)]">{'// packages/contract/src/gate.ts'}</span>
             {'\n'}
             <span className="text-[#6ea8fe]">const</span> <span className="text-[var(--lp-pale)]">GATE_WITNESS</span>
             <span className="text-[var(--lp-pale-2)]">: </span>
@@ -95,7 +95,7 @@ export function RuleSection() {
             <span className="text-[#5fd3a6]">true</span>
             <span className="text-[var(--lp-pale-2)]">;</span>
             {'   '}
-            <span className="text-[var(--lp-pale-3)]">// unforgeable outside this module</span>
+            <span className="text-[var(--lp-pale-3)]">{'// unforgeable outside this module'}</span>
             {'\n'}
             <span className="text-[var(--lp-pale-2)]">{'}'}</span>
           </code>

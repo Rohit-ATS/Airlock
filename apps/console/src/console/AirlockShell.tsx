@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TrueForgeUI } from '@truefoundry/trueforge-ui';
 import type { SemanticTokens } from '@truefoundry/trueforge-ui';
 import { DEFAULT_POLICY, type BudgetPolicy, type StopCause } from '@airlock/contract';
@@ -106,11 +106,17 @@ export function AirlockShell({
   agentName: string;
   budget?: BudgetPolicy;
 }) {
-  // One store for the lifetime of the page; the observer writes into it from
-  // outside React, and components read it through useSyncExternalStore.
-  const storeRef = useRef<RunStore>(null);
-  if (storeRef.current === null) storeRef.current = new RunStore();
-  const store = storeRef.current;
+  /*
+   * One store for the lifetime of the page; the observer writes into it from
+   * outside React, and components read it through useSyncExternalStore.
+   *
+   * A lazy `useState` initialiser rather than a ref primed during render. Both
+   * construct exactly one store, but reading and writing a ref while rendering
+   * is not safe under concurrent rendering — React may start a render, abandon
+   * it, and start again, and the abandoned attempt has already mutated the ref.
+   * The initialiser is the supported way to say "construct this once".
+   */
+  const [store] = useState(() => new RunStore());
 
   const server = useMemo(
     () =>

@@ -68,25 +68,38 @@ export function ControlRoom() {
   /** Set after mount so time-dependent readings never differ between server and client. */
   const [now, setNow] = useState<Date | null>(null);
 
-  const refresh = useCallback(async () => {
-    try {
-      const [p, d] = await Promise.all([fetch('/api/posture'), fetch('/api/dossiers')]);
-      if (!p.ok || !d.ok) throw new Error('the console is not answering');
-      setData((await p.json()) as PostureResponse);
-      setDossiers(((await d.json()) as { dossiers: Dossier[] }).dossiers);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'unknown error');
-    }
-  }, []);
+  /*
+   * A promise chain rather than an `async` function, deliberately.
+   *
+   * The body of an `async` function runs synchronously up to its first `await`,
+   * so calling one from an effect puts every `setState` it might reach on the
+   * same tick as the effect — a render to decide, then a render to correct
+   * itself. Starting with `Promise.all` means the synchronous part of this is
+   * two `fetch` calls and nothing else; every state write happens in a
+   * continuation.
+   */
+  const refresh = useCallback(
+    () =>
+      Promise.all([fetch('/api/posture'), fetch('/api/dossiers')])
+        .then(async ([p, d]) => {
+          if (!p.ok || !d.ok) throw new Error('the console is not answering');
+          setData((await p.json()) as PostureResponse);
+          setDossiers(((await d.json()) as { dossiers: Dossier[] }).dossiers);
+          // Stamped where the data lands rather than where the poll starts, so
+          // "holding for 4m 12s" is measured against the reading it is shown
+          // beside rather than against a clock that ticks independently of it.
+          setNow(new Date());
+          setError(null);
+        })
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : 'unknown error');
+        }),
+    [],
+  );
 
   useEffect(() => {
-    setNow(new Date());
     void refresh();
-    const id = setInterval(() => {
-      setNow(new Date());
-      void refresh();
-    }, 6000);
+    const id = setInterval(() => void refresh(), 6000);
     return () => clearInterval(id);
   }, [refresh]);
 
@@ -102,7 +115,16 @@ export function ControlRoom() {
     };
   }, [dossiers]);
 
-  const viewer = data?.viewer ?? { email: 'loading…', role: 'requester' };
+  /*
+   * Memoised because the fallback is a fresh object every render, and this
+   * feeds the dependency list of the refusal grouping below — so an unmemoised
+   * literal quietly makes that `useMemo` recompute on every tick of a
+   * six-second poll, which is the opposite of what it is there for.
+   */
+  const viewer = useMemo<Viewer>(
+    () => data?.viewer ?? { email: 'loading…', role: 'requester' },
+    [data?.viewer],
+  );
   const p = data?.posture;
 
   /* --- everything the gate is currently refusing, grouped ----------------- */
@@ -466,7 +488,6 @@ function QueueRow({ dossier, viewer, now }: { dossier: Dossier; viewer: Viewer; 
 }
 
 function DecidedRow({ dossier }: { dossier: Dossier }) {
-  const applied = dossier.audit.applied_at !== null;
   const rejected = dossier.approval.decision === 'rejected';
   const glass = dossier.signatures.some((s) => s.break_glass);
 

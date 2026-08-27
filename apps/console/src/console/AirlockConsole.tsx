@@ -148,25 +148,34 @@ const SHORT_FAILURE: Record<TurnFailure['kind'], string> = {
  * them the button is broken.
  */
 function useRetryCountdown(failure: TurnFailure | null, since: string | null): number {
-  const [left, setLeft] = useState(0);
   const wait = failure?.retryAfterSeconds ?? null;
 
-  useEffect(() => {
-    if (!wait || !since) {
-      setLeft(0);
-      return;
-    }
-    // Counted from when the harness reported it, not from when this component
-    // mounted — a banner re-rendered five seconds later must not restart the
-    // clock and make the operator wait twice.
-    const ready = new Date(since).getTime() + wait * 1000;
-    const tick = () => setLeft(Math.max(0, Math.ceil((ready - Date.now()) / 1000)));
-    tick();
-    const id = setInterval(tick, 500);
-    return () => clearInterval(id);
-  }, [since, wait]);
+  /*
+   * Counted from when the harness reported the failure, not from when this
+   * component mounted — a banner re-rendered five seconds later must not
+   * restart the clock and make the operator serve the wait twice.
+   */
+  const ready = wait && since ? new Date(since).getTime() + wait * 1000 : null;
 
-  return left;
+  /*
+   * The clock is state and the remainder is derived from it.
+   *
+   * The alternative — an interval that writes the remaining seconds into state,
+   * seeded by calling the tick once synchronously — sets state inside the
+   * effect body, which costs a render to display zero and another to correct
+   * it. Holding the instant instead means the only writer is the interval
+   * callback, and the number on screen is a pure function of it.
+   */
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (ready === null) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [ready]);
+
+  if (ready === null) return 0;
+  return Math.max(0, Math.ceil((ready - now) / 1000));
 }
 
 /**
@@ -578,21 +587,32 @@ function ConsoleBody({ className }: { className?: string }) {
   const activity = useActivity();
 
   /* --- the change queue --------------------------------------------------- */
-  const refresh = useCallback(async () => {
-    try {
-      const res = await fetch('/api/dossiers');
-      if (!res.ok) return;
-      const body = (await res.json()) as { dossiers: Dossier[] };
-      setDossiers(body.dossiers);
-      for (const d of body.dossiers) {
-        if (d.started_by === 'webhook' || d.started_by === 'agent') {
-          store.prove(19, `session created through the HTTP API by the ${d.started_by}`, d.dossier_id);
-        }
-      }
-    } catch {
-      /* queue stays as it was */
-    }
-  }, [store]);
+  /*
+   * A promise chain rather than an `async` function, deliberately.
+   *
+   * An `async` body runs synchronously up to its first `await`, so calling one
+   * straight from an effect puts the state writes it can reach on the same tick
+   * as the effect. Starting from `fetch` keeps the synchronous part to the
+   * request itself; everything that writes happens in a continuation.
+   */
+  const refresh = useCallback(
+    () =>
+      fetch('/api/dossiers')
+        .then(async (res) => {
+          if (!res.ok) return;
+          const body = (await res.json()) as { dossiers: Dossier[] };
+          setDossiers(body.dossiers);
+          for (const d of body.dossiers) {
+            if (d.started_by === 'webhook' || d.started_by === 'agent') {
+              store.prove(19, `session created through the HTTP API by the ${d.started_by}`, d.dossier_id);
+            }
+          }
+        })
+        .catch(() => {
+          /* queue stays as it was */
+        }),
+    [store],
+  );
 
   useEffect(() => {
     void refresh();
@@ -600,15 +620,31 @@ function ConsoleBody({ className }: { className?: string }) {
     return () => clearInterval(id);
   }, [refresh]);
 
-  /* --- follow the run into the zone that matters -------------------------- */
-  useEffect(() => {
+  /*
+   * Follow the run into the zone that matters, and open the sandbox pane the
+   * first time the sandbox actually produces a line.
+   *
+   * Adjusted during render against the previous value rather than from an
+   * effect. Both of these are "when X becomes true, move the view" — and an
+   * effect that does it runs *after* the browser has already painted the old
+   * view, so the operator sees the wrong zone for a frame and then a jump.
+   * Comparing against the last value seen and setting during render is the
+   * supported way to express this; React re-runs the component immediately,
+   * before anything reaches the screen.
+   */
+  const [lastPausedOn, setLastPausedOn] = useState(run.pausedOn);
+  if (run.pausedOn !== lastPausedOn) {
+    setLastPausedOn(run.pausedOn);
     if (run.pausedOn === 'approval') setZone('WAITING');
-  }, [run.pausedOn]);
+  }
 
-  /* --- open the sandbox pane the first time the sandbox actually runs ------ */
-  useEffect(() => {
+  const [lastLogLines, setLastLogLines] = useState(run.sandboxLog.length);
+  if (run.sandboxLog.length !== lastLogLines) {
+    setLastLogLines(run.sandboxLog.length);
+    // Pinned means the operator has collapsed it deliberately; that decision
+    // outranks ours.
     if (!logPinned && run.sandboxLog.length > 0) setLogCollapsed(false);
-  }, [run.sandboxLog.length, logPinned]);
+  }
 
   /* --- clear the notice once it has had time to be read ------------------- */
   useEffect(() => {
