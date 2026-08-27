@@ -185,10 +185,18 @@ export function SandboxLog({ collapsed, onToggle }: { collapsed: boolean; onTogg
                   size="xs"
                   className={cx(
                     'min-w-0 flex-1 break-words whitespace-pre-wrap',
-                    line.kind === 'tool' ? 'text-ice' : line.kind === 'system' ? 'text-seal' : 'text-ink-3',
+                    line.kind === 'tool'
+                      ? 'text-ice'
+                      : line.kind === 'system'
+                        ? 'text-seal'
+                        : // --hazard is reserved for irreversibility; a tool
+                          // that refused is --fault, the same as a failed turn.
+                          line.kind === 'error'
+                          ? 'text-fault'
+                          : 'text-ink-3',
                   )}
                 >
-                  {line.kind === 'tool' ? '→ ' : line.kind === 'result' ? '  ' : '● '}
+                  {line.kind === 'tool' ? '→ ' : line.kind === 'error' ? '✕ ' : line.kind === 'result' ? '  ' : '● '}
                   {line.text}
                 </Evidence>
               </div>

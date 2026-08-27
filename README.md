@@ -10,7 +10,7 @@
 </p>
 
 <p>
-  <img alt="tests" src="https://img.shields.io/badge/tests-293%20passing-35d6a4?style=flat">
+  <img alt="tests" src="https://img.shields.io/badge/tests-340%20passing-35d6a4?style=flat">
   <img alt="claims" src="https://img.shields.io/badge/README%20claims-32%20anchored%20to%20code-4fc3f7?style=flat">
   <img alt="capabilities" src="https://img.shields.io/badge/harness%20capabilities-23-f7942f?style=flat">
   <img alt="write path" src="https://img.shields.io/badge/tools%20that%20write%20to%20production-0-ff5257?style=flat">
@@ -354,9 +354,9 @@ reading the code rather than typed in and left to rot.
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| There is no tool that applies a change to production. Twelve tools ship; exactly one is destructive, and the harness holds it for a human. | [`tools.ts:1228`](packages/mcp/src/tools.ts#L1228) | `node --test packages/mcp/test/server.test.mjs` | The tool list is asserted whole — a thirteenth tool fails the test. |
+| There is no tool that applies a change to production. Twelve tools ship; exactly one is destructive, and the harness holds it for a human. | [`tools.ts:1266`](packages/mcp/src/tools.ts#L1266) | `node --test packages/mcp/test/server.test.mjs` | The tool list is asserted whole — a thirteenth tool fails the test. |
 | The agent may open a pull request and may not merge one. `merge_pull_request` is on a deny-list checked independently of the allow-list. | [`check-agents.mjs:73`](scripts/check-agents.mjs#L73) | `npm run check:agents` | Four specs check out; `airlock-scout` reports no path to production at all. |
-| The agent looks facts up instead of asking. A fact lives in a system of record; only judgement is put to a human. | [`tools.ts:950`](packages/mcp/src/tools.ts#L950) | `node --test packages/contract/test/resolve.test.mjs` | Twelve tools; this is the one that records what was resolved and where from. |
+| The agent looks facts up instead of asking. A fact lives in a system of record; only judgement is put to a human. | [`tools.ts:988`](packages/mcp/src/tools.ts#L988) | `node --test packages/contract/test/resolve.test.mjs` | Twelve tools; this is the one that records what was resolved and where from. |
 | An ambiguous fact seals the gate ahead of the certificate, and is asked with its candidates listed rather than as an empty box. | [`gate.ts:249`](packages/contract/src/gate.ts#L249) | `npm run check:fixtures` | `dos_refund_ambiguous` — a flawless SCOPE proof, refused because two customers matched one email. |
 | Resolved facts are fingerprinted into the certificate and re-checked before the gate, so a fact that moved seals the door. | [`resolve.ts:239`](packages/contract/src/resolve.ts#L239) | `npm run check:fixtures` | `dos_payout_context_drift` — no row changed, no checksum noticed, the pin caught it. |
 | A pinned proof nobody re-checked is refused rather than waved through: an absent check is not a passed check. | [`resolve.ts:276`](packages/contract/src/resolve.ts#L276) | `node --test packages/contract/test/resolve.test.mjs` | CONTEXT_UNVERIFIED, kept distinct from CONTEXT_DRIFTED so neither hides inside the other. |
@@ -380,7 +380,7 @@ reading the code rather than typed in and left to rot.
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| A capability lamp cannot be lit from application code. The only writer is the detector fold over the real event stream. | [`detectors.ts:82`](packages/contract/src/detectors.ts#L82) | `node --test packages/contract/test/harness.test.mjs` | Noise, repeated connectors and prose that merely mentions a chart light nothing. |
+| A capability lamp cannot be lit from application code. The only writer is the detector fold over the real event stream. | [`detectors.ts:83`](packages/contract/src/detectors.ts#L83) | `node --test packages/contract/test/harness.test.mjs` | Noise, repeated connectors and prose that merely mentions a chart light nothing. |
 | The observer is a faithful passthrough: same chunks, same objects, same order, none added, none lost — even when a detector throws. | [`observedServer.ts:26`](apps/console/src/server/observedServer.ts#L26) | `node --test packages/contract/test/observer.test.mjs` | A realistic turn stream is driven through it and checked both ways: what lit, and what must stay dark. |
 | An unsourced claim says it is unsourced, rather than defaulting to a grade that makes every number look accounted for. | [`provenance.ts:154`](packages/contract/src/provenance.ts#L154) | `node --test packages/contract/test/provenance.test.mjs` | A figure the agent asserted never acquires a link to an event that did not produce it. |
 
@@ -1007,7 +1007,7 @@ computed-style probe — which is to say, by measuring rather than by looking.
 ## Tests
 
 ```bash
-npm test        # 293 tests, 18 fixtures, 4 agent specs, 1 policy file, 32 claims, 4 SVG assets
+npm test        # 340 tests, 18 fixtures, 4 agent specs, 1 policy file, 32 claims, 4 SVG assets
 ```
 
 Those four numbers are **checked, not typed**. `verify-claims.mjs` runs the suite, counts the
@@ -1015,7 +1015,7 @@ files and compares them against this line, so adding a test and forgetting the R
 build. A reader who counts 206 against a README promising 201 has been handed a reason to
 disbelieve the other twenty-three claims, and that is a lot of damage for a stale integer.
 
-Eighteen suites, and each pins a property rather than an implementation:
+Twenty-one suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |

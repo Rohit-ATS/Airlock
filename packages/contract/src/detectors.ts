@@ -10,6 +10,7 @@
  * from application code.
  */
 import type { HarnessEvent } from './dossier.js';
+import { readToolCalls } from './toolText.js';
 
 /**
  * TrueForge events are typed openly (`{ type: string; [k: string]: unknown }`)
@@ -170,6 +171,23 @@ export function detect(event: RawEvent, state: DetectorState): Emit[] {
       break;
     }
 
+    /*
+     * Both spellings, because the live stream and the stored events differ.
+     *
+     * A streamed `model.message` carries no `content` and no `tool_calls`; both
+     * arrive on `model.message.delta`, and only the stored events put them on
+     * the message itself. Every capability below that keys off a tool name —
+     * web search, sandbox code execution, on-demand skill loading — was
+     * therefore undetectable on a live run, which is every run anybody watches.
+     * The lamps stayed dark through runs that genuinely exercised them, which
+     * is the one failure mode this file exists to prevent.
+     *
+     * Deltas are fragments, so state has to do the accumulating: the OpenUI
+     * fence can straddle two frames, and a tool call's name arrives once while
+     * its arguments arrive over many. `readToolCalls` drops the fragments and
+     * `toolSchemasLoaded` deduplicates the rest.
+     */
+    case 'model.message.delta':
     case 'model.message': {
       const content = pick(event, 'content', 'content');
       const text = typeof content === 'string' ? content : '';
@@ -202,15 +220,16 @@ export function detect(event: RawEvent, state: DetectorState): Emit[] {
         if (inTok > state.lastTotalTokens) state.lastTotalTokens = inTok;
       }
 
-      for (const call of arr(pick(event, 'toolCalls', 'tool_calls'))) {
-        const c = obj(call);
-        const fn = obj(c.function);
-        const name = str(fn.name) ?? '';
-        const info = obj(pick(c, 'toolInfo', 'tool_info'));
-        const serverName = str(pick(info, 'serverName', 'server_name')) ?? '';
-        const infoType = str(info.type) ?? '';
+      for (const call of readToolCalls(event)) {
+        const name = call.name;
+        const serverName = call.server ?? '';
+        const infoType = call.kind ?? '';
 
-        if (name) state.toolSchemasLoaded.add(serverName ? `${serverName}.${name}` : name);
+        const qualified = serverName ? `${serverName}.${name}` : name;
+        // A delta streams one call's arguments over many frames; the same call
+        // must not be counted, or lit, more than once.
+        if (state.toolSchemasLoaded.has(qualified)) continue;
+        state.toolSchemasLoaded.add(qualified);
 
         if (serverName && SEARCH_SERVERS.test(serverName)) {
           out.push({ capability: 4, evidence: `tool call on ${serverName}`, detail: name });

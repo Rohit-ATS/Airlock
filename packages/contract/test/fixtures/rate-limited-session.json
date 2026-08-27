@@ -1,0 +1,508 @@
+{
+  "data": [
+    {
+      "turn_id": "01m0zvygx5ktxefjqyx295nwcv.hh8bck",
+      "event": {
+        "id": "01m0zvyr97a0dvvajt22wjq380",
+        "type": "turn.done",
+        "state": {
+          "output": {
+            "id": "01m0zvyn46yf8x4tbhph1spgdy",
+            "type": "model.message",
+            "usage": {
+              "input_tokens": 8104,
+              "output_tokens": 152,
+              "cache_read_tokens": 7680,
+              "cache_write_tokens": 0,
+              "input_tokens_breakdown": {
+                "skills": 0,
+                "harness": 1844,
+                "messages": 0,
+                "instructions": 1934,
+                "tool_definitions": 4401
+              }
+            },
+            "content": "A change dossier has been opened to add a nullable `tier` column to the `users` table. \n\n**Next steps:**\n- I need to resolve the live Postgres server version and the current row count of the `users` table before proceeding with verification. These facts are required to ensure the change is planned and proven against the real, current state.\n\n**Current status:**\n- The change is recorded, but the approval gate is sealed until these facts are resolved.\n- No human will be asked to approve this until the required context is complete and a certificate is produced.\n\nWould you like me to proceed by attempting to resolve the Postgres version and the row count of the `users` table, or do you have this information available?",
+            "thread_id": "main",
+            "created_at": "2026-08-26T20:25:01.983Z",
+            "finish_reason": "stop"
+          },
+          "status": "done",
+          "metrics": {
+            "total_tokens": 23827,
+            "total_input_tokens": 23365,
+            "total_output_tokens": 462,
+            "total_reasoning_tokens": 0,
+            "total_cache_read_tokens": 21504,
+            "total_cache_write_tokens": 0
+          },
+          "completed_at": "2026-08-26T20:25:01.991Z",
+          "required_actions": []
+        },
+        "thread_id": null,
+        "created_at": "2026-08-26T20:25:01.991Z"
+      }
+    },
+    {
+      "turn_id": "01m0zvygx5ktxefjqyx295nwcv.hh8bck",
+      "event": {
+        "id": "01m0zvyn46yf8x4tbhph1spgdy",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 8104,
+          "output_tokens": 152,
+          "cache_read_tokens": 7680,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "content": "A change dossier has been opened to add a nullable `tier` column to the `users` table. \n\n**Next steps:**\n- I need to resolve the live Postgres server version and the current row count of the `users` table before proceeding with verification. These facts are required to ensure the change is planned and proven against the real, current state.\n\n**Current status:**\n- The change is recorded, but the approval gate is sealed until these facts are resolved.\n- No human will be asked to approve this until the required context is complete and a certificate is produced.\n\nWould you like me to proceed by attempting to resolve the Postgres version and the row count of the `users` table, or do you have this information available?",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:25:01.983Z",
+        "finish_reason": "stop"
+      }
+    },
+    {
+      "turn_id": "01m0zvygx5ktxefjqyx295nwcv.hh8bck",
+      "event": {
+        "id": "01m0zvyn3zatjedzrghyzj039s",
+        "type": "tool.response",
+        "content": "0 of 2 resolved · 2 unresolved on dos_tier_nullable_column.\nFingerprint sha256:4f53cda18c2baa0… is pinned; it will be re-checked before anyone is asked.\n\nStill outstanding: target_table, row_count, postgres_version, users_row_count.\nResolve what you can. For anything genuinely ambiguous, ask the human WITH the\ncandidates listed — an empty question about a fact is the thing this replaces.\n\nGATE IS SEALED for dos_tier_nullable_column.\nReason: CONTEXT_UNRESOLVED\nSomething this change needs to know is still ambiguous or missing. A proof about an unidentified subject is a proof of the wrong thing, so the gate does not open until every required fact resolves to exactly one answer.\n\nDo not ask a human to approve this. Fix it, or report that it cannot be done.",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:24:58.751Z",
+        "tool_call_id": "call_dKPIFVppHTcCRa14hkNVF48g"
+      }
+    },
+    {
+      "turn_id": "01m0zvygx5ktxefjqyx295nwcv.hh8bck",
+      "event": {
+        "id": "01m0zvykb07xa0txqx6bhqxgmt",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 7809,
+          "output_tokens": 111,
+          "cache_read_tokens": 7296,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:24:58.717Z",
+        "tool_calls": [
+          {
+            "id": "call_dKPIFVppHTcCRa14hkNVF48g",
+            "type": "function",
+            "function": {
+              "name": "airlock_resolve_context",
+              "arguments": "{\"dossier_id\":\"dos_tier_nullable_column\",\"facts\":[{\"field\":\"postgres_version\",\"label\":\"Postgres Server Version\",\"status\":\"UNRESOLVED\",\"value\":\"\",\"system\":\"postgres\",\"locator\":\"server.version\",\"event_id\":\"\",\"trust\":\"SYSTEM\",\"candidates\":[]},{\"field\":\"users_row_count\",\"label\":\"Row count of users table\",\"status\":\"UNRESOLVED\",\"value\":\"\",\"system\":\"postgres\",\"locator\":\"users\",\"event_id\":\"\",\"trust\":\"SYSTEM\",\"candidates\":[]}]}"
+            },
+            "tool_info": {
+              "name": "airlock_resolve_context",
+              "type": "mcp",
+              "server_id": "airlock",
+              "server_name": "airlock"
+            }
+          }
+        ],
+        "finish_reason": "tool_calls"
+      }
+    },
+    {
+      "turn_id": "01m0zvygx5ktxefjqyx295nwcv.hh8bck",
+      "event": {
+        "id": "01m0zvykatctfbctc8294jrqsf",
+        "type": "tool.response",
+        "content": "Opened dos_tier_nullable_column (SCHEMA_MIGRATION).\n\nSCHEMA_MIGRATION — Schema migration\n  Structural change to a live database: columns, indexes, constraints, types.\n  certificate required : UNDO\n  approvers required   : 1\n  certificate valid for: 1800s after verification\n  why                  : Structural change must be proven reversible. A schema change with no proven rollback is not a migration, it is a bet. Thirty minutes to take it back, because the inverse was proven half an hour ago and the table has not moved.\n\nIt has no certificate, so the gate is sealed and no human will be asked anything.\nNext: run the verification, then call airlock_attach_certificate with the result.",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:24:56.922Z",
+        "tool_call_id": "call_ERyfzybtN37b30YvKiWAb7W0"
+      }
+    },
+    {
+      "turn_id": "01m0zvygx5ktxefjqyx295nwcv.hh8bck",
+      "event": {
+        "id": "01m0zvygypz9naqjshyn1ze2hp",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 7452,
+          "output_tokens": 199,
+          "cache_read_tokens": 6528,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:24:56.881Z",
+        "tool_calls": [
+          {
+            "id": "call_ERyfzybtN37b30YvKiWAb7W0",
+            "type": "function",
+            "function": {
+              "name": "airlock_open_change",
+              "arguments": "{\"dossier_id\":\"dos_tier_nullable_column\",\"change_class\":\"SCHEMA_MIGRATION\",\"request\":\"Add a nullable tier column to the users table.\",\"requested_by\":\"user\",\"systems\":[\"postgres\"],\"branch_ref\":\"shadow/dos_tier_nullable_column\",\"forward\":[{\"system\":\"postgres\",\"op\":\"ALTER TABLE users ADD COLUMN tier text NULL; SET lock_timeout = '5s';\",\"reversible\":true}],\"rollback\":[{\"system\":\"postgres\",\"op\":\"ALTER TABLE users DROP COLUMN tier; SET lock_timeout = '5s';\",\"reversible\":true}],\"magnitude\":{\"records\":0,\"people\":0,\"amount_minor\":0,\"currency\":\"USD\",\"undo_window_seconds\":1800},\"principals\":[],\"affected_tables\":[{\"system\":\"postgres\",\"name\":\"users\",\"rows\":0,\"operation\":\"add column\"}],\"blast_radius\":[],\"risk_notes\":[],\"questions\":[],\"recommendation\":\"APPLY\"}"
+            },
+            "tool_info": {
+              "name": "airlock_open_change",
+              "type": "mcp",
+              "server_id": "airlock",
+              "server_name": "airlock"
+            }
+          }
+        ],
+        "finish_reason": "tool_calls"
+      }
+    },
+    {
+      "turn_id": "01m0zvygx5ktxefjqyx295nwcv.hh8bck",
+      "event": {
+        "id": "01m0zvygyfm0x2amb6q73q7wr6",
+        "type": "mcp.initialize",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:24:54.480Z",
+        "mcp_servers": [
+          {
+            "id": "airlock",
+            "name": "airlock",
+            "transport_type": "streamable-http"
+          }
+        ]
+      }
+    },
+    {
+      "turn_id": "01m0zvygx5ktxefjqyx295nwcv.hh8bck",
+      "event": {
+        "id": "01m0zvygxp86d9h01kgh52b6xv",
+        "type": "turn.created",
+        "state": {
+          "status": "running"
+        },
+        "turn_id": "01m0zvygx5ktxefjqyx295nwcv.hh8bck",
+        "thread_id": null,
+        "created_at": "2026-08-26T20:24:54.447Z",
+        "previous_turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvskjr6rfebrr43g84xxrc",
+        "type": "turn.done",
+        "state": {
+          "status": "error",
+          "message": "Request failed (429): Rate limit reached for gpt-4.1 in organization org-REDACTED on tokens per min (TPM): Limit 30000, Used 26713, Requested 7669. Please try again in 8.764s. Visit https://platform.openai.com/account/rate-limits to learn more.",
+          "metrics": {
+            "total_tokens": 32138,
+            "total_input_tokens": 31835,
+            "total_output_tokens": 303,
+            "total_reasoning_tokens": 0,
+            "total_cache_read_tokens": 18816,
+            "total_cache_write_tokens": 0
+          },
+          "completed_at": "2026-08-26T20:22:13.336Z"
+        },
+        "thread_id": null,
+        "created_at": "2026-08-26T20:22:13.336Z"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvsjyra8d2q9pq5nd1tpee",
+        "type": "tool.response",
+        "content": "28 change(s):\n\ndos_race_1787762985773_4 SCHEMA_MIGRATION  APPLIED        add a nullable race_col_4 column to users\ndos_race_1787762985773_3 SCHEMA_MIGRATION  APPLIED        add a nullable race_col_3 column to users\ndos_race_1787762985773_2 SCHEMA_MIGRATION  APPLIED        add a nullable race_col_2 column to users\ndos_race_1787762985773_1 SCHEMA_MIGRATION  APPLIED        add a nullable race_col_1 column to users\ndos_race_1787762985773_0 SCHEMA_MIGRATION  APPLIED        add a nullable race_col_0 column to users\ndos_race_1787762899833_4 SCHEMA_MIGRATION  APPLIED        add a nullable race_col_4 column to users\ndos_race_1787762899833_3 SCHEMA_MIGRATION  UNDO/PROVEN    add a nullable race_col_3 column to users\ndos_race_1787762899833_2 SCHEMA_MIGRATION  UNDO/PROVEN    add a nullable race_col_2 column to users\ndos_race_1787762899833_1 SCHEMA_MIGRATION  UNDO/PROVEN    add a nullable race_col_1 column to users\ndos_race_1787762899833_0 SCHEMA_MIGRATION  APPLIED        add a nullable race_col_0 column to users\ndos_payout_context_drift MONEY_MOVEMENT    SCOPE/PROVEN   Pay out the August marketplace balance to the seller account.\ndos_access_oncall        ACCESS_GRANT      SCOPE/PROVEN   Give the on-call engineer read access to the production database for the\ndos_access_standing      ACCESS_GRANT      SCOPE/PROVEN   The analytics service account needs permanent read access to production \ndos_refund_ambiguous     MONEY_MOVEMENT    SCOPE/PROVEN   Refund the duplicate August charge to d.reyes@example.com.\ndos_tier_migration       SCHEMA_MIGRATION  APPLIED        Add a tier column to users, backfill it from subscriptions, then drop th\ndos_bio_reclassify       DATA_OPERATION    UNDO/PROVEN    Reclassify user account types from the free-text bio field so the new se\ndos_plan_name_retire     SCHEMA_MIGRATION  UNDO/PROVEN    Retire users.plan_name now that tier has been backfilled — including eve\ndos_replica_scaledown    INFRA_MUTATION    UNDO/PROVEN    Scale the read replica pool from three nodes down to one now that the mi\ndos_orders_backfill      DATA_OPERATION    UNDO/PROVEN    Backfill the new fulfilment_region column on orders from the shipping ad\ndos_incident_email       COMMS_BLAST       SCOPE/PROVEN   Email every customer who was affected by the 14 August pricing bug to te\ndos_currency_fix         DATA_OPERATION    UNDO/FAILED    Every EU invoice created before 2026-01-01 was stored in USD instead of \ndos_refund_stripe        MONEY_MOVEMENT    SCOPE/PROVEN   The 14 August pricing bug double-charged term subscribers. Refund the du\ndos_erasure_dana         ERASURE           SCOPE/PROVEN   We received a right-to-erasure request for the user with email dana.reye\ndos_bucket_delete        INFRA_MUTATION    REJECTED       Delete the airlock-uploads-legacy bucket. Nothing has read from it since\ndos_email_unique         SCHEMA_MIGRATION  APPLIED        Add a unique constraint on accounts(email) now that the duplicate cleanu\ndos_plan_column          SCHEMA_MIGRATION  APPLIED        Drop the deprecated plan_name column from users now that every service r\ndos_gdpr_batch           ERASURE           APPLIED        Process the four right-to-erasure requests that came in during the week \ndos_orders_index         SCHEMA_MIGRATION  APPLIED        Add a concurrent index on orders(customer_id, created_at) so the dashboa",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:12.696Z",
+        "tool_call_id": "call_R4StQfAm8lbNvWzaxdftGnsO"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvshtbtk90e7vb9dw4v914",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 6563,
+          "output_tokens": 18,
+          "cache_read_tokens": 6400,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:12.677Z",
+        "tool_calls": [
+          {
+            "id": "call_R4StQfAm8lbNvWzaxdftGnsO",
+            "type": "function",
+            "function": {
+              "name": "airlock_list_changes",
+              "arguments": "{\"waiting_only\":false}"
+            },
+            "tool_info": {
+              "name": "airlock_list_changes",
+              "type": "mcp",
+              "server_id": "airlock",
+              "server_name": "airlock"
+            }
+          }
+        ],
+        "finish_reason": "tool_calls"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvsht5bxe1p5x50jnwhgws",
+        "type": "tool.response",
+        "content": "{\"error\":[{\"type\":\"text\",\"text\":\"airlock_resolve_context failed: No change with id add_nullable_tier_to_users. Call airlock_list_changes to see what exists.\"}]}",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:11.525Z",
+        "tool_call_id": "call_NvLBkS0PGMehbVkqGrDrDL2h"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvsabc8h5jza9x8h1se4bj",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 6445,
+          "output_tokens": 226,
+          "cache_read_tokens": 6272,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:11.488Z",
+        "tool_calls": [
+          {
+            "id": "call_NvLBkS0PGMehbVkqGrDrDL2h",
+            "type": "function",
+            "function": {
+              "name": "airlock_resolve_context",
+              "arguments": "{\"dossier_id\":\"add_nullable_tier_to_users\",\"facts\":[{\"field\":\"postgres_version\",\"label\":\"Postgres Server Version\",\"status\":\"UNRESOLVED\",\"value\":\"\",\"system\":\"postgres\",\"locator\":\"server.version\",\"event_id\":\"\",\"trust\":\"SYSTEM\" \t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t,\"candidates\":[]}]}"
+            },
+            "tool_info": {
+              "name": "airlock_resolve_context",
+              "type": "mcp",
+              "server_id": "airlock",
+              "server_name": "airlock"
+            }
+          }
+        ],
+        "finish_reason": "tool_calls"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvsab3hbhy0y8pv00ax5sk",
+        "type": "tool.response",
+        "content": "airlock:\n  airlock_read_policy, airlock_list_changes, airlock_get_change, airlock_check_gate, airlock_open_change, airlock_verify_change, airlock_attach_certificate, airlock_report_untrusted, airlock_resolve_context, airlock_attach_code_changes, airlock_attach_code_review, airlock_request_approval",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:03.875Z",
+        "tool_call_id": "call_SSKEMiOM045pLwLWy4ciyrQC"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvs95vgepfcyvexdbfg673",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 6354,
+          "output_tokens": 18,
+          "cache_read_tokens": 6144,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:03.866Z",
+        "tool_calls": [
+          {
+            "id": "call_SSKEMiOM045pLwLWy4ciyrQC",
+            "type": "function",
+            "function": {
+              "name": "list_tools",
+              "arguments": "{\"mcp_server\":\"airlock\"}"
+            },
+            "tool_info": {
+              "name": "list_tools",
+              "type": "truefoundry-system"
+            }
+          }
+        ],
+        "finish_reason": "tool_calls"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvs95pa2jn086ggbxn8f98",
+        "type": "tool.response",
+        "content": "{\"error\":[{\"type\":\"text\",\"text\":\"{\\\"error\\\":\\\"MCP server 'deferred-tools' not found\\\"}\"}]}",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:02.678Z",
+        "tool_call_id": "call_NBCP7pkLR7YCfsSRITBZ5GHH"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvs7v0b70fsh81x2hrn1en",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 6303,
+          "output_tokens": 19,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:02.670Z",
+        "tool_calls": [
+          {
+            "id": "call_NBCP7pkLR7YCfsSRITBZ5GHH",
+            "type": "function",
+            "function": {
+              "name": "list_tools",
+              "arguments": "{\"mcp_server\":\"deferred-tools\"}"
+            },
+            "tool_info": {
+              "name": "list_tools",
+              "type": "truefoundry-system"
+            }
+          }
+        ],
+        "finish_reason": "tool_calls"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvs7tt3s4kat0x0gd9swqh",
+        "type": "tool.response",
+        "content": "SCHEMA_MIGRATION — Schema migration\n  Structural change to a live database: columns, indexes, constraints, types.\n  certificate required : UNDO\n  approvers required   : 1\n  certificate valid for: 1800s after verification\n  why                  : Structural change must be proven reversible. A schema change with no proven rollback is not a migration, it is a bet. Thirty minutes to take it back, because the inverse was proven half an hour ago and the table has not moved.",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:01.306Z",
+        "tool_call_id": "call_pCbhihmTPJwJXYocDVTgNDHJ"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvs5wvevgd813n0t8n6w1p",
+        "type": "model.message",
+        "usage": {
+          "input_tokens": 6170,
+          "output_tokens": 22,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "skills": 0,
+            "harness": 1844,
+            "messages": 0,
+            "instructions": 1934,
+            "tool_definitions": 4401
+          }
+        },
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:22:01.294Z",
+        "tool_calls": [
+          {
+            "id": "call_pCbhihmTPJwJXYocDVTgNDHJ",
+            "type": "function",
+            "function": {
+              "name": "airlock_read_policy",
+              "arguments": "{\"change_class\":\"SCHEMA_MIGRATION\"}"
+            },
+            "tool_info": {
+              "name": "airlock_read_policy",
+              "type": "mcp",
+              "server_id": "airlock",
+              "server_name": "airlock"
+            }
+          }
+        ],
+        "finish_reason": "tool_calls"
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvs5wnesr9nech341z6chq",
+        "type": "mcp.initialize",
+        "thread_id": "main",
+        "created_at": "2026-08-26T20:21:59.317Z",
+        "mcp_servers": [
+          {
+            "id": "airlock",
+            "name": "airlock",
+            "transport_type": "streamable-http"
+          }
+        ]
+      }
+    },
+    {
+      "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+      "event": {
+        "id": "01m0zvs5vw0fth35gy7excg8tn",
+        "type": "turn.created",
+        "input": [
+          {
+            "type": "user.message",
+            "content": "Open a change to add a nullable tier column to the users table."
+          }
+        ],
+        "state": {
+          "status": "running"
+        },
+        "turn_id": "01m0zvs5vgjasrfps0dh8se858.hh8bck",
+        "thread_id": null,
+        "created_at": "2026-08-26T20:21:59.284Z",
+        "previous_turn_id": null
+      }
+    }
+  ],
+  "pagination": {
+    "limit": 100
+  }
+}

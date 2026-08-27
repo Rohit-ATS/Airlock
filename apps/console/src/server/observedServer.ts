@@ -32,11 +32,33 @@ export function withHarnessObserver(base: AgentUIServer, hooks: ObserverHooks): 
         // A turn created with no input is a resume: an approval, an answer, or
         // an MCP authorization coming back.
         resumed: !req.input || req.input.length === 0,
+        prompt: userText(req.input),
       },
       hooks,
     );
 
   return { ...base, createTurn };
+}
+
+/**
+ * The operator's own words, out of a turn's input.
+ *
+ * Read defensively rather than off a typed field: the SDK's input union grows,
+ * and this is a convenience for a retry button. Getting it wrong must cost a
+ * greyed-out button, never a broken turn — so anything unrecognised yields
+ * null and the console simply does not offer the shortcut.
+ */
+function userText(input: unknown): string | null {
+  if (!Array.isArray(input)) return null;
+  const parts: string[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== 'object') continue;
+    const entry = item as { type?: unknown; content?: unknown };
+    if (entry.type !== 'user.message') continue;
+    if (typeof entry.content === 'string') parts.push(entry.content);
+  }
+  const text = parts.join('\n\n').trim();
+  return text.length > 0 ? text : null;
 }
 
 /**

@@ -1,7 +1,8 @@
-import { airlockAgentName, trueforgeBaseUrl } from '@/data/env';
+import { airlockAgentName } from '@/data/env';
 import { putDossier } from '@/data/dossierStore';
 import { deriveBrief } from '@airlock/contract';
 import { listChangedFiles, readFileAtRef } from '@/github/client';
+import { openSession, startTurn, superviseInBackground } from '@/server/harnessRuns';
 
 /**
  * Open a change for a pull request, with nobody present.
@@ -15,7 +16,6 @@ import { listChangedFiles, readFileAtRef } from '@/github/client';
  * was told; the other means it noticed.
  */
 
-const BASE_URL = trueforgeBaseUrl();
 const AGENT_NAME = airlockAgentName();
 
 export interface CertifyResult {
@@ -103,35 +103,31 @@ export async function certifyPullRequest(input: {
 }
 
 /**
- * Open a TrueForge session and start the turn, through the documented HTTP API.
+ * Open a TrueForge session, start the turn, and see it through.
  *
  * Non-streaming: the webhook answers immediately and the run continues on the
  * server, which is exactly why session durability matters. Nothing here waits
  * for the agent — if this blocked, GitHub would time out the delivery and the
  * trigger would look flaky rather than asynchronous.
+ *
+ * What *is* new is that the run is now supervised rather than abandoned. This
+ * function used to post the turn and return, and a turn that died on a provider
+ * rate limit — the normal outcome of a real change-control run against a
+ * 30k-tokens-per-minute ceiling — took the whole change with it: sealed
+ * dossier, no certificate, nobody asked, and a queue entry that looks like work
+ * in progress forever. `superviseInBackground` polls the turn and resumes it
+ * where the provider asked us to, and stops the moment the run reaches a human.
+ * See `server/harnessRuns.ts`.
  */
 export async function openHarnessSession(message: string): Promise<string | null> {
-  try {
-    const created = await fetch(new URL('/api/v1/sessions', BASE_URL), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ agent: { name: AGENT_NAME } }),
-    });
-    if (!created.ok) return null;
-    const session = (await created.json()) as { id?: string; data?: { id?: string } };
-    // The HTTP surface wraps in `data`; the SDK does not. Read both rather than
-    // betting on one, the same way the detectors do.
-    const id = session.data?.id ?? session.id;
-    if (!id) return null;
+  const sessionId = await openSession(AGENT_NAME);
+  if (!sessionId) return null;
 
-    await fetch(new URL(`/api/v1/sessions/${id}/turns`, BASE_URL), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input: [{ type: 'user.message', content: message }], stream: false }),
-    });
+  const turnId = await startTurn(sessionId, message);
+  // A session that exists is still worth recording against the dossier even if
+  // the first turn did not take — it is the handle an operator needs to go and
+  // look. But there is nothing to supervise.
+  if (turnId) superviseInBackground(sessionId, turnId);
 
-    return id;
-  } catch {
-    return null;
-  }
+  return sessionId;
 }

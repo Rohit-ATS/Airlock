@@ -11,11 +11,17 @@ import {
   DEFAULT_POLICY,
   HarnessLedger,
   assessBudget,
+  classifyFailure,
+  labelToolResponse,
+  qualifyToolCall,
+  readToolCalls,
+  readToolResponse,
   type BudgetPolicy,
   type BudgetVerdict,
   type HarnessEvent,
   type RawEvent,
   type StopCause,
+  type TurnFailure,
 } from '@airlock/contract';
 
 export interface LaneState {
@@ -34,7 +40,14 @@ export interface LaneState {
 export interface SandboxLine {
   at: string;
   text: string;
-  kind: 'tool' | 'result' | 'system';
+  /**
+   * `error` is separate from `result` because the harness does not distinguish
+   * them on the wire — a refusal arrives as an ordinary `tool.response` whose
+   * content happens to be an error envelope. Rendered in the same grey as a
+   * success, which is what used to happen, a failing run announced itself in a
+   * way nobody could see.
+   */
+  kind: 'tool' | 'result' | 'error' | 'system';
   /**
    * The TrueForge event id this line was produced from.
    *
@@ -83,6 +96,36 @@ export interface RunState {
    * nobody has raised yet.
    */
   stopCause: StopCause | null;
+  /**
+   * Why the run failed, when it did.
+   *
+   * The harness reports a dead turn as `turn.done` with `state.status: "error"`
+   * and a message naming the cause. This used to be read for the status and
+   * thrown away, which is how a run killed by a provider rate limit rendered as
+   * a red dot over an unfinished transcript with nothing on screen to say so.
+   * The message is the whole diagnosis; it is kept.
+   *
+   * Classified by the same function `/api/activity` uses, deliberately. The
+   * DOING lane shows this store's view for a turn posted from this tab and the
+   * polled feed's view for every other run — two panels a foot apart that
+   * bucketed the same provider error differently would be a defect nobody could
+   * unsee.
+   */
+  failure: TurnFailure | null;
+  /**
+   * When the harness reported the failure.
+   *
+   * Separate from the failure because `TurnFailure` is about the provider and
+   * this is about our clock. It is what the retry countdown is measured from —
+   * counting from render instead would restart the wait every time the banner
+   * re-rendered and make the operator serve the sentence twice.
+   */
+  failureAt: string | null;
+  /**
+   * What the operator asked for, so a run that died for a reason nobody chose
+   * can be offered back without retyping it.
+   */
+  prompt: string | null;
 }
 
 function emptyRun(): RunState {
@@ -105,6 +148,9 @@ function emptyRun(): RunState {
     reconnects: 0,
     aborting: false,
     stopCause: null,
+    failure: null,
+    failureAt: null,
+    prompt: null,
   };
 }
 
@@ -134,24 +180,61 @@ export class RunStore {
     for (const fn of this.listeners) fn();
   }
 
+  /**
+   * Tool call id → the name that call was made under.
+   *
+   * Outside `RunState` on purpose: it is bookkeeping for rendering, not run
+   * state, and putting it in the snapshot would make every tool call a new
+   * object identity for `useSyncExternalStore` to re-render on.
+   */
+  private toolCallNames = new Map<string, string>();
+
   reset(startedBy: RunState['startedBy'] = 'ui') {
     this.state = { ...emptyRun(), startedBy };
     // A new run gets the whole budget. The ceiling is per run, not per session.
     this.breached = false;
+    // Ids are unique per run; keeping them would only leak.
+    this.toolCallNames.clear();
     for (const fn of this.listeners) fn();
   }
 
-  noteStreamOpen(sessionId: string, resumed: boolean) {
+  noteStreamOpen(sessionId: string, resumed: boolean, prompt?: string | null) {
     this.commit({
       sessionId,
       status: 'running',
       pausedOn: null,
       reconnects: resumed ? this.state.reconnects + 1 : this.state.reconnects,
+      // A new attempt clears the last one's verdict. Leaving a stale banner up
+      // over a run that is visibly working is worse than never having shown it.
+      failure: null,
+      failureAt: null,
+      // A resume carries no request of its own, so it must not erase the one
+      // the retry button is holding on behalf of the turn that failed.
+      prompt: prompt ?? (resumed ? this.state.prompt : null),
     });
   }
 
   noteStreamClose(error?: unknown) {
-    if (error) this.commit({ status: 'error' });
+    if (!error) return;
+    /*
+     * The stream died between here and the harness.
+     *
+     * Deliberately reported as the transport failure it is, in the harness's
+     * own words, rather than promoted to a turn failure — the executor may well
+     * still be working, and a console that announces "the run failed" when what
+     * broke was this browser's connection is lying about production.
+     */
+    const message = error instanceof Error ? error.message : String(error);
+    this.commit({
+      status: 'error',
+      aborting: false,
+      failure: {
+        kind: 'UNKNOWN',
+        message: `The console lost its connection to the harness — ${message}. The run may still be going on the server.`,
+        retryAfterSeconds: null,
+      },
+      failureAt: new Date().toISOString(),
+    });
   }
 
   /** A human pressed ABORT; the harness has not confirmed yet. */
@@ -248,6 +331,8 @@ export class RunStore {
         next.turnId = str(pick(event, 'turnId', 'turn_id')) ?? null;
         next.status = 'running';
         next.pausedOn = null;
+        next.failure = null;
+        next.failureAt = null;
         break;
       }
 
@@ -299,6 +384,19 @@ export class RunStore {
         break;
       }
 
+      /*
+       * Both spellings of a model turn, because the two surfaces disagree.
+       *
+       * A streamed `model.message` carries no `tool_calls` at all — the calls
+       * arrive on `model.message.delta`, whose first frame per call holds the
+       * id, the name and the server. Only the *stored* events put them on
+       * `model.message`. This store is fed the live stream, so for as long as
+       * it watched `model.message` alone it never saw a single tool call:
+       * the sandbox log showed responses with nothing above them and every lane
+       * reported zero calls. Both are read, and `toolCallNames` deduplicates,
+       * so folding either surface — or both — gives the same log.
+       */
+      case 'model.message.delta':
       case 'model.message': {
         const usage = rec(event.usage);
         const inTok = num(pick(usage, 'inputTokens', 'input_tokens')) ?? 0;
@@ -316,19 +414,21 @@ export class RunStore {
           }
         }
 
-        const calls = arr(pick(event, 'toolCalls', 'tool_calls'));
+        // Continuation frames stream argument fragments under the same call id.
+        // Already-seen ids are dropped so one call logs one line.
+        const calls = readToolCalls(event).filter((c) => !this.toolCallNames.has(c.id));
         if (calls.length) {
           const logged: SandboxLine[] = [];
           const laneAdds: Array<{ id: string; name: string; server: string | null; at: string }> = [];
-          for (const c of calls) {
-            const call = rec(c);
-            const fn = rec(call.function);
-            const name = str(fn.name) ?? 'tool';
-            const info = rec(pick(call, 'toolInfo', 'tool_info'));
-            const server = str(pick(info, 'serverName', 'server_name')) ?? null;
-            const id = str(call.id) ?? name;
-            laneAdds.push({ id, name, server, at });
-            logged.push({ at, kind: 'tool', text: `${server ? `${server}·` : ''}${name}`, stepId });
+          for (const call of calls) {
+            laneAdds.push({ id: call.id, name: call.name, server: call.server, at });
+            // Remembered so the *response* can name the call it answers.
+            // `tool.response` carries only `tool_call_id`, so a log that does
+            // not keep this can never say more than "tool returned" — at
+            // exactly the moment an operator is trying to work out which of
+            // eight calls went wrong.
+            this.toolCallNames.set(call.id, qualifyToolCall(call));
+            logged.push({ at, kind: 'tool', text: qualifyToolCall(call), stepId });
           }
           if (threadId) {
             const base = next.lanes ?? this.state.lanes;
@@ -344,10 +444,23 @@ export class RunStore {
       case 'tool.response': {
         const content = str(event.content) ?? '';
         if (content) {
+          /*
+           * Decoded, not dumped.
+           *
+           * `content` is a string and the harness does not say which kind: a
+           * tool's own prose, an error envelope with the message nested two
+           * levels down inside a JSON string, or — when the agent is reading
+           * its own manual through `get_tool_info` — a whole tool schema. Shown
+           * raw and clipped at 220 characters, the last of those filled the log
+           * with AIRLOCK's own prompt text, which reads to anyone watching as
+           * though the run is broken.
+           */
+          const decoded = readToolResponse(content);
+          const called = str(pick(event, 'toolCallId', 'tool_call_id'));
           const line: SandboxLine = {
             at,
-            kind: 'result',
-            text: content.length > 220 ? `${content.slice(0, 220)}…` : content,
+            kind: decoded.ok ? 'result' : 'error',
+            text: labelToolResponse(decoded, called ? this.toolCallNames.get(called) : null),
             stepId,
           };
           next.sandboxLog = [...(next.sandboxLog ?? this.state.sandboxLog), line].slice(-400);
@@ -396,6 +509,22 @@ export class RunStore {
           next.aborting = false;
         } else if (status === 'error') {
           next.status = 'error';
+          /*
+           * Verbatim from the harness, classified only so the console knows
+           * whether a retry could possibly work. Never rewritten.
+           *
+           * The harness is not obliged to send a message, and a missing reason
+           * must not become a missing banner — that is the exact failure this
+           * whole path exists to remove. So an unexplained error still gets a
+           * failure, one that says plainly that no reason was given rather than
+           * inventing a plausible one.
+           */
+          next.failure = classifyFailure(str(st.message) ?? null) ?? {
+            kind: 'UNKNOWN',
+            message: 'The harness ended this turn with an error and gave no reason.',
+            retryAfterSeconds: null,
+          };
+          next.failureAt = at;
         } else {
           next.status = 'done';
           next.pausedOn = null;
