@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { summariseEvents, unwrapEvents } from '../dist/index.js';
+import { classifyFailure, isRetryable, summariseEvents, unwrapEvents } from '../dist/index.js';
 
 /**
  * The activity feed, tested against a real capture.
@@ -141,4 +141,117 @@ test('a subagent gets its own lane when one is announced', () => {
     summary.lanes.map((l) => l.thread),
     ['main', 'sub-1'],
   );
+});
+
+/**
+ * Failures, tested against the message that actually killed a run.
+ *
+ * The string below is verbatim from `state.message` on a real `turn.done` after
+ * the change-control agent hit OpenAI's per-minute token ceiling mid-turn. It is
+ * kept whole, rather than trimmed to the interesting substring, because every
+ * property asserted here — the 429, the prose retry interval, the "Request
+ * failed" prefix that a careless classifier buckets as a generic provider
+ * error — is a real feature of what providers actually send.
+ */
+const RATE_LIMIT_MESSAGE =
+  'Request failed (429): Rate limit reached for gpt-4.1 in organization org-7NwExuwokpTftGUyl90VGDSD ' +
+  'on tokens per min (TPM): Limit 30000, Used 26713, Requested 7669. Please try again in 8.764s. ' +
+  'Visit https://platform.openai.com/account/rate-limits to learn more.';
+
+test('a failed turn carries the provider’s own sentence, not just "failed"', () => {
+  const summary = summariseEvents([
+    { type: 'turn.created', id: '1', created_at: 'x' },
+    {
+      type: 'turn.done',
+      id: '2',
+      created_at: 'y',
+      state: { status: 'error', message: RATE_LIMIT_MESSAGE },
+    },
+  ]);
+
+  assert.equal(summary.status, 'error');
+  assert.equal(summary.failure.kind, 'RATE_LIMITED');
+  // Verbatim. An operator has to be able to paste this into a provider dashboard.
+  assert.equal(summary.failure.message, RATE_LIMIT_MESSAGE);
+  assert.equal(summary.failure.retryAfterSeconds, 8.764);
+
+  const last = summary.steps[summary.steps.length - 1];
+  assert.equal(last.kind, 'failed', 'a failure must not wear the same chip as a completed turn');
+  assert.equal(last.detail, RATE_LIMIT_MESSAGE);
+});
+
+test('"Request failed (429)" is a rate limit, not a generic provider error', () => {
+  // Ordering regression: a `PROVIDER` test for "request failed" placed before
+  // the rate-limit test would swallow every 429 OpenAI sends.
+  assert.equal(classifyFailure(RATE_LIMIT_MESSAGE).kind, 'RATE_LIMITED');
+});
+
+test('the retry interval is read when named, and null when it is not', () => {
+  assert.equal(classifyFailure('Rate limited. Please try again in 250ms.').retryAfterSeconds, 0.25);
+  // Null and zero are different facts. Zero would render as "retry now".
+  assert.equal(classifyFailure('Rate limit reached for gpt-4.1.').retryAfterSeconds, null);
+});
+
+test('the buckets separate what an operator waits out from what they must fix', () => {
+  assert.equal(classifyFailure('Request failed (401): Incorrect API key provided.').kind, 'MODEL_AUTH');
+  assert.equal(
+    classifyFailure("This model's maximum context length is 128000 tokens.").kind,
+    'CONTEXT_OVERFLOW',
+  );
+  assert.equal(classifyFailure('Request failed (503): upstream connect error').kind, 'PROVIDER');
+  assert.equal(classifyFailure('the wheels came off').kind, 'UNKNOWN');
+});
+
+test('a retry is offered only where sending the same request again could work', () => {
+  assert.equal(isRetryable(classifyFailure(RATE_LIMIT_MESSAGE)), true);
+  assert.equal(isRetryable(classifyFailure('Request failed (503): upstream connect error')), true);
+  // A key that is wrong stays wrong, and an error nobody described is not one
+  // to encourage anyone to repeat.
+  assert.equal(isRetryable(classifyFailure('Request failed (401): Incorrect API key provided.')), false);
+  assert.equal(isRetryable(classifyFailure('the wheels came off')), false);
+});
+
+test('a turn that did not fail carries no failure at all', () => {
+  const summary = summariseEvents([
+    { type: 'turn.created', id: '1', created_at: 'x' },
+    { type: 'turn.done', id: '2', created_at: 'y', state: { status: 'completed' } },
+  ]);
+  assert.equal(summary.status, 'done');
+  assert.equal(summary.failure, null, 'status and failure must travel together');
+});
+
+test('a session that recovered does not keep flying the failure flag', () => {
+  /*
+   * The real shape of the first session this was checked against: a turn killed
+   * by a 429, then a second turn that worked. The summary describes where the
+   * session stands now, so a populated `failure` next to `status: 'done'` would
+   * paint a red banner over a run that had already recovered.
+   */
+  const summary = summariseEvents([
+    { type: 'turn.created', id: '1', created_at: 'a' },
+    { type: 'turn.done', id: '2', created_at: 'b', state: { status: 'error', message: RATE_LIMIT_MESSAGE } },
+    { type: 'turn.created', id: '3', created_at: 'c' },
+    { type: 'turn.done', id: '4', created_at: 'd', state: { status: 'completed' } },
+  ]);
+
+  assert.equal(summary.status, 'done');
+  assert.equal(summary.failure, null, 'the later success supersedes the earlier failure');
+  // The failed turn is still in the feed. It did happen, and that is history.
+  assert.ok(
+    summary.steps.some((s) => s.kind === 'failed' && s.detail === RATE_LIMIT_MESSAGE),
+    'the failed turn keeps its own row',
+  );
+});
+
+test('a failure the harness declined to explain still reports as failed', () => {
+  // The harness is not obliged to send a message, and a missing reason must not
+  // become a missing failure.
+  const summary = summariseEvents([
+    { type: 'turn.created', id: '1', created_at: 'x' },
+    { type: 'turn.done', id: '2', created_at: 'y', state: { status: 'error' } },
+  ]);
+  assert.equal(summary.status, 'error');
+  assert.equal(summary.failure, null);
+  assert.equal(summary.steps[summary.steps.length - 1].label, 'turn failed');
+  assert.equal(classifyFailure(null), null);
 });

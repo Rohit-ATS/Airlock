@@ -9,8 +9,8 @@ import {
   ThreadListContainer,
   ToasterProvider,
 } from '@truefoundry/trueforge-ui';
-import type { ApprovalGrant, Dossier, Viewer } from '@airlock/contract';
-import { CAPABILITY_TOTAL, formatUsd } from '@airlock/contract';
+import type { ApprovalGrant, Dossier, TurnFailure, Viewer } from '@airlock/contract';
+import { CAPABILITY_TOTAL, describeFailure, formatUsd, isRetryable } from '@airlock/contract';
 import { Chip, Dot, Empty, Evidence, Legend, cx } from '@/design/primitives';
 import { HarnessCounter, HarnessPanel } from '@/harness/HarnessPanel';
 import { useRun, useRunControls, useRunStore } from '@/harness/HarnessProvider';
@@ -86,14 +86,180 @@ function StatusReadout() {
 
   // A cancelled run says *why*. "Cancelled" alone leaves an operator wondering
   // whether a colleague stopped it or a ceiling did, and those want different
-  // responses.
+  // responses. A failed run says the same, for the same reason: "error" on its
+  // own sends people to the container logs to find out what the console was
+  // already holding.
   const label =
-    run.status === 'cancelled' && run.stopCause === 'budget' ? 'stopped — over budget' : s.label;
+    run.status === 'cancelled' && run.stopCause === 'budget'
+      ? 'stopped — over budget'
+      : run.status === 'error' && run.failure
+        ? SHORT_FAILURE[run.failure.kind]
+        : s.label;
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5" title={run.failure?.message ?? undefined}>
       <Dot tone={s.tone} pulse={run.status === 'running' || run.status === 'paused'} />
       <span className="text-[11px] text-ink-2">{label}</span>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* The failure banner                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Put the composer back the way it was, with `prompt` in it.
+ *
+ * The turn has to go through the harness rather than around it, so the console
+ * never posts one itself — it hands the text to the composer the SDK owns and
+ * lets the operator press send. Used by both the example cards and the retry
+ * button, because they want exactly the same thing.
+ */
+function fillComposer(prompt: string) {
+  const el = document.querySelector<HTMLTextAreaElement>('[data-airlock-composer] textarea');
+  if (!el) return;
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+  setter?.call(el, prompt);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.focus();
+}
+
+/**
+ * The topbar has room for two words, and `describeFailure` writes a sentence.
+ *
+ * Keyed off the same `FailureKind` so the chip and the banner can never
+ * disagree about what happened — only about how much room they have to say it.
+ */
+const SHORT_FAILURE: Record<TurnFailure['kind'], string> = {
+  RATE_LIMITED: 'error — throttled',
+  MODEL_AUTH: 'error — model key',
+  CONTEXT_OVERFLOW: 'error — context full',
+  PROVIDER: 'error — provider',
+  UNKNOWN: 'error',
+};
+
+/**
+ * The countdown a provider asked for.
+ *
+ * A 429 that names a wait is naming the condition under which a retry will
+ * work, so the button is held closed until it passes. Letting somebody press
+ * retry into a live rate limit produces a second identical failure and teaches
+ * them the button is broken.
+ */
+function useRetryCountdown(failure: TurnFailure | null, since: string | null): number {
+  const [left, setLeft] = useState(0);
+  const wait = failure?.retryAfterSeconds ?? null;
+
+  useEffect(() => {
+    if (!wait || !since) {
+      setLeft(0);
+      return;
+    }
+    // Counted from when the harness reported it, not from when this component
+    // mounted — a banner re-rendered five seconds later must not restart the
+    // clock and make the operator wait twice.
+    const ready = new Date(since).getTime() + wait * 1000;
+    const tick = () => setLeft(Math.max(0, Math.ceil((ready - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [since, wait]);
+
+  return left;
+}
+
+/**
+ * What the harness said, and what to do about it.
+ *
+ * This is the screen the console was missing. A turn killed by a provider rate
+ * limit arrives as `turn.done` carrying the provider's own sentence; before
+ * this the console read the status, dropped the sentence, and left a red dot
+ * above a transcript that simply stopped mid-run. An operator's only remaining
+ * move was to guess, or to read the harness container's logs.
+ *
+ * The provider's words are shown verbatim under our one line about what to do.
+ * They are the string that can be pasted into a dashboard or a ticket, and a
+ * console that paraphrases them is a console that has to be worked around.
+ */
+function RunFailureBanner({
+  failure,
+  at,
+  onRetry,
+  onDismiss,
+}: {
+  failure: TurnFailure;
+  /** When the harness reported it — the origin of the retry countdown. */
+  at: string | null;
+  onRetry: (() => void) | null;
+  onDismiss: () => void;
+}) {
+  const waitLeft = useRetryCountdown(failure, at);
+  const held = waitLeft > 0;
+
+  return (
+    <div
+      role="alert"
+      data-airlock-failure={failure.kind}
+      className="flex shrink-0 items-start gap-2.5 border-b border-fault/30 bg-fault-bg px-3 py-2.5"
+    >
+      <span className="pt-[3px]">
+        <Dot tone="fault" />
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-[11.5px] leading-relaxed font-medium text-fault">
+          {describeFailure(failure)}
+        </p>
+        {/*
+         * `break-words` and not `truncate`: a provider message names the
+         * organisation, the limit and the overage, and the numbers are the
+         * useful part. Clipping them to one line saves nothing worth saving.
+         */}
+        <Evidence size="xs" className="mt-1 block break-words text-ink-3">
+          {failure.message}
+        </Evidence>
+        {/*
+         * The sentence that stops an operator escalating a throttle.
+         *
+         * A red banner over a change-control console reads as "the change went
+         * wrong" unless it says otherwise, and here nothing about the change
+         * went wrong at all — the model provider ran out of tokens per minute.
+         * The gate never opened, so there is nothing to unwind.
+         */}
+        {failure.kind !== 'UNKNOWN' ? (
+          <p className="mt-1 text-[10.5px] leading-relaxed text-ink-4">
+            Nothing reached production and no approval was affected — the run stopped before the gate.
+          </p>
+        ) : null}
+      </div>
+
+      {onRetry ? (
+        <button
+          onClick={onRetry}
+          disabled={held}
+          title={
+            held
+              ? `The provider asked for ${failure.retryAfterSeconds}s. Retrying sooner produces the same failure.`
+              : 'Put the request back in the composer so you can send it again.'
+          }
+          className={cx(
+            'mt-[1px] shrink-0 rounded-[4px] border px-2 py-1 text-[10.5px] font-semibold tracking-[0.08em] transition-colors',
+            held
+              ? 'cursor-not-allowed border-hairline-2 bg-raised-2 text-ink-4'
+              : 'border-fault/45 bg-raised text-fault hover:brightness-125',
+          )}
+        >
+          {held ? `RETRY IN ${waitLeft}s` : 'RETRY'}
+        </button>
+      ) : null}
+
+      <button
+        onClick={onDismiss}
+        className="mt-[3px] shrink-0 text-[10.5px] text-ink-3 hover:text-ink-2"
+      >
+        dismiss
+      </button>
     </div>
   );
 }
@@ -353,6 +519,14 @@ function ConsoleBody({ className }: { className?: string }) {
   const [breakGlassEnabled, setBreakGlassEnabled] = useState(false);
   /** Transient feedback from the last decision, e.g. "one of two signatures". */
   const [notice, setNotice] = useState<{ tone: 'seal' | 'fault' | 'ice'; text: string } | null>(null);
+  /**
+   * The failure the operator has already read and closed, keyed by its
+   * timestamp. Keyed rather than boolean so a *second* failure re-opens the
+   * banner instead of inheriting the first one's dismissal — two rate limits in
+   * a row are two facts, and the second one silently hidden is the bug this
+   * whole banner exists to fix.
+   */
+  const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
 
   /* --- who is looking: capability 21, proven by a real call --------------- */
   useEffect(() => {
@@ -549,14 +723,25 @@ function ConsoleBody({ className }: { className?: string }) {
     setStarted(true);
     // Hand the prompt to the composer the SDK owns, rather than posting a turn
     // ourselves — the run must go through the harness, not around it.
-    const el = document.querySelector<HTMLTextAreaElement>('[data-airlock-composer] textarea');
-    if (el) {
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      setter?.call(el, prompt);
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.focus();
-    }
+    fillComposer(prompt);
   }, []);
+
+  /**
+   * Offer the failed request back.
+   *
+   * Only for failures a retry could actually survive, and only when the console
+   * still holds the words the operator used. Everything else gets the banner
+   * without a button, which is the honest shape: there is something to read and
+   * nothing to press.
+   */
+  const onRetry = useMemo(() => {
+    if (!run.failure || !isRetryable(run.failure) || !run.prompt) return null;
+    const prompt = run.prompt;
+    return () => {
+      setStarted(true);
+      fillComposer(prompt);
+    };
+  }, [run.failure, run.prompt]);
 
   const waitingCount = dossiers.filter((d) => d.approval.decision === null && d.audit.applied_at === null).length;
   const didCount = dossiers.length - waitingCount;
@@ -597,6 +782,15 @@ function ConsoleBody({ className }: { className?: string }) {
   return (
     <div className={cx('flex h-full min-h-0 flex-col bg-void', className)}>
       <Topbar viewer={viewer} onToggleHarness={() => setDrawerOpen((v) => !v)} />
+
+      {run.failure && run.failureAt !== dismissedFailure ? (
+        <RunFailureBanner
+          failure={run.failure}
+          at={run.failureAt}
+          onRetry={onRetry}
+          onDismiss={() => setDismissedFailure(run.failureAt)}
+        />
+      ) : null}
 
       {notice ? (
         <div

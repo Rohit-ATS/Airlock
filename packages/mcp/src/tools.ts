@@ -86,6 +86,21 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (text ? JSON.parse(text) : {}) as T;
 }
 
+/**
+ * How many changes `airlock_list_changes` will render at once.
+ *
+ * Chosen against what the tool is for rather than against a token count: the
+ * agent calls it to check whether the change it is about to open already
+ * exists, and to find the one it is working on. Both are recent-work questions.
+ * Twenty-five rows is comfortably more than a working day's ledger and about
+ * two thousand characters — small enough to be re-sent as context on every
+ * subsequent iteration of the turn without eating the model's per-minute
+ * ceiling, which is what an unbounded list does once a deployment has been
+ * running for a while.
+ */
+const LIST_CHANGES_LIMIT = 25;
+
+/** Newest first — the console sorts by `created_at` descending. */
 async function listChanges(): Promise<Dossier[]> {
   const body = await api<{ dossiers: Dossier[] }>('/api/dossiers');
   return body.dossiers;
@@ -408,7 +423,30 @@ export function airlockTools(): ToolDefinition[] {
           ? all.filter((d) => d.approval.decision === null && d.audit.applied_at === null)
           : all;
         if (rows.length === 0) return 'No changes.';
-        return [`${rows.length} change(s):`, '', ...rows.map(renderSummary)].join('\n');
+
+        /*
+         * Bounded, because a ledger only grows.
+         *
+         * This used to render every change it had. That is fine on a fresh
+         * checkout and a slow poison on a real one: the response is re-sent as
+         * context on every subsequent model call in the turn, so an agent that
+         * asks "does this change already exist?" against a few hundred historical
+         * dossiers pays for the whole ledger on every iteration afterwards. On a
+         * tokens-per-minute ceiling that is not a cost, it is a rate limit — the
+         * turn dies with the dossier still sealed, which is exactly the failure
+         * the console now has to explain.
+         *
+         * Newest first, since the question this tool answers is almost always
+         * about recent work, and the count is stated so a truncated list can
+         * never be mistaken for the whole ledger.
+         */
+        const shown = rows.slice(0, LIST_CHANGES_LIMIT);
+        const head =
+          shown.length < rows.length
+            ? `${rows.length} change(s); showing the ${shown.length} most recent. ` +
+              'Call airlock_get_change with an id for detail, or waiting_only to narrow this.'
+            : `${rows.length} change(s):`;
+        return [head, '', ...shown.map(renderSummary)].join('\n');
       },
     },
 

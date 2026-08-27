@@ -358,8 +358,8 @@ run-level events.
 | --- | --- |
 | `turn.created` | First event, always. Carries `turn_id`, `previous_turn_id`, `input` |
 | `turn.done` | Last event, always. `state.status` = `done` \| `cancelled` \| `error` |
-| `model.message` | `content`, `tool_calls`, `finish_reason`, `usage` |
-| `model.message.delta` | Increment, not running total. Shares the base event's `id`. Live stream only |
+| `model.message` | **Stored events only:** `content`, `tool_calls`, `finish_reason`, `usage`. On the live stream it is a bare marker — see below |
+| `model.message.delta` | Increment, not running total. Shares the base event's `id`. Live stream only. **This is where a live tool call is** |
 | `tool.response` | `tool_call_id`, `content` (a string — structured results are serialized) |
 | `tool.approval_required` | `tool_calls: [{ id, source_event_id }]`. **Turn ends here** |
 | `tool.response_required` | Same shape. Client-side tool, e.g. `ask_user_question` |
@@ -368,6 +368,59 @@ run-level events.
 | `sandbox.created` | `sandbox_id`. Emitted **once per session** — later turns reuse it |
 | `thread.created` | `title`, `agent_info: { type, name, input, model? }`, `parent` |
 | `thread.done` | `state`. Does **not** close the turn stream |
+
+### The live stream and the stored events are not the same events
+
+The single most expensive difference in this API, because nothing about it
+errors — the branch simply never runs.
+
+`GET /sessions/{id}/events` returns `model.message` with `content` and
+`tool_calls` on it. **The live turn stream does not.** A streamed
+`model.message` carries four keys and nothing else:
+
+```json
+{ "type": "model.message", "id": "01m…", "thread_id": "main", "created_at": "…" }
+```
+
+Both the text and the tool calls arrive on `model.message.delta`. For a tool
+call, the **first** delta carries the whole identity and the rest carry
+argument fragments:
+
+```json
+{"type":"model.message.delta","tool_calls":[{"index":0,"id":"call_OL2…","type":"function",
+  "function":{"name":"airlock_check_gate","arguments":""},
+  "tool_info":{"type":"mcp","name":"airlock_check_gate","server_id":"airlock","server_name":"airlock"}}]}
+{"type":"model.message.delta","tool_calls":[{"index":0,"function":{"arguments":"{\""}}]}
+```
+
+A frame with no `id` and no `function.name` is a fragment, not a call. Reading
+one as a call puts a phantom tool in the log; ignoring deltas entirely means
+seeing no tools at all.
+
+AIRLOCK was built against the stored shape, because that is what the fixtures
+were captured from, and so on every live run: the sandbox log showed tool
+*responses* with no calls above them, lane tool counts stayed at zero, and every
+capability lamp keyed to a tool name stayed dark through runs that genuinely
+exercised it. `readToolCalls` in `packages/contract/src/toolText.ts` reads both
+shapes and drops the fragments; `packages/contract/test/liveStream.test.mjs`
+pins it against a real capture of both.
+
+**A rate limit is a turn state, not an exception.** The harness does not retry.
+A 429 from the model provider arrives as `turn.done` with
+`state.status: "error"` and the provider's sentence in `state.message`,
+including the interval it wants:
+
+```
+Request failed (429): Rate limit reached for gpt-4.1 … on tokens per min (TPM):
+Limit 30000, Used 26713, Requested 7669. Please try again in 8.764s.
+```
+
+One iteration of the change-control agent costs about 8.1k input tokens
+(`state.metrics` breaks it down: 4.4k tool definitions, 1.9k instructions, 1.8k
+harness), so against a 30k-per-minute ceiling a real run is throttled several
+times. Resume by creating a turn with **empty input** — turns chain
+automatically, so no history is resent, and the run continues from where it
+stopped. See `packages/contract/src/resume.ts`.
 
 **Wire format gotcha:** the HTTP/JSON surface is `snake_case`; the TypeScript SDK
 camelCases the same fields (`turnId`, `sourceEventId`, `mcpServers`). AIRLOCK's detectors

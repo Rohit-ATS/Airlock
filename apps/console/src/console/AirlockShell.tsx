@@ -123,8 +123,8 @@ export function AirlockShell({
         agentName,
         hooks: {
           onEvent: (event) => store.ingest(event),
-          onStreamOpen: ({ sessionId, resumed }) => {
-            store.noteStreamOpen(sessionId, resumed);
+          onStreamOpen: ({ sessionId, resumed, prompt }) => {
+            store.noteStreamOpen(sessionId, resumed, prompt);
             if (resumed) {
               // A stream that reattaches and keeps its history is exactly what
               // session durability and replica failover look like from here.

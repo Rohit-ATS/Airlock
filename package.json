@@ -46,7 +46,7 @@
     "benchmark": "node benchmark/run.mjs",
     "verify:claims": "node scripts/verify-claims.mjs",
     "gen:claims": "node scripts/verify-claims.mjs --emit",
-    "harness:turn": "node scripts/harness-turn.mjs",
+    "harness:turn": "npm run build --workspace @airlock/contract && node scripts/harness-turn.mjs",
     "harness:sandbox": "node scripts/harness-sandbox.mjs",
     "check:assets": "node scripts/check-assets.mjs",
     "demo:refresh": "node scripts/demo-refresh.mjs",

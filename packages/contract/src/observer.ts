@@ -41,6 +41,15 @@ export interface StreamMeta {
    * durability and replica failover care about.
    */
   resumed: boolean;
+  /**
+   * The plain text the operator asked for, when this turn started from one.
+   *
+   * Carried so a run that dies for a reason nobody chose — a provider rate
+   * limit, an overloaded upstream — can be offered back for another go without
+   * the operator having to retype it from the transcript. Null on a resume,
+   * which by definition has no new request of its own.
+   */
+  prompt?: string | null;
 }
 
 export interface ObserverHooks {

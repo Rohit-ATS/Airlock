@@ -1,0 +1,571 @@
+[
+  {
+    "type": "turn.created",
+    "id": "01m1001k91szf4989zh796hw9d",
+    "turn_id": "01m1001k8rj296aze64x0jewyh.hh8bck",
+    "previous_turn_id": null,
+    "input": [
+      {
+        "type": "user.message",
+        "content": "Call airlock_check_gate on dossier dos_nonexistent. Nothing else."
+      }
+    ],
+    "state": {
+      "status": "running"
+    },
+    "created_at": "2026-08-26T21:36:29.467Z",
+    "thread_id": null
+  },
+  {
+    "type": "mcp.initialize",
+    "id": "01m1001k9k37x9648cqs1ecg7r",
+    "created_at": "2026-08-26T21:36:29.491Z",
+    "thread_id": "main",
+    "mcp_servers": [
+      {
+        "name": "airlock",
+        "id": "airlock",
+        "transport_type": "streamable-http"
+      }
+    ]
+  },
+  {
+    "type": "model.message",
+    "thread_id": "main",
+    "created_at": "2026-08-26T21:36:29.496Z",
+    "id": "01m1001k9rfyd5wzs2718efgrb"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "id": "call_OL2OSmQobzViEqzNlmZiePfe",
+        "type": "function",
+        "function": {
+          "name": "airlock_check_gate",
+          "arguments": ""
+        },
+        "tool_info": {
+          "type": "mcp",
+          "name": "airlock_check_gate",
+          "server_id": "airlock",
+          "server_name": "airlock"
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main",
+    "created_at": "2026-08-26T21:36:30.789Z"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "function": {
+          "arguments": "{\""
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "function": {
+          "arguments": "d"
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "function": {
+          "arguments": "ossier"
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "function": {
+          "arguments": "_id"
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "function": {
+          "arguments": "\":\""
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "function": {
+          "arguments": "dos"
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "function": {
+          "arguments": "_non"
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "function": {
+          "arguments": "existent"
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main"
+  },
+  {
+    "tool_calls": [
+      {
+        "index": 0,
+        "function": {
+          "arguments": "\"}"
+        }
+      }
+    ],
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main"
+  },
+  {
+    "type": "model.message.delta",
+    "id": "01m1001k9rfyd5wzs2718efgrb",
+    "thread_id": "main",
+    "finish_reason": "tool_calls",
+    "usage": {
+      "input_tokens": 6302,
+      "output_tokens": 21,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "input_tokens_breakdown": {
+        "harness": 1844,
+        "skills": 0,
+        "instructions": 2088,
+        "tool_definitions": 4401,
+        "messages": 0
+      }
+    }
+  },
+  {
+    "tool_call_id": "call_OL2OSmQobzViEqzNlmZiePfe",
+    "content": "{\"error\":[{\"type\":\"text\",\"text\":\"airlock_check_gate failed: No change with id dos_nonexistent. Call airlock_list_changes to see what exists.\"}]}",
+    "type": "tool.response",
+    "id": "01m1001mvqpxvhgzewa7hd2xsp",
+    "created_at": "2026-08-26T21:36:31.095Z",
+    "thread_id": "main"
+  },
+  {
+    "type": "model.message",
+    "thread_id": "main",
+    "created_at": "2026-08-26T21:36:31.102Z",
+    "id": "01m1001mvy5jbg67bejbmq75k7"
+  },
+  {
+    "content": "The",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main",
+    "created_at": "2026-08-26T21:36:32.143Z"
+  },
+  {
+    "content": " operation",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " failed",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": ":",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " there",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " is",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " no",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " change",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " with",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " the",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " ID",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " dos",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": "_non",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": "existent",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": ".",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " If",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " you",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " want",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " to",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " check",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " the",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " status",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " of",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " an",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " existing",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " change",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": ",",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " please",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " provide",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " a",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " valid",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " dossier",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " ID",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": ".",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " If",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " you",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " need",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " to",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " see",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " which",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " changes",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " exist",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": ",",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " you",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " can",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " list",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " all",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " current",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": " changes",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "content": ".",
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main"
+  },
+  {
+    "type": "model.message.delta",
+    "id": "01m1001mvy5jbg67bejbmq75k7",
+    "thread_id": "main",
+    "finish_reason": "stop",
+    "usage": {
+      "input_tokens": 6366,
+      "output_tokens": 52,
+      "cache_read_tokens": 5888,
+      "cache_write_tokens": 0,
+      "input_tokens_breakdown": {
+        "harness": 1844,
+        "skills": 0,
+        "instructions": 2088,
+        "tool_definitions": 4401,
+        "messages": 0
+      }
+    }
+  },
+  {
+    "type": "turn.done",
+    "id": "01m1001pf33pdnx54678s0zmg2",
+    "created_at": "2026-08-26T21:36:32.739Z",
+    "state": {
+      "status": "done",
+      "output": {
+        "content": "The operation failed: there is no change with the ID dos_nonexistent. If you want to check the status of an existing change, please provide a valid dossier ID. If you need to see which changes exist, you can list all current changes.",
+        "type": "model.message",
+        "id": "01m1001mvy5jbg67bejbmq75k7",
+        "created_at": "2026-08-26T21:36:32.732Z",
+        "thread_id": "main",
+        "finish_reason": "stop",
+        "usage": {
+          "input_tokens": 6366,
+          "output_tokens": 52,
+          "cache_read_tokens": 5888,
+          "cache_write_tokens": 0,
+          "input_tokens_breakdown": {
+            "harness": 1844,
+            "skills": 0,
+            "instructions": 2088,
+            "tool_definitions": 4401,
+            "messages": 0
+          }
+        }
+      },
+      "required_actions": [],
+      "completed_at": "2026-08-26T21:36:32.739Z",
+      "metrics": {
+        "total_input_tokens": 12668,
+        "total_output_tokens": 73,
+        "total_tokens": 12741,
+        "total_cache_read_tokens": 5888,
+        "total_cache_write_tokens": 0,
+        "total_reasoning_tokens": 0
+      }
+    },
+    "thread_id": null
+  }
+]

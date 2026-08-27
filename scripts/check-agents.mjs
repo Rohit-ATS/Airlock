@@ -176,6 +176,36 @@ for (const file of files) {
           'people to click through, and holding fewer opens a second path to production.',
       );
     }
+
+    /*
+     * The gate's own tools must arrive with the conversation, not be discovered.
+     *
+     * Deferred loading is the right default for a connector the agent might
+     * never touch — that is why every production connector here sets
+     * `preload: false`, and the comment on `stripe` says so. It is the wrong
+     * default for airlock, and the difference is not stylistic.
+     *
+     * With `preload: false` the harness hands the model `list_tools` and
+     * `get_tool_info` instead of the tools, and the model has to go and read
+     * its own manual one tool at a time before it can do anything at all. An
+     * observed run spent eleven consecutive iterations doing exactly that:
+     * list, then get_tool_info twelve times, one of them twice — and never
+     * opened a change. Each of those iterations re-sends the whole context, so
+     * against a tokens-per-minute ceiling the run exhausts its budget on
+     * discovery and dies of a rate limit before it reaches the gate.
+     *
+     * So this is asserted, not left to whoever edits the JSON next: the twelve
+     * tools that constitute AIRLOCK's entire surface are cheap to carry and are
+     * the whole reason the agent exists.
+     */
+    if (airlock.preload !== true) {
+      note(
+        file,
+        'mounts the airlock server with preload off, so the agent must discover the gate tools with ' +
+          'list_tools/get_tool_info before it can use them. That costs a round trip per tool and burns the ' +
+          'token budget on reading its own manual. Set "preload": true.',
+      );
+    }
   } else if (writeSelectors.length > 0) {
     note(
       file,
