@@ -503,7 +503,9 @@ if (!passed) {
 }
 
 counts.push({ what: 'tests', actual: Number(passed[1]), pattern: /(\d+) tests, \d+ fixtures/ });
-counts.push({ what: 'test suites', actual: testFiles.length, pattern: /^(\w+) suites, and each pins/m, words: true });
+// `[\w-]+` rather than `\w+`: "Twenty-one" is one word to a reader and two to
+// a regex that does not allow the hyphen.
+counts.push({ what: 'test suites', actual: testFiles.length, pattern: /^([\w-]+) suites, and each pins/m, words: true });
 counts.push({
   what: 'fixtures',
   actual: fs.readdirSync(path.join(root, 'contracts/examples')).filter((f) => f.endsWith('.json')).length,
@@ -526,8 +528,16 @@ counts.push({
   pattern: /badge\/README%20claims-(\d+)%20anchored/,
 });
 
+// Through forty, and hyphenated above twenty, because the suite count crossed
+// twenty and the check failed with "could not find where the README states its
+// test suites count" — which reads like the sentence had been deleted rather
+// than like the table had run out. A counter that cannot count past its own
+// examples is a counter that stops being run.
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
-  'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+  'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty',
+  'twenty-one', 'twenty-two', 'twenty-three', 'twenty-four', 'twenty-five', 'twenty-six', 'twenty-seven',
+  'twenty-eight', 'twenty-nine', 'thirty', 'thirty-one', 'thirty-two', 'thirty-three', 'thirty-four',
+  'thirty-five', 'thirty-six', 'thirty-seven', 'thirty-eight', 'thirty-nine', 'forty'];
 
 const wrong = [];
 for (const c of counts) {
