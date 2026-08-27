@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   openGate,
   parseDossier,
@@ -357,20 +357,42 @@ function SealedDoor({ decision }: { decision: Extract<GateDecision, { state: 'SE
 
 export function GateDemo() {
   const [k, setK] = useState<Knobs>(INITIAL);
-  const set = <K extends keyof Knobs>(key: K, value: Knobs[K]) => setK((prev) => ({ ...prev, [key]: value }));
+
+  /*
+   * How many distinct combinations the reader has tried, and how many opened.
+   *
+   * Counted in the handler that changes a knob, not accumulated into a ref
+   * while rendering. Mutating a ref during render — and then reading `.size`
+   * back out of it in the same pass — is impure: React is free to render this
+   * component twice for one interaction, or to abandon a render half-way, and
+   * either would quietly inflate a counter the page presents as a fact. The
+   * gate is re-opened for the *next* knobs to decide which set to add to,
+   * which costs one pure `openGate` call per click.
+   */
+  const [tried, setTried] = useState<ReadonlySet<string>>(() => new Set([JSON.stringify(INITIAL)]));
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() =>
+    openGate(build(INITIAL), VIEWERS[INITIAL.who], { now: NOW }).state === 'OPEN'
+      ? new Set([JSON.stringify(INITIAL)])
+      : new Set(),
+  );
+
+  const set = <K extends keyof Knobs>(key: K, value: Knobs[K]) => {
+    const next = { ...k, [key]: value };
+    const nextKey = JSON.stringify(next);
+    setK(next);
+    // A set that already holds the key is returned unchanged, so re-treading
+    // combinations does not re-render the page.
+    setTried((s) => (s.has(nextKey) ? s : new Set(s).add(nextKey)));
+    if (openGate(build(next), VIEWERS[next.who], { now: NOW }).state === 'OPEN') {
+      setOpened((s) => (s.has(nextKey) ? s : new Set(s).add(nextKey)));
+    }
+  };
 
   const dossier = useMemo(() => build(k), [k]);
   const viewer = VIEWERS[k.who];
   const decision = useMemo(() => openGate(dossier, viewer, { now: NOW }), [dossier, viewer]);
   const verdict = verdictOf(dossier, decision);
   const policy = decision.policy;
-
-  // How many distinct combinations the reader has tried, and how many opened.
-  const seen = useRef(new Set<string>());
-  const opened = useRef(new Set<string>());
-  const key = JSON.stringify(k);
-  seen.current.add(key);
-  if (decision.state === 'OPEN') opened.current.add(key);
 
   const wantsUndo = k.cls === 'SCHEMA_MIGRATION';
 
@@ -381,7 +403,7 @@ export function GateDemo() {
         <div className="mb-4 flex items-baseline justify-between gap-3">
           <span className="legend">Try to open it</span>
           <span className="evidence text-[10px] text-ink-4">
-            {seen.current.size} tried · {opened.current.size} opened
+            {tried.size} tried · {opened.size} opened
           </span>
         </div>
 

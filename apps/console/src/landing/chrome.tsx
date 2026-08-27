@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { cx } from '@/design/primitives';
 import { Mark } from '@/console/Mark';
@@ -33,11 +33,17 @@ export function Reveal({
   delay?: number;
   className?: string;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
 
-  useEffect(() => {
-    const el = ref.current;
+  /**
+   * Observe on attach, not from an effect.
+   *
+   * Setting "shown" synchronously inside an effect costs a render whose only
+   * job is to undo what the previous one decided. A ref callback runs in the
+   * commit phase and can return its own cleanup in React 19, so the observer is
+   * created, revealed from and torn down in one function.
+   */
+  const observe = useCallback((el: HTMLDivElement | null) => {
     if (!el) return;
     // Without IntersectionObserver — or before hydration on a slow device —
     // content must still be readable, so the fallback is "shown".
@@ -62,7 +68,7 @@ export function Reveal({
 
   return (
     <div
-      ref={ref}
+      ref={observe}
       className={cx('reveal', className)}
       data-shown={shown ? 'true' : 'false'}
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}

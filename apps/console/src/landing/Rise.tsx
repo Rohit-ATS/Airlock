@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { cx } from '@/design/primitives';
 
@@ -19,11 +19,20 @@ import { cx } from '@/design/primitives';
 /* -------------------------------------------------------------------------- */
 
 export function Reveal({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
 
-  useEffect(() => {
-    const el = ref.current;
+  /**
+   * Observe on attach, not from an effect.
+   *
+   * The fallback for a browser with no IntersectionObserver has to make the
+   * content visible, and doing that with a synchronous `setShown(true)` inside
+   * an effect is a render whose only purpose is to undo the decision the
+   * previous render just made. A ref callback runs in the commit phase and can
+   * return its own cleanup in React 19, so the observer's whole lifetime — set
+   * up, one-way reveal, teardown — lives in a single function, and the element
+   * is never left hidden by an effect that has not run yet.
+   */
+  const observe = useCallback((el: HTMLDivElement | null) => {
     if (!el) return;
     if (typeof IntersectionObserver === 'undefined') {
       setShown(true);
@@ -46,7 +55,7 @@ export function Reveal({ children, delay = 0, className }: { children: ReactNode
 
   return (
     <div
-      ref={ref}
+      ref={observe}
       className={cx('lp-reveal', className)}
       data-shown={shown ? 'true' : 'false'}
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   GENESIS_HASH,
   parseDossier,
@@ -124,14 +124,25 @@ export function LedgerDemo() {
     }));
   }, [receipts, tampered]);
 
-  const reverify = useCallback(async () => {
-    if (ledger.length === 0) return;
-    setVerdict(await verifyChain(ledger));
-  }, [ledger]);
-
+  /*
+   * Re-verify whenever the chain changes, and ignore a verdict that arrives
+   * after it has changed again.
+   *
+   * The `live` flag is not ceremony: tampering with a record swaps the ledger
+   * while a previous verification is still awaiting, and without the guard the
+   * older result can land last and paint the chain green over a broken link —
+   * which is precisely the thing this demo exists to show cannot happen.
+   */
   useEffect(() => {
-    void reverify();
-  }, [reverify]);
+    if (ledger.length === 0) return;
+    let live = true;
+    void verifyChain(ledger).then((result) => {
+      if (live) setVerdict(result);
+    });
+    return () => {
+      live = false;
+    };
+  }, [ledger]);
 
   const broken = verdict !== null && !verdict.ok;
 

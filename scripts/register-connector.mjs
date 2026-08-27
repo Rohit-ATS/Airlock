@@ -3,7 +3,7 @@
  * OAuth if it needs one.
  *
  *   node scripts/register-connector.mjs supabase
- *   node scripts/register-connector.mjs supabase --project kbwfgetqrycqemmtpnqq
+ *   node scripts/register-connector.mjs supabase --project <your-project-ref>
  *
  * AIRLOCK's claim is "the agent read the live schema", and until a real
  * connector is mounted that is a claim about a local SQLite file. This is what

@@ -9,15 +9,23 @@ import { Chip, Dot, Empty, Evidence, Legend, cx } from '@/design/primitives';
 /* WAITING — the approval queue                                                */
 /* -------------------------------------------------------------------------- */
 
-/** How long a change has been holding for a human, live. */
+/**
+ * How long a change has been holding for a human, live.
+ *
+ * The clock is held in state rather than read with `Date.now()` while
+ * rendering. A component that reads the wall clock during render is impure —
+ * React may render it twice and get two different answers, and under
+ * concurrent rendering that is not hypothetical. The interval is what keeps the
+ * age moving; the timestamp it writes is what keeps the render honest.
+ */
 function useAge(iso: string | null): string {
-  const [, tick] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 1000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
   if (!iso) return '—';
-  const ms = Date.now() - new Date(iso).getTime();
+  const ms = now - new Date(iso).getTime();
   if (ms < 0) return '0s';
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
