@@ -16,7 +16,7 @@
     "down": "node scripts/down.mjs",
     "dev": "npm run dev --workspace @airlock/console",
     "build": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/verifier && npm run build --workspace @airlock/mcp && npm run build --workspace @airlock/console",
-    "test": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/verifier && npm run build --workspace @airlock/mcp && node --test packages/contract/test/*.test.mjs packages/mcp/test/*.test.mjs && node scripts/check-fixtures.mjs && node scripts/check-agents.mjs && node scripts/check-policy.mjs && node scripts/check-no-simulation.mjs && node scripts/check-console-security.mjs && node scripts/verify-claims.mjs && node scripts/check-assets.mjs",
+    "test": "npm run build --workspace @airlock/contract && npm run build --workspace @airlock/verifier && npm run build --workspace @airlock/mcp && node --test packages/contract/test/*.test.mjs packages/mcp/test/*.test.mjs && node scripts/check-fixtures.mjs && node scripts/check-agents.mjs && node scripts/check-policy.mjs && node scripts/check-no-simulation.mjs && node scripts/check-console-security.mjs && node scripts/check-secrets.mjs && node scripts/verify-claims.mjs && node scripts/check-assets.mjs",
     "lint": "npm run lint --workspace @airlock/console",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "mcp": "node packages/mcp/bin/airlock-mcp.mjs",
