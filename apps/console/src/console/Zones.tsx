@@ -89,6 +89,12 @@ function QueueRow({
   return (
     <button
       onClick={onSelect}
+      // The change this row is, addressable without reading its prose. Two
+      // different changes can be worded identically — a console pointed at a
+      // real harness accumulates several "give the on-call engineer read
+      // access" requests — so the request text does not identify a row, and
+      // anything checking this queue needs something that does.
+      data-dossier-id={dossier.dossier_id}
       className={cx(
         'flex w-full items-start gap-3 border-b border-hairline px-3 py-2.5 text-left transition-colors',
         selected ? 'bg-raised-2' : 'hover:bg-raised',
