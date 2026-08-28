@@ -39,6 +39,7 @@
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.TRUEFORGE_BASE_URL ?? 'http://localhost:8791';
 const specPath = process.argv[2] ?? 'agents/airlock-change-control.agent.json';
@@ -95,6 +96,59 @@ const name = raw.name;
 const manifest = structuredClone(raw.manifest);
 
 say(`Adapting ${specPath} (${name}) for this server:`);
+
+/*
+ * Let the operator choose the model without editing a committed spec.
+ *
+ * The spec asks for `openai/gpt-4.1`, and on a low provider tier that model
+ * carries a 30,000 tokens-per-minute ceiling. A change-control turn re-sends
+ * roughly 8k tokens of tool definitions and instructions on every model call,
+ * so about four calls a minute fit inside the ceiling and a real run needs
+ * more. The turn then dies mid-flight on a 429 with the change still sealed,
+ * which reads to anyone watching as "AIRLOCK does not work" rather than "the
+ * account is throttled".
+ *
+ * `openai/gpt-4.1-mini` is the same family — so the temperature and max_tokens
+ * this spec depends on are still accepted, unlike the 5.x models — and carries
+ * 200,000 TPM on that same tier. That is the difference between a run that
+ * finishes and a run that cannot.
+ *
+ * Deliberately an override rather than a new default: the committed spec should
+ * keep asking for the better model, because the right fix is a provider tier
+ * that can serve it. This exists so a demo is not blocked on billing. An
+ * unknown value is not silently accepted — it falls through to the model check
+ * below, which lists what the server actually has.
+ */
+/**
+ * Read the override from the environment, falling back to the repo-root `.env`.
+ *
+ * Shell-only would be a trap. `npm run harness:setup` re-registers the agent,
+ * and an operator who set the model once in a terminal an hour ago would get it
+ * silently reverted to the spec's model on the next setup — which on a low tier
+ * means the next real turn dies on a 429 for no reason they changed. Putting it
+ * in `.env` is the way this repo carries every other setting, so it works here
+ * too.
+ */
+function envModel() {
+  if (process.env.AIRLOCK_MODEL) return process.env.AIRLOCK_MODEL.trim();
+  try {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+    const text = readFileSync(path.join(root, '.env'), 'utf8');
+    const m = /^\s*AIRLOCK_MODEL\s*=\s*(.+)$/m.exec(text);
+    return m ? m[1].trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+const override = envModel();
+if (override) {
+  const chosen = override;
+  if (chosen !== manifest.model.name) {
+    say(`  model    ${manifest.model.name} -> ${chosen}  (AIRLOCK_MODEL)`);
+    manifest.model = { ...manifest.model, name: chosen };
+  }
+}
 
 // 1. Documentation keys the API does not accept.
 const stripComments = (value) => {

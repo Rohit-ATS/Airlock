@@ -31,10 +31,12 @@ interface Run {
   servers: string[];
 }
 
-interface Feed {
+export interface Feed {
   reachable: boolean;
   runs: Run[];
   note?: string;
+  /** Where the console looked, so a wrong port is diagnosable from the screen. */
+  base_url?: string;
 }
 
 /** Poll in step with the change queue, so the two panels never disagree. */
@@ -166,7 +168,19 @@ export function LiveActivity({ feed }: { feed: Feed | null }) {
     <div className="flex h-full min-h-0 flex-col">
       <StatusLine run={run} />
       {run.failure ? <FailureBanner failure={run.failure} /> : null}
-      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+      <div
+        // The activity feed scrolls and, unlike the queue and the rail beside
+        // it, holds nothing focusable — every row is a timestamp and two spans.
+        // So a pointer could reach the history of the run and a keyboard could
+        // not, which is the same defect already fixed on the fault screen.
+        // `role="log"` is the accurate one here: an append-only record of what
+        // the agent did, which is precisely what a reader is being asked to
+        // audit.
+        tabIndex={0}
+        role="log"
+        aria-label="Agent activity"
+        className="scroll-thin min-h-0 flex-1 overflow-y-auto"
+      >
         {steps.length === 0 ? (
           <div className="px-3 py-3">
             <Legend>The run has produced no events yet.</Legend>

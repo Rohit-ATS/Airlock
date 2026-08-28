@@ -197,12 +197,23 @@ async function driveTurn(input) {
           break;
         }
 
-        case 'tool.approval_required':
-          // The whole product, in one event.
-          seen.approvalHeld = event.name ?? event.tool_name ?? 'unknown tool';
+        case 'tool.approval_required': {
+          // The whole product, in one event — so it had better say what it is
+          // holding. The name is not on this event any more than it is on
+          // `tool.response`: each entry is `{ id, source_event_id }` and
+          // nothing else, so `event.name` and `event.tool_name` are both
+          // undefined and this printed a literal "unknown tool" while the thing
+          // actually being held was arbitrary SQL against production. The ids
+          // resolve through the same map `tool.response` uses.
+          const ids = Array.isArray(event.tool_calls)
+            ? event.tool_calls.map((c) => c?.id).filter(Boolean)
+            : [];
+          const named = ids.map((id) => calledAs.get(id)).filter(Boolean);
+          seen.approvalHeld = named.join(', ') || event.name || event.tool_name || 'a tool';
           console.log(`\n  ${AMBER}${BOLD}HELD FOR A HUMAN${OFF} ${AMBER}${seen.approvalHeld}${OFF}`);
           console.log(`  ${DIM}the harness is holding this tool. nothing moves until a person answers.${OFF}\n`);
           break;
+        }
 
         // Where the id-to-name mapping a `tool.response` needs actually lives.
         //

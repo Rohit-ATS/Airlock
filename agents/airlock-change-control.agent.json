@@ -28,11 +28,16 @@
         "enable_tools": [
           "@read-only"
         ],
+        "preload_tools": [
+          "list_tables",
+          "execute_sql"
+        ],
         "require_approval_for_tools": [
           "@write",
           "@destructive"
         ],
-        "preload": false
+        "preload": false,
+        "comment_preload_tools": "These two are eager; the other eleven stay deferred. Fully deferred, the agent has no Supabase tool NAMES in context when it goes to resolve a fact, and it invents them: a real run called pg_version and count_rows, got \"not allowed on MCP server supabase\" for both, and then told the operator the users table had 500 rows -- a number it had never read. The dossier was right and empty (resolved_context.facts was []), so nothing false was ever certified; but an unsourced number in the narration is precisely what this product exists to make impossible. Eager-loading the two tools that answer \"what is the schema\" and \"what is in it\" costs a few hundred tokens per call and removes the guess. The rest stay deferred so the tool-definition budget does not grow back."
       },
       {
         "name": "github",
@@ -46,11 +51,18 @@
           "update_pull_request",
           "add_issue_comment"
         ],
+        "preload_tools": [
+          "get_file_contents",
+          "create_branch",
+          "create_or_update_file",
+          "create_pull_request"
+        ],
         "require_approval_for_tools": [
           "@all"
         ],
         "preload": false,
-        "comment": "Propose-only. The agent writes the expand/contract changes the blast radius implies and opens a pull request for an independent reviewer. It cannot merge one — merging is applying, and applying is what the human does. scripts/check-agents.mjs asserts merge_pull_request never appears here."
+        "comment": "Propose-only. The agent writes the expand/contract changes the blast radius implies and opens a pull request for an independent reviewer. It cannot merge one — merging is applying, and applying is what the human does. scripts/check-agents.mjs asserts merge_pull_request never appears here.",
+        "comment_preload_tools": "The four verbs the review loop actually walks: read the blast radius, branch, commit, open the PR. The other forty stay deferred. This is not an optimisation, it is a correctness fix -- with GitHub fully deferred the agent has no tool NAMES in context and invents them, which is exactly what happened on Supabase (it called pg_version and count_rows, neither of which exists, then narrated a row count it had never read). Forty-four eager tool definitions would cost more context per call than the whole airlock server; four is the working set."
       },
       {
         "name": "exa",

@@ -399,8 +399,34 @@ export function summariseEvents(events: readonly SessionEvent[]): ActivitySummar
       }
 
       case 'tool.approval_required': {
-        const names = toolNames(event);
-        heldOn = names[0] ?? 'a tool';
+        /*
+         * Name what is being held.
+         *
+         * This event carries call *ids* and nothing else — each entry is
+         * `{ id, source_event_id }`, with no tool name anywhere on it. Reading
+         * names off it therefore returns nothing, and the console asked a
+         * person to approve "unknown tool".
+         *
+         * Being asked to authorise an action nobody will name is the one thing
+         * an approval surface must never do, and it is worse here than it
+         * sounds: the calls actually held on the run that exposed this were
+         * `SHOW server_version` and `SELECT COUNT(*) FROM users` — arbitrary
+         * SQL against production, presented as "unknown tool".
+         *
+         * The names are already known. `calledAs` has been accumulating
+         * `id -> server·tool` from the `model.message` that requested each
+         * call, and that event always precedes the hold, so the ids resolve.
+         * `toolNames` stays as the fallback for any shape that does inline a
+         * name, rather than being replaced by a lookup that assumes this one.
+         */
+        const held = event.tool_calls ?? event.toolCalls;
+        const resolved = (Array.isArray(held) ? held : [])
+          .map((call) => str((call as { id?: unknown })?.id))
+          .map((id) => (id ? (calledAs.get(id) ?? null) : null))
+          .filter((name): name is string => Boolean(name));
+
+        const names = resolved.length > 0 ? resolved : toolNames(event);
+        heldOn = names.join(', ') || 'a tool';
         status = 'held';
         push('held', `held for a human: ${heldOn}`);
         break;

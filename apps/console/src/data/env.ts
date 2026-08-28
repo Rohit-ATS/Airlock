@@ -116,6 +116,33 @@ export function trueforgeBaseUrl(): string {
   return env('TRUEFORGE_BASE_URL') ?? env('NEXT_PUBLIC_TRUEFORGE_BASE_URL') ?? 'http://localhost:8790';
 }
 
+/**
+ * Whether anybody actually *pointed* this console at a harness.
+ *
+ * The default above is a convenience, not a configuration. The difference
+ * matters exactly once, and it matters a great deal: when the harness does not
+ * answer, "you configured an identity provider and it is down" and "you never
+ * configured one" are different facts about the world, and only the first one
+ * is evidence that something is wrong. See `resolveViewer`.
+ */
+export function trueforgeConfigured(): boolean {
+  return env('TRUEFORGE_BASE_URL') !== undefined || env('NEXT_PUBLIC_TRUEFORGE_BASE_URL') !== undefined;
+}
+
+/**
+ * Standalone mode: no identity provider, one local operator, said out loud.
+ *
+ * Unset means "decide from whether a harness was configured", which is what
+ * makes a fresh clone usable without making a configured deployment lax. `1`
+ * and `0` both force the answer for deployments that want to be explicit.
+ */
+export function localOperatorSetting(): 'on' | 'off' | 'auto' {
+  const raw = env('AIRLOCK_LOCAL_OPERATOR');
+  if (raw === '1') return 'on';
+  if (raw === '0') return 'off';
+  return 'auto';
+}
+
 /** The agent every console session runs. */
 export function airlockAgentName(): string {
   return (

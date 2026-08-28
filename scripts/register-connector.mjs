@@ -37,7 +37,41 @@
  * a property.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = process.env.TRUEFORGE_BASE_URL ?? 'http://localhost:8791';
+
+/**
+ * Read a secret the same way the rest of the repo does: environment first, then
+ * the repo-root `.env`.
+ *
+ * Nothing here loads dotenv, and a token that exists in `.env` but not in the
+ * shell is the overwhelmingly common case — an operator edits the file and runs
+ * the script, and being told "no token" while looking straight at the token is
+ * the sort of thing that costs an hour and all of someone's goodwill.
+ */
+function secret(...names) {
+  for (const name of names) {
+    if (process.env[name]) return process.env[name].trim();
+  }
+  let text;
+  try {
+    text = fs.readFileSync(path.join(root, '.env'), 'utf8');
+  } catch {
+    return null;
+  }
+  for (const name of names) {
+    const m = new RegExp(`^\\s*${name}\\s*=\\s*(.+)$`, 'm').exec(text);
+    if (m) {
+      const value = m[1].trim();
+      if (value) return value;
+    }
+  }
+  return null;
+}
 
 const DIM = '\x1b[2m';
 const BOLD = '\x1b[1m';
@@ -57,14 +91,78 @@ const CONNECTORS = {
     url: (opts) =>
       `https://mcp.supabase.com/mcp?project_ref=${opts.project}&read_only=true`,
     needs: ['project'],
-    auth: { type: 'dcr' },
+    /*
+     * DCR first, a personal access token when one is offered — and the reason
+     * the fallback exists is worth recording, because the symptom is opaque.
+     *
+     * TrueForge 0.1.4 caches the DCR client it mints per connector and hands
+     * back an authorize URL built from it. Against Supabase that URL can fail:
+     *
+     *   {"message":"Unrecognized client_id"}    HTTP 422
+     *
+     * Supabase's own registration endpoint is healthy — POSTing to
+     * `/platform/oauth/apps/register` returns 201 with a client_id that
+     * redirects to the consent screen on the first try. The harness's cached
+     * client is simply not one Supabase honours, updating the manifest mints
+     * another equally unrecognised one, and there is no DELETE for a configured
+     * MCP server to reset it with. That leaves the operator holding a link that
+     * cannot work and no way to regenerate it.
+     *
+     * So when SUPABASE_ACCESS_TOKEN is present this registers static header
+     * auth instead. It is the less elegant of the two — a long-lived token in
+     * .env rather than a scope approved in a browser — but it is deterministic,
+     * it survives a harness restart, and it does not put a live demo behind an
+     * OAuth round trip that has already failed once. Create one at
+     * https://supabase.com/dashboard/account/tokens
+     *
+     * `read_only=true` stays in the URL either way, so the upstream still
+     * refuses writes no matter which credential opened the connection.
+     */
+    auth: () => {
+      const token = secret('SUPABASE_ACCESS_TOKEN', 'SUPABASE_PAT');
+      if (token) return { type: 'header', headers: { Authorization: `Bearer ${token}` } };
+      return { type: 'dcr' };
+    },
     description:
       'Supabase, read-only, scoped to one project. Live schema, live row counts, ' +
       'live server version — the facts airlock_resolve_context refuses to guess.',
   },
   github: {
     url: () => 'https://api.githubcopilot.com/mcp/',
-    auth: { type: 'dcr' },
+    /*
+     * GitHub is the exception to the `dcr` preference above, and not by choice.
+     *
+     * Registering it with `auth: { type: 'dcr' }` is refused by the harness:
+     *
+     *   MCP server 'github' has no DCR support (missing registration_endpoint);
+     *   auth.type: dcr is misconfigured for this server
+     *
+     * GitHub's MCP server publishes no OAuth registration endpoint, so there is
+     * no client for the harness to mint and the only route left is a static
+     * header. That means a token really does sit in `.env` for this one, which
+     * is exactly the trade the note above says to avoid — so the scope matters
+     * more here than anywhere else. A fine-grained PAT limited to this one
+     * repository with Contents and Pull requests is enough for the whole review
+     * loop. A classic org-wide token is not needed and should not be used: the
+     * agent's write surface is already fenced by the deny-list in
+     * check-agents.mjs, and a broad token would put a second, unfenced route to
+     * production behind the same string.
+     */
+    auth: () => {
+      const token = secret('GITHUB_MCP_TOKEN', 'GITHUB_TOKEN');
+      if (!token) {
+        return {
+          missing:
+            'GITHUB_TOKEN is not set, and GitHub\'s MCP server cannot do OAuth.\n' +
+            '  Create a fine-grained PAT scoped to this repository only:\n' +
+            '    https://github.com/settings/personal-access-tokens/new\n' +
+            '    Repository access -> Only select repositories -> Airlock\n' +
+            '    Permissions -> Contents: Read and write, Pull requests: Read and write\n' +
+            '  Then add it to .env as GITHUB_TOKEN=github_pat_… and run this again.',
+        };
+      }
+      return { type: 'header', headers: { Authorization: `Bearer ${token}` } };
+    },
     description:
       'GitHub, for the blast-radius scan and the review loop. Reads code; opens ' +
       'pull requests for a reviewer that is not the agent. Never merges.',
@@ -113,12 +211,21 @@ if (!health.ok) {
   process.exit(2);
 }
 
+// Auth can be a plain block or a function of the environment, because one of
+// these connectors needs a token read at run time rather than a constant.
+const auth = typeof connector.auth === 'function' ? connector.auth() : connector.auth;
+if (auth?.missing) {
+  console.error(`${RED}Cannot register ${name}.${OFF}\n`);
+  console.error(`  ${auth.missing}\n`);
+  process.exit(2);
+}
+
 const manifest = {
   type: 'remote',
   name,
   url: connector.url(opts),
   description: connector.description,
-  ...(connector.auth ? { auth: connector.auth } : {}),
+  ...(auth ? { auth } : {}),
 };
 
 // Registered already? POST conflicts, PUT rotates. Both take the collection
@@ -152,6 +259,43 @@ if (status === 'not_required' || status === 'authenticated') {
     console.error(JSON.stringify(authorize.body).slice(0, 400));
     process.exit(1);
   }
+  /*
+   * Check the link before handing it over.
+   *
+   * An authorize URL is only useful if the authorization server recognises the
+   * client inside it, and when it does not the operator finds out by clicking
+   * it and reading a bare JSON error — at which point the obvious reading is
+   * "AIRLOCK is broken" rather than "the harness cached a bad client". One
+   * unauthenticated GET settles it: the server either redirects to its consent
+   * screen or refuses the client outright.
+   */
+  let deadLink = null;
+  try {
+    const probe = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+    if (probe.status >= 400) deadLink = `${probe.status} ${(await probe.text()).slice(0, 160)}`;
+  } catch {
+    // A network failure here is not evidence the link is bad; say nothing.
+  }
+
+  if (deadLink) {
+    console.log('');
+    console.error(`${RED}${BOLD}The harness produced an authorization link that its own provider rejects.${OFF}`);
+    console.error(`  ${DIM}${deadLink}${OFF}`);
+    console.error('');
+    console.error('  This is a defect in the harness, not in your account: Supabase registers');
+    console.error('  new OAuth clients on request, but the client TrueForge cached is not one');
+    console.error('  it honours, and there is no way to reset it from outside.');
+    console.error('');
+    console.error(`  ${BOLD}Use a personal access token instead — it is deterministic:${OFF}`);
+    console.error('    1. https://supabase.com/dashboard/account/tokens  ->  Generate new token');
+    console.error('    2. add it to .env as SUPABASE_ACCESS_TOKEN=sbp_…');
+    console.error(`    3. node scripts/register-connector.mjs ${name}${
+      connector.needs?.includes('project') ? ` --project ${opts.project}` : ''
+    }`);
+    console.error('');
+    process.exit(1);
+  }
+
   console.log('');
   console.log(`${AMBER}${BOLD}This connector needs you to authorize it, once.${OFF}`);
   console.log('');

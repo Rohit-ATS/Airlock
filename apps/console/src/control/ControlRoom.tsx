@@ -21,6 +21,7 @@ import {
   type Viewer,
 } from '@airlock/contract';
 import { Evidence, Legend, cx } from '@/design/primitives';
+import { StandaloneNotice } from '@/design/StandaloneNotice';
 import { Mark } from '@/console/Mark';
 
 /**
@@ -152,6 +153,11 @@ export function ControlRoom() {
   return (
     <div className="min-h-dvh">
       <Header viewer={viewer} generatedAt={data?.generated_at ?? null} />
+
+      {/* The control room's whole question is "can I trust the record of what
+          this system did". Whether anybody authenticated the people in that
+          record belongs at the top of the answer, not in a tooltip. */}
+      <StandaloneNotice />
 
       <main className="mx-auto max-w-[1320px] px-5 pt-6 pb-20 sm:px-8">
         {error ? (

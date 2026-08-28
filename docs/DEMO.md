@@ -13,6 +13,28 @@ npm run build --workspace @airlock/contract
 npm run dev --workspace @airlock/console
 ```
 
+Every interaction in this runbook is replayed against a running server by
+[`check-console-http.mjs`](../scripts/check-console-http.mjs) in CI — the verdicts, the undo
+states, the refusals and the approvals. A step that stops working here fails the build rather
+than failing on camera.
+
+### The orange bar at the top, and what to say about it
+
+On a fresh clone there is no harness, so there is no identity provider, so AIRLOCK signs you in
+as a single **local operator** and puts a permanent orange notice above the console saying
+exactly that. Do not skip past it — it is a thirty-second beat that makes the rest credible:
+
+> There is nobody to authenticate me here, so AIRLOCK gave me the approver role and then told
+> you it had, in a banner it will not let me dismiss. That is the same rule as the provenance
+> grades and the unlit capability lamps: the system says what it cannot prove. Point it at a
+> real harness and this disappears — and if that harness is configured and goes down, I become
+> a requester and the gate shuts, because a control that evaporates when a dependency fails is
+> not a control.
+
+If you would rather record without it, run against a harness (`npm run harness:up`) or set
+`AIRLOCK_LOCAL_OPERATOR=0` — but the second one removes your ability to approve anything, which
+is the point of it.
+
 ---
 
 ## The three-minute cut
@@ -78,14 +100,22 @@ The chain breaks, record #2 greys out, and the verdict flips to `TAMPERING DETEC
 
 Open `/console`. Go straight to **WAITING**.
 
-Nine changes waiting. Click through four, fast:
+Thirteen changes waiting — four with the gate open, nine sealed for nine different reasons.
+Click through four, fast:
 
-| Change | What to say |
-| --- | --- |
-| `dos_tier_migration` | Gate open. Certificate, checksums, blast radius, lock profile, cost — everything needed to decide, on one screen. |
-| `dos_currency_fix` | *"The rollback restored 1,199,998 of 1,200,000 rows."* A rollback that mostly restores the data is a failure, not a warning. |
-| `dos_refund_stripe` | £41,904 against a £25,000 ceiling. Proven, and refused. |
-| `dos_erasure_dana` | One signature already held. **Countersign — 1 of 2.** A quorum counts people, not clicks. |
+| Change | What is on the screen | What to say |
+| --- | --- | --- |
+| `dos_tier_migration` | **Approve — apply to production** | Gate open. Certificate, checksums, blast radius, lock profile, cost — everything needed to decide, on one screen. |
+| `dos_currency_fix` | no approve control at all | *"The rollback restored 1,199,998 of 1,200,000 rows."* A rollback that mostly restores the data is a failure, not a warning. |
+| `dos_refund_stripe` | no approve control at all | £41,904 against a £25,000 ceiling. Proven, and refused. |
+| `dos_access_oncall` | **Countersign — 0 of 2 signatures** | Proven and permitted, and still not enough. A quorum counts people, not clicks. |
+| `dos_erasure_dana` | **This cannot be undone — arm approval** | Sam already signed this one, so *yours is the second of two* — the gate goes final and the control becomes a two-step arm, because the next thing that happens is irreversible. |
+
+<sub>Those two erasure/access rows are easy to say the wrong way round on camera, so they are
+written out: <code>dos_access_oncall</code> holds <b>no</b> signatures and offers Countersign;
+<code>dos_erasure_dana</code> holds <b>one</b>, which makes your press the final one and turns
+the control into the armed destroy. Both labels are asserted in
+<a href="../scripts/check-demo-ui.mjs"><code>check-demo-ui.mjs</code></a>.</sub>
 
 Approve `dos_tier_migration`. It moves to **DID** with a receipt attached — **and a countdown
 starts.**

@@ -216,11 +216,48 @@ jobs:
       - name: Every claim in the README still points at the code
         run: npm run verify:claims
 
+      # These two run in `npm test` but were never enumerated here, so the one
+      # place they were guaranteed to run was a developer's laptop. A guard that
+      # only runs where somebody remembers to run it is not a guard.
+      - name: The console write surface is guarded
+        run: node scripts/check-console-security.mjs
+
+      - name: No committed secrets
+        run: node scripts/check-secrets.mjs
+
       - name: Typecheck every workspace
         run: npm run typecheck
 
       - name: Build the console
         run: npm run build --workspace @airlock/console
+
+      # Everything above tests AIRLOCK as a set of functions. This boots the
+      # console as a server and replays the documented interactions against it —
+      # the README's curl transcripts, DEMO.md's verdicts, and the three
+      # identity postures — because the defects that reached a judge were all in
+      # the gap between "the function is correct" and "the running system does
+      # what the documentation says".
+      - name: The console behaves as documented, over HTTP
+        run: npm run check:console:http
+
+      # And the half of the demo that is a statement about a screen: that the
+      # Approve control is absent rather than disabled, that the six refusals in
+      # DEMO.md really are six different refusals when clicked in that order,
+      # and that the ledger demo breaks its chain in the browser. The browser
+      # binary is a separate download, which is why this is not in `npm test`.
+      - name: Install a browser for the UI checks
+        run: npx playwright-core install --with-deps chromium
+
+      - name: The demo's own controls, driven in a real browser
+        run: |
+          AIRLOCK_DATA_DIR="$(mktemp -d)" npm start --workspace @airlock/console &
+          for _ in $(seq 1 90); do
+            curl -sf http://localhost:3000/api/config >/dev/null && break
+            sleep 1
+          done
+          curl -sf http://localhost:3000/api/config >/dev/null || { echo "::error::the console never came up"; exit 1; }
+          npm run check:demo:ui
+          npm run check:a11y
 
       # Generated files are emitted from the source of truth. If regenerating
       # them changes anything, the docs and the code have drifted.

@@ -23,7 +23,12 @@ export async function GET(request: Request) {
   const [p, head] = await Promise.all([posture(viewer), ledgerHead()]);
 
   return NextResponse.json({
-    viewer: { email: viewer.email, role: viewer.role, type: viewer.type },
+    viewer: {
+      email: viewer.email,
+      role: viewer.role,
+      type: viewer.type,
+      standalone: viewer.standalone === true,
+    },
     posture: p,
     ledger: head,
     breakGlassEnabled: BREAK_GLASS_ENABLED,

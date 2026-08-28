@@ -72,7 +72,7 @@ test('nothing but the protocol is written to stdout', async () => {
   const { responses, stderr } = await converse([INIT]);
   assert.equal(responses.length, 1, 'exactly one response, no stray output');
   // The readiness line must go to stderr, or it would corrupt the stream.
-  assert.match(stderr, /ready — 12 tools/);
+  assert.match(stderr, /ready — 13 tools/);
 });
 
 test('exactly one tool is destructive, and it is the approval request', async () => {
@@ -91,6 +91,7 @@ test('exactly one tool is destructive, and it is the approval request', async ()
   // attached, rather than something that happens quietly on a Thursday.
   const writes = tools.filter((t) => t.annotations?.readOnlyHint !== true);
   assert.deepEqual(writes.map((t) => t.name).sort(), [
+    'airlock_attach_blast_radius',
     'airlock_attach_certificate',
     'airlock_attach_code_changes',
     'airlock_attach_code_review',
