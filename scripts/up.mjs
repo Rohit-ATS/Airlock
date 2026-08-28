@@ -244,7 +244,48 @@ for (const line of (setup.stdout ?? '').split('\n')) {
 }
 ok('provider, connector and agent registered');
 
-/* --- 5. the console -------------------------------------------------------- */
+/* --- 5. the demo fixtures, re-dated --------------------------------------- */
+
+/*
+ * Before the console starts, not after.
+ *
+ * A certificate has a freshness window of ten to thirty minutes, and the seed
+ * only ever runs against an empty ledger. So a checkout used yesterday opens
+ * today with every undecided fixture expired and every gate sealed
+ * CERTIFICATE_STALE — the rule working exactly as designed, and a console that
+ * looks broken, with the one human moment the product exists for unreachable.
+ *
+ * `demo-refresh.mjs` exists to prevent that and its header said "npm run up
+ * runs it for you". It did not: nothing here called it. It also could not have
+ * worked if it had, because the helpers it imports were never re-exported from
+ * the contract's barrel, so it threw on every invocation.
+ *
+ * The ordering matters: the store caches the ledger in memory on first read, so
+ * re-dating the file after the console is serving would leave the console
+ * showing the stale copy it had already loaded.
+ *
+ * A failure here is a warning rather than a stop. It touches demo data only,
+ * and refusing to bring up a working stack over it would be the wrong trade —
+ * but it is said out loud, because silence is what let this rot.
+ */
+heading('Demo fixtures');
+
+const refresh = runNode(['scripts/demo-refresh.mjs'], { stdio: 'pipe' });
+if (refresh.status === 0) {
+  const lines = (refresh.stdout ?? '').split('\n').map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim());
+  const redated = lines.find((l) => /re-dated/.test(l));
+  const approvable = lines.find((l) => /approvable|open at the gate/i.test(l));
+  ok(redated ? redated.replace(/^ok\s+/, '') : 'nothing needed re-dating');
+  if (approvable) note(approvable.replace(/^ok\s+/, ''));
+} else {
+  warn('demo-refresh failed — open fixtures may be past their freshness window.');
+  for (const line of `${refresh.stdout ?? ''}${refresh.stderr ?? ''}`.split('\n').filter(Boolean).slice(-4)) {
+    note(line.trim());
+  }
+  note('The stack is fine; the seeded certificates may all read CERTIFICATE_STALE.');
+}
+
+/* --- 6. the console -------------------------------------------------------- */
 
 heading(`Console on :${PORT}`);
 
