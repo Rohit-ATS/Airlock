@@ -76,6 +76,23 @@ const FORBIDDEN_TOOLS = [
   'delete_repository',
   'force_push',
   'create_release',
+  /*
+   * The two below are not about production, they are about the fence.
+   *
+   * Every other control here assumes the blast radius is one repository: the
+   * token is fine-grained to it, the deny-list guards the verbs that would
+   * apply a change inside it. `fork_repository` and `create_repository` both
+   * create a durable resource *outside* that fence — a fork is a complete copy
+   * of the code under an account nobody scoped, which is an exfiltration route
+   * that no amount of care about merge rights would notice.
+   *
+   * Neither is needed by the review loop, which branches, commits, and opens a
+   * pull request in place. They were reachable in practice, not in theory: the
+   * live GitHub MCP publishes 44 tools and both of these are among the 17 that
+   * mutate, so an allow-list that ever widened to `@write` would admit them.
+   */
+  'fork_repository',
+  'create_repository',
 ];
 
 const failures = [];

@@ -12,5 +12,9 @@ export async function GET(request: Request) {
     type: viewer.type,
     authenticated: viewer.authenticated,
     evidence: viewer.evidence,
+    // The console renders a permanent notice on this. A role granted because
+    // nobody is checking must never be reported the same way as one somebody
+    // issued.
+    standalone: viewer.standalone === true,
   });
 }

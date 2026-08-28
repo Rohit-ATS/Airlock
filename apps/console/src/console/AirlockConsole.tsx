@@ -12,6 +12,7 @@ import {
 import type { ApprovalGrant, Dossier, TurnFailure, Viewer } from '@airlock/contract';
 import { CAPABILITY_TOTAL, describeFailure, formatUsd, isRetryable } from '@airlock/contract';
 import { Chip, Dot, Empty, Evidence, Legend, cx } from '@/design/primitives';
+import { StandaloneNotice } from '@/design/StandaloneNotice';
 import { HarnessCounter, HarnessPanel } from '@/harness/HarnessPanel';
 import { useRun, useRunControls, useRunStore } from '@/harness/HarnessProvider';
 import { CertificateCard } from '@/certificate/CertificateCard';
@@ -441,6 +442,53 @@ function Topbar({ viewer, onToggleHarness }: { viewer: Viewer; onToggleHarness: 
 /* Guided empty state                                                          */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * "There is no harness, so nothing you type here can run."
+ *
+ * The DOING zone's most inviting control is an example prompt, and on a fresh
+ * clone with no TrueForge server there is nothing behind it. Pressing one used
+ * to replace this whole panel with the SDK's empty transcript — "How can I help
+ * you today?" — which then waited forever, because the request it made had
+ * nowhere to go. A reader is entitled to conclude from that that the product is
+ * broken, and they would be reasoning correctly from what they were shown.
+ *
+ * The rest of the console genuinely does work without a harness: the queue, the
+ * certificates, the gate, the ledger and every refusal are computed here. So
+ * this says which half is unavailable and which half is not, rather than
+ * degrading the whole screen to a dead prompt.
+ */
+function HarnessDownNotice({ baseUrl }: { baseUrl?: string }) {
+  return (
+    <div role="status" className="mx-3 mt-3 rounded-[5px] border border-hazard/40 bg-hazard-bg px-3.5 py-3">
+      <div className="flex items-center gap-2">
+        <Dot tone="hazard" />
+        <p className="text-[12px] font-semibold text-hazard">
+          No agent run can start — the TrueForge harness is not reachable
+          {baseUrl ? (
+            <>
+              {' '}
+              at <span className="evidence font-normal">{baseUrl}</span>
+            </>
+          ) : null}
+          .
+        </p>
+      </div>
+      <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-2">
+        Everything that does not need the agent still works, and it is most of what there is to look at:{' '}
+        <span className="text-ink">WAITING</span> and <span className="text-ink">DID</span> are served from this
+        console, and the gate, the policy engine and the ledger all run here. Only the live transcript above needs a
+        harness.
+      </p>
+      <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
+        To drive the agent: <span className="evidence text-ink-2">npm run harness:up</span> (Docker, and the supported
+        path on Windows), or <span className="evidence text-ink-2">npx @truefoundry/trueforge@latest</span> on
+        macOS/Linux. If one is already running, check{' '}
+        <span className="evidence text-ink-2">NEXT_PUBLIC_TRUEFORGE_BASE_URL</span>.
+      </p>
+    </div>
+  );
+}
+
 function GuidedStart({ onPick }: { onPick: (prompt: string) => void }) {
   return (
     <div className="scroll-thin flex h-full flex-col items-center justify-center overflow-y-auto px-6 py-10">
@@ -819,6 +867,10 @@ function ConsoleBody({ className }: { className?: string }) {
     <div className={cx('flex h-full min-h-0 flex-col bg-void', className)}>
       <Topbar viewer={viewer} onToggleHarness={() => setDrawerOpen((v) => !v)} />
 
+      {/* Standing property of the deployment, so it sits above the transient
+          notices and cannot be dismissed away from a screenshot. */}
+      <StandaloneNotice />
+
       {run.failure && run.failureAt !== dismissedFailure ? (
         <RunFailureBanner
           failure={run.failure}
@@ -926,6 +978,10 @@ function ConsoleBody({ className }: { className?: string }) {
           {zone === 'DOING' ? (
             <>
               <Lanes />
+              {/* Shown in every one of the three states below, because the
+                  transcript is just as dead after you have pressed something
+                  as it is before. */}
+              {activity && !activity.reachable ? <HarnessDownNotice baseUrl={activity.base_url} /> : null}
               <div className="min-h-0 flex-1 overflow-hidden">
                 {/*
                  * Three states, in order of who is driving.

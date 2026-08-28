@@ -66,6 +66,43 @@ function quote(name: string): string {
   return `"${String(name).replaceAll('"', '""')}"`;
 }
 
+/**
+ * Say what a raw SQLite error actually means for this verifier.
+ *
+ * One case earns the special handling, because it is the failure an agent
+ * connected to a real Postgres will hit first and the raw message sends the
+ * reader in the wrong direction entirely:
+ *
+ *   no such table: public.users
+ *
+ * Read literally, that says the table is missing — so the operator goes and
+ * checks the database, finds `users` sitting right there, and concludes the
+ * verifier is broken. It is not. The agent resolved its facts against Postgres,
+ * where `public.users` is the correct fully-qualified name, and then wrote the
+ * migration using that name. This shadow is SQLite, which has no schemas at
+ * all, so the qualifier cannot resolve.
+ *
+ * The name is deliberately NOT rewritten to make it run. What the certificate
+ * measures has to be the statements that were actually executed — that binding
+ * is the entire value of the artefact — so silently proving a different
+ * statement than the one supplied would be the exact dishonesty this package
+ * exists to prevent. The mismatch is reported instead, with the fix named.
+ */
+function explain(error: Error): string {
+  const missing = /no such table:\s*([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)/.exec(error.message);
+  if (missing) {
+    const [, schema, table] = missing;
+    return (
+      `${error.message}. This shadow is SQLite, which has no schemas, so a Postgres-style ` +
+      `qualified name cannot resolve here. The statements were written against ${schema}.${table} ` +
+      `— correct for the production target, unusable in this verifier. Supply the migration ` +
+      `against "${table}", or verify against a real Postgres shadow. The name was not rewritten ` +
+      `on your behalf: a certificate has to measure the statements it was actually given.`
+    );
+  }
+  return error.message;
+}
+
 function tableColumns(db: DatabaseSync, table: string): string[] {
   return (db.prepare(`PRAGMA table_info(${quote(table)})`).all() as Array<{ name: unknown }>)
     .map((row) => String(row.name))
@@ -213,7 +250,7 @@ export function verifyOnSqliteShadow(input: ShadowRunInput): ShadowRunResult {
         : `The rollback ran without error, but the data did not come back: the post-rollback digest ${postRollback} differs from the pre-change digest ${pre}. This change is not reversible by the inverse supplied.`,
     };
   } catch (error) {
-    return { ...base, status: 'FAILED', failure_reason: `Verification could not run: ${(error as Error).message}` };
+    return { ...base, status: 'FAILED', failure_reason: `Verification could not run: ${explain(error as Error)}` };
   } finally {
     // Torn down on every path — success, failure, and throw. An orphaned copy of
     // somebody's data is the worst thing this module could leave behind, and the

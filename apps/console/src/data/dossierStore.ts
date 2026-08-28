@@ -1,6 +1,7 @@
 import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
-import { breakGlassEnabled, dataDir, seedDisabled } from './env';
+import { fileURLToPath } from 'node:url';
+import { breakGlassEnabled, dataDir, env, seedDisabled } from './env';
 import { activePolicy } from './policy';
 import {
   Dossier,
@@ -137,21 +138,63 @@ async function seedFromExamples(): Promise<void> {
 }
 
 /**
- * Find `contracts/examples`, walking up from wherever the process was started.
+ * Find `contracts/examples`.
  *
- * `next dev` runs with cwd at `apps/console`, but `npm start` from the repo
- * root does not, and a fixed `../../` resolves to nothing in the second case —
- * an empty queue with no error, which is the worst way for this to fail.
+ * `next dev` runs with cwd at `apps/console`, but `npm start` from the repo root
+ * does not, and a fixed `../../` resolves to nothing in the second case — an
+ * empty queue with no error, which is the worst way for this to fail.
+ *
+ * Walking up from cwd fixed those two and left a third: cwd is a property of
+ * whoever typed the command, not of where the fixtures are. Start the console
+ * with `next start <dir>` from somewhere else, run it from a service manager, or
+ * put it behind any process supervisor that sets its own working directory, and
+ * the search walks up a completely unrelated branch of the filesystem, finds
+ * nothing, and seeds an empty console — silently, because "no fixtures" is a
+ * legitimate state and cannot be distinguished from "wrong directory" here.
+ *
+ * So there are three sources now, most explicit first:
+ *
+ *   1. AIRLOCK_FIXTURES_DIR, for a deployment that puts them somewhere of its
+ *      own choosing. If it is set and wrong, that is worth being loud about,
+ *      because somebody stated an intention that is not being met.
+ *   2. Up from this module, which is where the fixtures actually are relative
+ *      to the code that wants them, whatever cwd happens to be.
+ *   3. Up from cwd, kept because a standalone build relocates the module and
+ *      the repo layout is then only discoverable from the process's position.
  */
 function examplesDir(): string | null {
-  let dir = process.cwd();
-  for (let up = 0; up < 5; up += 1) {
-    const candidate = path.join(dir, 'contracts', 'examples');
-    if (existsSync(candidate)) return candidate;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+  const declared = env('AIRLOCK_FIXTURES_DIR');
+  if (declared) {
+    if (existsSync(declared)) return declared;
+    console.warn(
+      `[airlock] AIRLOCK_FIXTURES_DIR is set to ${declared}, which does not exist. ` +
+        'Falling back to the built-in search; the queue may seed empty.',
+    );
   }
+
+  const roots: string[] = [];
+  try {
+    // `import.meta.url` survives the Next server bundle, so this resolves to a
+    // real directory inside `.next/server/...` and the walk climbs out of it.
+    roots.push(path.dirname(fileURLToPath(import.meta.url)));
+  } catch {
+    /* No module URL (an unusual bundler); cwd below is then the only source. */
+  }
+  roots.push(process.cwd());
+
+  for (const root of roots) {
+    let dir = root;
+    // Deep enough to climb out of `.next/server/app/api/<route>` and still
+    // reach the repo root from `apps/console`.
+    for (let up = 0; up < 10; up += 1) {
+      const candidate = path.join(dir, 'contracts', 'examples');
+      if (existsSync(candidate)) return candidate;
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+
   return null;
 }
 

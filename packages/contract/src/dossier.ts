@@ -166,7 +166,31 @@ export const Magnitude = z.object({
   people: z.number().int().nonnegative().default(0),
   /** Money leaving the building, in minor units. Negative means money arriving. */
   amount_minor: z.number().int().default(0),
-  currency: z.string().length(3).optional(),
+  /**
+   * ISO 4217, and genuinely optional — including when the agent says so badly.
+   *
+   * `.length(3).optional()` accepts an omitted currency and rejects an empty
+   * one, which sounds like a distinction without a difference until an agent
+   * fills in a magnitude for a schema migration. There is no money in a schema
+   * migration, so it sends `currency: ""` or `currency: null`, and gets:
+   *
+   *   Too small: expected string to have >=3 characters
+   *
+   * That is a true statement about the schema and terrible advice. It reads as
+   * "this field needs a value", so the model supplies one — a real run answered
+   * `"USD"` on an `amount_minor: 0` schema migration and the dossier carried a
+   * currency for a change that moves no money. Fabricated provenance in an
+   * audit record is a considerably worse outcome than a missing optional field,
+   * and this contract exists to stop exactly that.
+   *
+   * So the two ways of saying "there is no currency here" are normalised to the
+   * one the schema already accepts. A real code is still held to three
+   * characters; only the absent cases are widened.
+   */
+  currency: z.preprocess(
+    (value) => (value === '' || value === null ? undefined : value),
+    z.string().length(3).optional(),
+  ),
   /**
    * How long the change stays undoable after it is applied, in seconds. `null`
    * means never — the moment it lands it is permanent. The console renders this

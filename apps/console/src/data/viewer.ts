@@ -1,5 +1,5 @@
 import type { Viewer } from '@airlock/contract';
-import { trueforgeBaseUrl } from './env';
+import { trueforgeBaseUrl, trueforgeConfigured, localOperatorSetting } from './env';
 
 /**
  * Who is asking.
@@ -17,7 +17,13 @@ export interface ResolvedViewer extends Viewer {
   authenticated: boolean;
   /** The literal evidence string for capability 21. */
   evidence: string;
-  type: 'default' | 'oidc-connected';
+  type: 'default' | 'oidc-connected' | 'standalone';
+  /**
+   * True when nobody is authenticating anybody and the console is saying so.
+   * The UI renders a permanent notice on the strength of this; it is not a
+   * detail, it is the caveat that makes the role honest.
+   */
+  standalone?: boolean;
 }
 
 /** Resolved through the shared loader so the repo-root .env is actually read. */
@@ -60,6 +66,54 @@ const LOCAL_ADMIN: ResolvedViewer = {
   evidence: 'GET /api/v1/auth/me -> default session (login disabled)',
 };
 
+/**
+ * Standalone: there is no identity provider, and the console says so.
+ *
+ * This is the honest description of a fresh clone. Nothing is configured, the
+ * ledger is a JSON file on this disk, and the only person who can reach the
+ * console is the person sitting at it — who could edit that file directly and
+ * skip every control in this repository. Withholding the approver role from
+ * them protects nothing; it only makes the product impossible to evaluate.
+ *
+ * What it must never do is *look* like separation of duties. So the role comes
+ * with a caveat the console is required to render, the email is a job
+ * description rather than a person, and `authenticated` stays false, because
+ * nobody authenticated anybody.
+ */
+const LOCAL_OPERATOR: ResolvedViewer = {
+  email: 'local-operator',
+  role: 'approver',
+  authenticated: false,
+  type: 'standalone',
+  standalone: true,
+  evidence: 'no identity provider configured — standalone local operator',
+};
+
+/**
+ * Which way to fall when the harness does not answer.
+ *
+ * This is the whole of the security-relevant decision, so it is one function
+ * with the reasoning next to it rather than a condition inline.
+ *
+ * The audit finding this preserves: *anyone who can make the harness
+ * unreachable — a dropped container, a wrong TRUEFORGE_BASE_URL, a network blip
+ * during a demo — became an approver.* That remains fixed, because every one of
+ * those cases is a deployment that **configured** a harness. Configured and
+ * silent is still a requester, exactly as before.
+ *
+ * The case that changes is the one the audit never covered: nothing configured
+ * at all. That is not a harness that fell over, it is a product running the
+ * only way it can run before you have set anything up, and answering it with
+ * "you may not approve" made the console unusable on the machine of every
+ * person evaluating it for the first time.
+ */
+function fallbackViewer(): ResolvedViewer {
+  const setting = localOperatorSetting();
+  if (setting === 'off') return UNKNOWN_VIEWER;
+  if (setting === 'on') return LOCAL_OPERATOR;
+  return trueforgeConfigured() ? UNKNOWN_VIEWER : LOCAL_OPERATOR;
+}
+
 export async function resolveViewer(request: Request): Promise<ResolvedViewer> {
   const headers: Record<string, string> = {};
   const cookie = request.headers.get('cookie');
@@ -71,7 +125,7 @@ export async function resolveViewer(request: Request): Promise<ResolvedViewer> {
     const res = await fetch(new URL('/api/v1/auth/me', BASE_URL), { headers, cache: 'no-store' });
     // A rejection is not a report that login is disabled. It is a refusal to
     // identify the caller, and the caller does not get to be an approver.
-    if (!res.ok) return UNKNOWN_VIEWER;
+    if (!res.ok) return fallbackViewer();
 
     const me = (await res.json()) as { type?: string; email?: string; role?: string };
     const type = me.type === 'oidc-connected' ? 'oidc-connected' : 'default';
@@ -86,8 +140,9 @@ export async function resolveViewer(request: Request): Promise<ResolvedViewer> {
       evidence: `GET /api/v1/auth/me -> oidc-connected, role=${me.role ?? 'user'}`,
     };
   } catch {
-    // Unreachable. The console stays usable — a requester can read everything —
-    // but nobody is promoted on the strength of a failed request.
-    return UNKNOWN_VIEWER;
+    // Unreachable. A configured deployment stays a requester; an unconfigured
+    // one becomes a clearly-labelled local operator. Neither is promoted on the
+    // strength of a failed request without the console saying what happened.
+    return fallbackViewer();
   }
 }

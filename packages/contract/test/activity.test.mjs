@@ -158,6 +158,52 @@ const RATE_LIMIT_MESSAGE =
   'on tokens per min (TPM): Limit 30000, Used 26713, Requested 7669. Please try again in 8.764s. ' +
   'Visit https://platform.openai.com/account/rate-limits to learn more.';
 
+test('a held tool is named, even though the hold event carries only call ids', () => {
+  /*
+   * The shape below is verbatim from a real run. `tool.approval_required`
+   * carries `{ id, source_event_id }` per call and no name at all, so the feed
+   * used to render "unknown tool" — while what was actually being held was
+   * arbitrary SQL against production.
+   */
+  const summary = summariseEvents([
+    { type: 'turn.created', id: '1', created_at: 'a' },
+    {
+      type: 'model.message',
+      id: '2',
+      created_at: 'b',
+      thread_id: 'main',
+      tool_calls: [
+        { id: 'call_A', function: { name: 'execute_sql' }, tool_info: { server_name: 'supabase', type: 'mcp' } },
+        { id: 'call_B', function: { name: 'list_tables' }, tool_info: { server_name: 'supabase', type: 'mcp' } },
+      ],
+    },
+    {
+      type: 'tool.approval_required',
+      id: '3',
+      created_at: 'c',
+      thread_id: 'main',
+      tool_calls: [{ id: 'call_A', source_event_id: '2' }, { id: 'call_B', source_event_id: '2' }],
+    },
+  ]);
+
+  assert.equal(summary.status, 'held');
+  assert.equal(summary.heldOn, 'supabase·execute_sql, supabase·list_tables');
+  assert.ok(
+    summary.steps.some((s) => s.kind === 'held' && s.label.includes('supabase·execute_sql')),
+    'the held row must name the tool a person is being asked to approve',
+  );
+});
+
+test('an unresolvable held call degrades to "a tool" rather than inventing one', () => {
+  const summary = summariseEvents([
+    { type: 'turn.created', id: '1', created_at: 'a' },
+    // No preceding model.message, so nothing can name this call.
+    { type: 'tool.approval_required', id: '2', created_at: 'b', tool_calls: [{ id: 'call_orphan' }] },
+  ]);
+  assert.equal(summary.status, 'held');
+  assert.equal(summary.heldOn, 'a tool');
+});
+
 test('a failed turn carries the provider’s own sentence, not just "failed"', () => {
   const summary = summariseEvents([
     { type: 'turn.created', id: '1', created_at: 'x' },

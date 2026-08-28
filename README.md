@@ -10,7 +10,7 @@
 </p>
 
 <p>
-  <img alt="tests" src="https://img.shields.io/badge/tests-340%20passing-35d6a4?style=flat">
+  <img alt="tests" src="https://img.shields.io/badge/tests-345%20passing-35d6a4?style=flat">
   <img alt="claims" src="https://img.shields.io/badge/README%20claims-32%20anchored%20to%20code-4fc3f7?style=flat">
   <img alt="capabilities" src="https://img.shields.io/badge/harness%20capabilities-23-f7942f?style=flat">
   <img alt="write path" src="https://img.shields.io/badge/tools%20that%20write%20to%20production-0-ff5257?style=flat">
@@ -193,7 +193,8 @@ $ curl -s localhost:3000/api/dossiers | node -e '
     d.certificate.checksums.post_rollback = "sha256:" + "d".repeat(64);
     d.certificate.checksums.match = true;          // the lie
     process.stdout.write(JSON.stringify(d));
-  ' | curl -s -XPOST localhost:3000/api/dossiers -H 'Content-Type: application/json' --data-binary @-
+  ' | curl -s -XPOST localhost:3000/api/dossiers -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $AIRLOCK_API_TOKEN" --data-binary @-
 
 $ curl -XPOST localhost:3000/api/dossiers/dos_liar/decision \
     -H 'Content-Type: application/json' -d '{"decision":"approved"}'
@@ -201,9 +202,19 @@ $ curl -XPOST localhost:3000/api/dossiers/dos_liar/decision \
 403
 ```
 
+<sub>Writing a dossier is a machine-to-machine write, so it carries the token from
+<code>AIRLOCK_API_TOKEN</code> — the seam the verification engine posts through. In
+<code>next dev</code> with no token configured the header is ignored and the command works
+without it; a server started with <code>npm start</code> requires one. <b>Approving</b> never
+does: the refusal below is what any caller gets.</sub>
+
 AIRLOCK never trusts the verifier's own `match` flag. It recomputes `pre === post_rollback`
 itself ([`gate.ts:221`](packages/contract/src/gate.ts#L221)), so an engine bug or a forged
 payload cannot open the door.
+
+Both transcripts above are replayed against a running server by
+[`check-console-http.mjs`](scripts/check-console-http.mjs) on every push, so a command that
+stops working here fails the build instead of failing in front of you.
 
 > **Try it without installing anything.** The landing page carries a live gate: it builds a
 > real Change Dossier from a set of controls and passes it to the real `openGate()`. Every
@@ -257,6 +268,22 @@ set `AIRLOCK_NO_SEED=1` to start empty.
 > undecided ones are re-based to the current time when they are seeded, because a certificate
 > has a freshness window and a permanently-expired demo demonstrates nothing.
 
+### Who you are, before you have set anything up
+
+Roles come from the harness — `GET /api/v1/auth/me` — and on a fresh clone there is no harness
+to ask. AIRLOCK distinguishes two cases that look identical from the console and are not:
+
+| What is true | Who you are | Why |
+| --- | --- | --- |
+| Nothing is configured | `local-operator`, an **approver**, with a permanent banner saying so | There is no identity provider to be separate from. The ledger is a JSON file you could edit directly, so withholding the role protects nothing and makes the product impossible to evaluate. |
+| A harness **is** configured and does not answer | `requester` — the gate stays shut | A dropped container, a wrong `TRUEFORGE_BASE_URL` or a blip during a demo must never promote anybody. Separation of duties that evaporates when a dependency is down is not separation of duties. |
+
+The banner is not dismissible, because it describes a standing property of the deployment
+rather than an event that has passed — and a caveat you can close is a caveat that is absent
+from the screenshot. Set `AIRLOCK_LOCAL_OPERATOR=0` to require a real approver even standalone,
+or `=1` to keep the local operator when a harness is configured. All three postures are
+asserted over HTTP in [`check-console-http.mjs`](scripts/check-console-http.mjs).
+
 To drive the agent rather than the fixtures, point it at a TrueForge server:
 
 ```bash
@@ -281,13 +308,19 @@ it and the command that demonstrates it.
 ```bash
 npm test
 ```
-> `263 tests, 0 fail` · `18 fixtures check out.` · `4 agent spec(s) check out.` ·
-> `airlock.policy.yaml checks out` · `32 claims, every one anchored to a line that exists.`
+> `345 tests, 0 fail` · `18 fixtures check out.` · `4 agent spec(s) check out.` ·
+> `airlock.policy.yaml checks out` · `32 claims, every one anchored to a line that exists.` ·
+> `Console HTTP surface checks out — 53 assertions against a running server.`
 >
 > Included in that: `gate.test.mjs` asserts no non-`PROVEN` certificate opens the gate under
 > any combination of class, status and viewer, and building the contract asserts the
 > compile-time half — [six forgeries of an `ApprovalGrant`](packages/contract/src/gate.typetest.ts)
 > that `tsc` must reject.
+>
+> The last line is the newest and the one that changed the most: `npm test` now boots the
+> console and replays the documented interactions against it — the `curl` transcripts in this
+> README, DEMO.md's verdicts, and all three identity postures. `npm run test:fast` skips it
+> when you only want the unit half.
 
 ```bash
 npm run verify:ledger
@@ -307,6 +340,23 @@ curl -s -XPOST http://localhost:3000/api/dossiers/dos_currency_fix/decision \
 > ```
 > The gate is not a UI state. Approving over HTTP with no browser involved is refused by the
 > same function, on the server, against the stored dossier.
+
+**And the half that is a statement about a screen.** "The Approve control is never rendered" is
+not a claim any unit test can settle, so it is driven in a real browser instead — every control
+DEMO.md tells a presenter to press, in the order it tells them to press it:
+
+```bash
+npm run build --workspace @airlock/console
+npm start --workspace @airlock/console &
+npx playwright-core install chromium      # once; ~140MB, which is why it is not in npm test
+npm run check:demo:ui
+```
+> `The demo's controls check out — 26 interactions driven in a real browser.`
+>
+> Six refusals from six different causes, the Approve control disappearing rather than
+> disabling, the quorum rendering `Countersign — 0 of 2` with no signature and an armed destroy
+> with one, and the ledger demo breaking its own chain and putting it back. `npm run check:a11y`
+> audits the same three routes against WCAG 2.1 AA.
 
 ### The full list
 
@@ -333,13 +383,13 @@ reading the code rather than typed in and left to rot.
 | The verifier's own `match` flag is never trusted. AIRLOCK recomputes `pre === post_rollback` itself. | [`gate.ts:284`](packages/contract/src/gate.ts#L284) | `node --test packages/contract/test/gate.test.mjs` | A dossier claiming `match:true` over differing checksums is still sealed. |
 | A claim of danger is believed; a claim of safety is recomputed. Drift seals the gate even when the drift checker reported everything fine. | [`gate.ts:411`](packages/contract/src/gate.ts#L411) | `node --test packages/contract/test/policy.test.mjs` | `drifted:false` with a production checksum that does not match still seals. |
 | Break-glass is not an approval: `BreakGlassOverride` carries a different private symbol, and no function accepts both. | [`gate.ts:454`](packages/contract/src/gate.ts#L454) | `node --test packages/contract/test/policy.test.mjs` | Two of the six compile-error forgeries are exactly this swap. |
-| The same rule runs server-side. Approving over HTTP with no browser involved is refused identically. | [`dossierStore.ts:418`](apps/console/src/data/dossierStore.ts#L418) | `curl -s -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision -H 'Content-Type: application/json' -d '{"decision":"approved"}'` | `{"error":"CERTIFICATE_FAILED"}` and HTTP 403. |
+| The same rule runs server-side. Approving over HTTP with no browser involved is refused identically. | [`dossierStore.ts:461`](apps/console/src/data/dossierStore.ts#L461) | `curl -s -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision -H 'Content-Type: application/json' -d '{"decision":"approved"}'` | `{"error":"CERTIFICATE_FAILED"}` and HTTP 403. |
 
 **Policy**
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| A quorum counts people, not clicks — signatures collapse by identity, so one approver signing twice is one approver. | [`dossier.ts:774`](packages/contract/src/dossier.ts#L774) | `node --test packages/contract/test/policy.test.mjs` | Two signatures from one identity leave the change still waiting. |
+| A quorum counts people, not clicks — signatures collapse by identity, so one approver signing twice is one approver. | [`dossier.ts:798`](packages/contract/src/dossier.ts#L798) | `node --test packages/contract/test/policy.test.mjs` | Two signatures from one identity leave the change still waiting. |
 | No standing production access: every access grant must carry an expiry, so the default state is that nobody holds the keys. | [`policy.ts:85`](packages/contract/src/policy.ts#L85) | `npm run check:fixtures` | `access-grant.standing.json` is refused for `GRANT_WITHOUT_EXPIRY`. |
 | The shipped `airlock.policy.yaml` is byte-identical to the compiled default, so the documented policy and the enforced one cannot disagree. | [`check-policy.mjs:53`](scripts/check-policy.mjs#L53) | `npm run check:policy` | `airlock.policy.yaml checks out — 7 classes, identical to the shipped default.` |
 
@@ -354,9 +404,9 @@ reading the code rather than typed in and left to rot.
 
 | The claim | The code | Run this | What you see |
 | --- | --- | --- | --- |
-| There is no tool that applies a change to production. Twelve tools ship; exactly one is destructive, and the harness holds it for a human. | [`tools.ts:1266`](packages/mcp/src/tools.ts#L1266) | `node --test packages/mcp/test/server.test.mjs` | The tool list is asserted whole — a thirteenth tool fails the test. |
+| There is no tool that applies a change to production. Thirteen tools ship; exactly one is destructive, and the harness holds it for a human. | [`tools.ts:1400`](packages/mcp/src/tools.ts#L1400) | `node --test packages/mcp/test/server.test.mjs` | The tool list is asserted whole — a fourteenth tool fails the test. |
 | The agent may open a pull request and may not merge one. `merge_pull_request` is on a deny-list checked independently of the allow-list. | [`check-agents.mjs:73`](scripts/check-agents.mjs#L73) | `npm run check:agents` | Four specs check out; `airlock-scout` reports no path to production at all. |
-| The agent looks facts up instead of asking. A fact lives in a system of record; only judgement is put to a human. | [`tools.ts:988`](packages/mcp/src/tools.ts#L988) | `node --test packages/contract/test/resolve.test.mjs` | Twelve tools; this is the one that records what was resolved and where from. |
+| The agent looks facts up instead of asking. A fact lives in a system of record; only judgement is put to a human. | [`tools.ts:1043`](packages/mcp/src/tools.ts#L1043) | `node --test packages/contract/test/resolve.test.mjs` | Twelve tools; this is the one that records what was resolved and where from. |
 | An ambiguous fact seals the gate ahead of the certificate, and is asked with its candidates listed rather than as an empty box. | [`gate.ts:249`](packages/contract/src/gate.ts#L249) | `npm run check:fixtures` | `dos_refund_ambiguous` — a flawless SCOPE proof, refused because two customers matched one email. |
 | Resolved facts are fingerprinted into the certificate and re-checked before the gate, so a fact that moved seals the door. | [`resolve.ts:239`](packages/contract/src/resolve.ts#L239) | `npm run check:fixtures` | `dos_payout_context_drift` — no row changed, no checksum noticed, the pin caught it. |
 | A pinned proof nobody re-checked is refused rather than waved through: an absent check is not a passed check. | [`resolve.ts:276`](packages/contract/src/resolve.ts#L276) | `node --test packages/contract/test/resolve.test.mjs` | CONTEXT_UNVERIFIED, kept distinct from CONTEXT_DRIFTED so neither hides inside the other. |
@@ -1007,7 +1057,7 @@ computed-style probe — which is to say, by measuring rather than by looking.
 ## Tests
 
 ```bash
-npm test        # 340 tests, 18 fixtures, 4 agent specs, 1 policy file, 32 claims, 4 SVG assets
+npm test        # 345 tests, 18 fixtures, 4 agent specs, 1 policy file, 32 claims, 4 SVG assets
 ```
 
 Those four numbers are **checked, not typed**. `verify-claims.mjs` runs the suite, counts the
@@ -1015,7 +1065,7 @@ files and compares them against this line, so adding a test and forgetting the R
 build. A reader who counts 206 against a README promising 201 has been handed a reason to
 disbelieve the other twenty-three claims, and that is a lot of damage for a stale integer.
 
-Twenty-one suites, and each pins a property rather than an implementation:
+Twenty-two suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |

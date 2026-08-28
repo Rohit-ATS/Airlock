@@ -48,7 +48,7 @@ import {
   scanResolvedFacts,
   operationsFingerprint,
 } from '@airlock/contract';
-import { verifyOnSqliteShadow } from '@airlock/verifier';
+import { verifyOnSqliteShadow, verifyOnPostgresShadow } from '@airlock/verifier';
 import path from 'node:path';
 import type { ToolDefinition } from './protocol.js';
 
@@ -62,6 +62,28 @@ const SQLITE_PATH = process.env.SQLITE_PATH ?? path.resolve(process.cwd(), 'data
 
 /** Where throwaway copies live. Each is deleted the moment its run ends. */
 const SHADOW_DIR = process.env.AIRLOCK_SHADOW_DIR ?? path.resolve(process.cwd(), '.airlock/shadow');
+
+/**
+ * The real Postgres, when there is one.
+ *
+ * With these set, a proof runs against a throwaway schema in the operator's own
+ * database, populated from their own rows. Without them it falls back to the
+ * local SQLite file, which is a real measurement of a database that is not
+ * theirs — fine for a fresh clone, and the cause of the most confusing failure
+ * this product can produce once a live connector is attached: the agent reads
+ * the live schema, writes a correct migration against it, and the proof reports
+ * the table does not exist.
+ */
+const SUPABASE_URL = process.env.SUPABASE_URL ?? '';
+const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN ?? '';
+const SUPABASE_PROJECT_REF = (() => {
+  if (!SUPABASE_URL) return '';
+  try {
+    return new URL(SUPABASE_URL).hostname.split('.')[0] ?? '';
+  } catch {
+    return '';
+  }
+})();
 
 /** The identity the agent acts as. Never an approver: an agent cannot open the gate. */
 const AGENT_IDENTITY = process.env.AIRLOCK_AGENT_IDENTITY ?? 'agent@airlock';
@@ -621,14 +643,29 @@ export function airlockTools(): ToolDefinition[] {
         const runId = `${dossier.dossier_id}-${Date.now()}`;
 
         // The measurement. Everything below this line is a reading, not a claim.
-        const result = verifyOnSqliteShadow({
-          databasePath: SQLITE_PATH,
-          shadowDir: SHADOW_DIR,
-          runId,
-          tables,
-          forward,
-          rollback,
-        });
+        //
+        // Against the operator's real Postgres when one is configured, because a
+        // proof of somebody else's database proves nothing about this change.
+        // The local SQLite file remains the fallback so a fresh clone still runs
+        // with no credentials at all.
+        const usePostgres = Boolean(SUPABASE_PROJECT_REF && SUPABASE_ACCESS_TOKEN);
+        const result = usePostgres
+          ? await verifyOnPostgresShadow({
+              projectRef: SUPABASE_PROJECT_REF,
+              accessToken: SUPABASE_ACCESS_TOKEN,
+              runId,
+              tables,
+              forward,
+              rollback,
+            })
+          : verifyOnSqliteShadow({
+              databasePath: SQLITE_PATH,
+              shadowDir: SHADOW_DIR,
+              runId,
+              tables,
+              forward,
+              rollback,
+            });
 
         // Row counts come back from COUNT(*) on the shadow, so `affected_tables`
         // stops being a number the agent asserted and becomes one that was
@@ -650,10 +687,18 @@ export function airlockTools(): ToolDefinition[] {
           ...(result.checksums ? { checksums: result.checksums } : {}),
           ...(result.forward_ms !== null ? { lock_ms_estimate: Math.round(result.forward_ms) } : {}),
           // Where it ran, in a field that already means "where the evidence is".
-          // `local-shadow://` rather than a sandbox URL because it ran on this
-          // host, and a certificate that implied an isolated sandbox would be
-          // claiming a blast-radius guarantee nobody provided.
-          sandbox_artifact_url: `local-shadow://${runId}`,
+          //
+          // The scheme is not decoration. `local-shadow://` says the proof ran
+          // against a copy of a local file on this host — a real measurement of
+          // a database that may not be the one the change is destined for.
+          // `pg-shadow://` says it ran against a throwaway schema inside the
+          // operator's own Postgres, populated from their own rows. A reader
+          // deciding how much a certificate is worth needs to be able to tell
+          // those apart, and a single hardcoded scheme quietly claimed the
+          // weaker one even when the stronger had happened.
+          sandbox_artifact_url: usePostgres
+            ? `pg-shadow://${SUPABASE_PROJECT_REF}/${runId}`
+            : `local-shadow://${runId}`,
           // The statements this proof is about. The gate recomputes the
           // dossier's own fingerprint and refuses if they have diverged, so a
           // genuinely measured certificate cannot be carried by a dossier whose
@@ -710,7 +755,17 @@ export function airlockTools(): ToolDefinition[] {
           );
         }
         if (result.forward_ms !== null) lines.push(`  forward took: ${result.forward_ms.toFixed(1)} ms (measured)`);
-        lines.push(`  ran in      : local shadow copy, destroyed on exit`, '', renderGate(saved));
+        // Says which of the two shadows this was. The line is read by the agent
+        // and quoted to a human, so a proof taken against the operator's own
+        // Postgres must not describe itself as a local file — that understates
+        // the evidence exactly as badly as the reverse would overstate it.
+        lines.push(
+          usePostgres
+            ? `  ran in      : throwaway schema in your Postgres, copied from live rows, dropped on exit`
+            : `  ran in      : local shadow copy, destroyed on exit`,
+          '',
+          renderGate(saved),
+        );
 
         return lines.join('\n');
       },
@@ -1104,6 +1159,85 @@ export function airlockTools(): ToolDefinition[] {
                 'candidates listed — an empty question about a fact is the thing this replaces.',
               ]
             : []),
+          '',
+          renderGate(saved),
+        ].join('\n');
+      },
+    },
+
+    {
+      name: 'airlock_attach_blast_radius',
+      description:
+        'Record every place in the codebase that reads what this change touches — found by SEARCHING THE CODE, not by remembering it. Clone the repository into your sandbox, grep it for the column, table or symbol the migration alters, and report the hits here with file and line. This is the half of a schema change that a database cannot tell you about: dropping users.plan_name is not finished when the column is gone, it is finished when the fourteen places that SELECT it no longer do, and a migration that is reversible in the database can still take the application down. Run the scan in the sandbox — cloning somebody\'s repository and executing a search across it is exactly the work that does not belong on the host. Report what the search actually printed. A blast radius you recalled instead of measured is worth nothing here, and an empty result from a scan that really ran is a finding in itself.',
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, title: 'Attach the blast radius' },
+      inputSchema: {
+        type: 'object',
+        required: ['dossier_id', 'hits'],
+        properties: {
+          dossier_id: { type: 'string' },
+          scanned: {
+            type: 'string',
+            description: 'The command you ran in the sandbox, verbatim. This is what makes the result checkable.',
+          },
+          hits: {
+            type: 'array',
+            description: 'One entry per place the code touches what this change alters. Empty is a valid answer when the scan really found nothing.',
+            items: {
+              type: 'object',
+              required: ['repo', 'file', 'line'],
+              properties: {
+                repo: { type: 'string', description: 'owner/name' },
+                file: { type: 'string', description: 'Path inside the repository.' },
+                line: { type: 'integer', description: 'Line number the match was on. From the search output, not estimated.' },
+                symbol: { type: 'string', description: 'The column, table or identifier that matched.' },
+                excerpt: { type: 'string', description: 'The matching line, trimmed.' },
+              },
+            },
+          },
+        },
+      },
+      handler: async (args) => {
+        const dossier = await getChange(str(args.dossier_id));
+        if (dossier.approval.decision !== null || dossier.audit.applied_at !== null) {
+          throw new Error('That change has already been decided.');
+        }
+
+        const hits = list(args.hits).map((h) => {
+          const item = (h ?? {}) as Record<string, unknown>;
+          return {
+            repo: str(item.repo),
+            file: str(item.file),
+            line: int(item.line),
+            ...(item.symbol ? { symbol: str(item.symbol) } : {}),
+            ...(item.excerpt ? { excerpt: str(item.excerpt).slice(0, 300) } : {}),
+          };
+        });
+
+        const parsed = safeParseDossier({ ...dossier, blast_radius: hits });
+        if (!parsed.success) {
+          throw new Error(
+            `The blast radius does not match the contract:\n${parsed.error.issues
+              .map((i) => `  ${i.path.join('.')}: ${i.message}`)
+              .join('\n')}`,
+          );
+        }
+        const saved = await putChange(parsed.data);
+
+        const files = new Set(hits.map((h) => `${h.repo}:${h.file}`));
+        return [
+          hits.length === 0
+            ? `No code reads what ${saved.dossier_id} changes — by search, not by assumption.`
+            : `${hits.length} reference(s) across ${files.size} file(s) read what ${saved.dossier_id} changes.`,
+          ...(args.scanned ? ['', `  scanned: ${str(args.scanned)}`] : []),
+          ...hits.slice(0, 12).map((h) => `  ${h.repo}/${h.file}:${h.line}${h.symbol ? `  ${h.symbol}` : ''}`),
+          ...(hits.length > 12 ? [`  … and ${hits.length - 12} more`] : []),
+          '',
+          hits.length === 0
+            ? 'Nothing in the application depends on this. The migration stands on its own.'
+            : 'These are the places a human is about to be asked to accept breaking. If the migration',
+          ...(hits.length === 0
+            ? []
+            : ['removes something they read, open the code changes too — a schema change without them is half a change.']),
           '',
           renderGate(saved),
         ].join('\n');

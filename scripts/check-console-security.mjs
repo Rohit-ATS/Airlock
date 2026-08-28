@@ -52,6 +52,27 @@ for (const rel of [
   expectMatches(rel, /const\s+origin\s*=\s*requireSameOrigin\(request\);\s*if\s*\(origin\)\s*return\s+origin;/s, 'must reject cross-origin browser writes before parsing or writing');
 }
 
+/*
+ * A decision verb is matched exactly, never defaulted.
+ *
+ * The regression this pins actually shipped: the route read
+ * `body.decision === 'rejected' ? 'rejected' : 'approved'`, so every input that
+ * was not the literal string "rejected" — a tense typo, the wrong case, a null,
+ * an empty body — approved the change and answered 200. The behavioural half of
+ * this is asserted over real HTTP in scripts/check-console-http.mjs; this is the
+ * cheap source-level half that fails fast without booting a server.
+ */
+expectMatches(
+  'apps/console/app/api/dossiers/[id]/decision/route.ts',
+  /if\s*\(body\.decision\s*!==\s*'approved'\s*&&\s*body\.decision\s*!==\s*'rejected'\)/s,
+  'decision verb must be matched exactly and refused otherwise, never defaulted to approved',
+);
+expectMatches(
+  'apps/console/app/api/dossiers/[id]/decision/route.ts',
+  /INVALID_DECISION/,
+  'an unrecognised decision verb must be refused by name',
+);
+
 expectIncludes(
   'apps/console/app/harness/[...path]/route.ts',
   "import { requireSameOrigin } from '@/server/machineAuth';",
