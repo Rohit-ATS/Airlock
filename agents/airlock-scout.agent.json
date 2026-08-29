@@ -3,7 +3,7 @@
   "comment": "Per-task model routing, honestly. TrueForge subagents are dynamic and inherit the root agent's model, so per-subagent routing is not configurable (see docs/TRUEFORGE-NOTES.md §4). What IS real is routing at the agent boundary: reconnaissance work — scanning a repo for references, counting rows, reading release notes — does not need the model that authors a migration, and does not need to cost what it costs. AIRLOCK routes that work to this agent and reports both models and both costs from real turn metrics.",
   "manifest": {
     "model": {
-      "name": "openai/gpt-4.1-mini",
+      "name": "openai/gpt-5-mini",
       "params": {
         "max_tokens": 4096,
         "temperature": 0

@@ -1,156 +1,168 @@
 # The demo
 
-A runbook for the three-minute submission video, and for anyone who wants to see what AIRLOCK
-does without reading the source.
-
-Everything below works on a fresh clone with no database, no API key and no signup. Nothing in
-this script requires the verification engine to be running.
+Three problems, and what AIRLOCK does about each. It runs live against a real database — every
+number on screen is measured while you watch.
 
 ```bash
-git clone https://github.com/Rohit-ATS/Airlock && cd Airlock
-npm install
-npm run build --workspace @airlock/contract
-npm run dev --workspace @airlock/console
+npm run up                        # harness + MCP server + console, one command
+npm run seed:supabase -- --reset  # 1,000,000 rows across six tables — once, then never again
+npm run demo                      # the three acts, ~90 seconds
 ```
 
-Every interaction in this runbook is replayed against a running server by
-[`check-console-http.mjs`](../scripts/check-console-http.mjs) in CI — the verdicts, the undo
-states, the refusals and the approvals. A step that stops working here fails the build rather
-than failing on camera.
+`npm run demo -- --yes` never pauses, for rehearsing or recording a take.
 
-### The orange bar at the top, and what to say about it
+---
 
-On a fresh clone there is no harness, so there is no identity provider, so AIRLOCK signs you in
-as a single **local operator** and puts a permanent orange notice above the console saying
-exactly that. Do not skip past it — it is a thirty-second beat that makes the rest credible:
+## What this replaced, and why
+
+The previous runbook was a list of things to click in a console seeded with hand-written
+fixtures. The fixtures were honest — they said they were fixtures — but every impressive number
+in the demo came from a JSON file, and the live path and the demonstrated path were describing
+different systems.
+
+Worse, the demo's headline change did not work. Asked to drop `users.plan_name` against the
+real project, the agent read the live schema, correctly found no such column, and stopped to
+ask a human what to do. That was the product behaving *perfectly* and the demo dying on camera,
+because nobody had ever given the gate a database worth guarding.
+
+So the fixtures are still there — they are what makes `/console` show something on a bare clone
+— and **the demo no longer runs on them.**
+
+---
+
+## Before you record
+
+Run the preflight. It is the first thing `npm run demo` does anyway, and it stops rather than
+degrading:
+
+```
+0. Is any of this actually running?
+
+   ✓  the console                        you are local-admin (approver)
+   ✓  the AIRLOCK MCP server             13 tools, none of which write to production
+   ✓  the demo database                  policy readable
+   ✓  real rows behind it                100,000 users, plan_name present, 1 dependent index
+```
+
+A missing precondition names the command that fixes it. **A demo that degrades gracefully is a
+demo that lies**, so if any of the four fails, nothing after it runs.
+
+### The orange bar, and what to say about it
+
+On a machine with no identity provider, AIRLOCK signs you in as a single local operator and
+puts a permanent orange notice above the console saying exactly that. Do not skip past it — it
+is a thirty-second beat that makes everything else credible:
 
 > There is nobody to authenticate me here, so AIRLOCK gave me the approver role and then told
-> you it had, in a banner it will not let me dismiss. That is the same rule as the provenance
-> grades and the unlit capability lamps: the system says what it cannot prove. Point it at a
-> real harness and this disappears — and if that harness is configured and goes down, I become
-> a requester and the gate shuts, because a control that evaporates when a dependency fails is
-> not a control.
-
-If you would rather record without it, run against a harness (`npm run harness:up`) or set
-`AIRLOCK_LOCAL_OPERATOR=0` — but the second one removes your ability to approve anything, which
-is the point of it.
+> you it had, in a banner it will not let me dismiss. Point it at a real harness and this
+> disappears — and if that harness is configured and goes down, I become a requester and the
+> gate shuts, because a control that evaporates when a dependency fails is not a control.
 
 ---
 
 ## The three-minute cut
 
-**Total 3:00.** Times are cumulative. The order matters: the argument has to be *made* before
-it is demonstrated, or the demonstration is just a screen recording of a form.
+**Total 3:00.** The order matters: the argument has to be *made* before it is demonstrated.
 
-### 0:00 — 0:20 · The problem, in one sentence
+### 0:00 — 0:25 · The problem
 
-Land on `/`. Read the headline aloud, then the rule:
+Land on `/`. Read the question out loud:
 
-> `certificate.status !== "PROVEN"` → the approval gate is never offered.
+> **"I'm about to drop `users.plan_name`. Approve?"**
 
-Say the line that separates AIRLOCK from every other approval flow:
+Then say why it is unanswerable:
 
-> Every other approval gate is *"the agent says it is going to do X — click yes."* That asks a
-> human to trust a plan. AIRLOCK's gate cannot be offered until the agent has already done the
-> thing, and undone it, somewhere safe.
+> Nobody can answer that honestly. To answer it you'd need to know whether the rollback works,
+> whether anything still reads the column, how long the table locks. None of that is on the
+> screen. So the human either clicks yes because the agent has been right before — and approval
+> becomes a formality — or clicks no at 2am, and the agent is useless.
+>
+> Every agent approval flow ships this same primitive: the agent states its intention, and a
+> human is asked to trust it. The button is rendered before anyone knows whether the change is
+> safe. That is not a control, it is a signature block.
 
-### 0:20 — 0:55 · Try to break it, live
+### 0:25 — 1:15 · Act 1 — the change that cannot be approved
 
-Scroll to **§02 Try the gate**. This is the strongest thirty-five seconds available, because
-the viewer watches the invariant hold rather than hearing it claimed.
+Run `npm run demo`. Let Act 1 play.
 
-Do exactly this, in this order:
+The agent opens the change and AIRLOCK **executes it** — against a throwaway schema inside the
+same Postgres, populated from the real rows — then runs the rollback and checksums the table a
+third time:
 
-1. Start on the default: migration, proven, checksums match. The Approve control is there.
-2. Flip **the checksum triple** to `Line 3 ≠ line 1`. The button **disappears**. Say:
-   > Not disabled. Not hidden. There is no value this component could be passed — `ApprovalGrant`
-   > carries a symbol only `openGate` can mint.
-3. Flip it back, then set **proof age** to 45 minutes → `CERTIFICATE_STALE`.
-4. Set **production** to *moved since* → `PRODUCTION_DRIFTED`. Say:
-   > The drift checker reported everything was fine. AIRLOCK compared the digests itself and
-   > disagreed. A claim of danger is believed; a claim of safety is recomputed.
-5. Switch class to **Access**, set the grant to *never expires* → `GRANT_WITHOUT_EXPIRY`. Say:
-   > The certificate is perfect. Policy simply does not permit access that never expires.
-6. Set **You are** → *Who asked for it* → `SELF_APPROVAL`.
+```
+✗  the rollback did not bring the data back
+   rows        : users=100,000
+   pre         : sha256:d2f21cbcb608ed22ac13e1e944e929d0c40f6be4c719e328eaeba98f3d350d21
+   post        : sha256:62dd725050452f1b9bd9bd32c9f08a6a4d6b494310921a03584486a6ede4cc83
+   post-rollback: sha256:ad8449f8165a8679dcc7ff29e50fa169fb247197fdcebf9acae8b97f682ecfc4
+   match       : false
+   forward took: 450.0 ms (measured)
+   GATE IS SEALED for dos_demo_drop_plan_name.
+```
 
-Six refusals, six different reasons, in thirty seconds, all running the real function.
+The line to say, while the three hashes are on screen:
 
-### 0:55 — 1:15 · Two kinds of proof
+> Line three is not line one. The column came back; the hundred thousand values in it did not.
+> That is a rollback that *ran without error* and restored nothing — which is exactly the
+> failure a human reading a diff cannot see, and exactly the failure that looks fine in a
+> post-deploy health check.
 
-Scroll to **§03**. Point at the checksum triple: lines 1 and 3 bracketed, line 2 deliberately
-dimmed because it is *expected* to differ.
+Then the beat that matters most in the whole demo — the agent tries to ask anyway:
 
-Then the exclusion list on the right:
+```
+✓  the agent tried to ask a human, and was refused
+   Refused. The gate is sealed for dos_demo_drop_plan_name: CERTIFICATE_FAILED
+   Nobody has been asked anything.
+```
 
-> You cannot prove a deletion reversible. So the agent proves the opposite thing — exactly what
-> it destroys, and exactly what it is deliberately keeping, with the obligation for each. An
-> exclusion with no stated reason is rejected by the contract.
+> Nobody was interrupted. This is not a disabled button — the value that would represent
+> permission was never constructed. `ApprovalGrant` carries a symbol only `openGate` can mint,
+> and `openGate` did not mint one.
 
-### 1:15 — 1:35 · The ledger, verified in the viewer's own browser
+### 1:15 — 2:00 · Act 2 — the change that can be
 
-Scroll to **§07**. Click **Rewrite it** on record #1.
+The column still has to go, so take the first step of expand/contract instead: add `plan_tier`
+and backfill it. Same treatment, no exceptions:
 
-The chain breaks, record #2 greys out, and the verdict flips to `TAMPERING DETECTED`. Say:
+```
+✓  the data came back byte-identical
+   pre         : sha256:d2f21cbcb608ed22a…
+   post        : sha256:059efb9d98ae307e5…
+   post-rollback: sha256:d2f21cbcb608ed22a…
+   match       : true
+   GATE WOULD OPEN.
 
-> That check ran in your browser, not on our server — which is rather the point. A tamper check
-> performed by the system holding the data proves considerably less than one performed by the
-> person who does not trust it.
+⧗  it is now in front of a human, and it stops here
+   It needs 1 more signature(s) from an approver who is not the requester.
+```
 
-### 1:35 — 2:20 · The console
+> Line three *is* line one, byte for byte, across a hundred thousand rows. Now — and only now —
+> a person is asked. And notice where the agent stops: it has no tool that applies a change,
+> and the one tool that moves a change forward is held by the harness. This is the end of what
+> the agent can reach.
 
-Open `/console`. Go straight to **WAITING**.
+### 2:00 — 2:35 · Act 3 — the human, and the record
 
-Thirteen changes waiting — four with the gate open, nine sealed for nine different reasons.
-Click through four, fast:
+Two things have to be true of the decision itself:
 
-| Change | What is on the screen | What to say |
-| --- | --- | --- |
-| `dos_tier_migration` | **Approve — apply to production** | Gate open. Certificate, checksums, blast radius, lock profile, cost — everything needed to decide, on one screen. |
-| `dos_currency_fix` | no approve control at all | *"The rollback restored 1,199,998 of 1,200,000 rows."* A rollback that mostly restores the data is a failure, not a warning. |
-| `dos_refund_stripe` | no approve control at all | £41,904 against a £25,000 ceiling. Proven, and refused. |
-| `dos_access_oncall` | **Countersign — 0 of 2 signatures** | Proven and permitted, and still not enough. A quorum counts people, not clicks. |
-| `dos_erasure_dana` | **This cannot be undone — arm approval** | Sam already signed this one, so *yours is the second of two* — the gate goes final and the control becomes a two-step arm, because the next thing that happens is irreversible. |
+```
+✓  curl on the sealed change: 403 CERTIFICATE_FAILED
+✓  approved  decided
+✓  the chain verifies
+   PASS — the chain is intact across 7 sealed record(s).
+   Head: sha256:2e868a2ddaba432281a04f59c1c1b9805f5e23036bf1b493574e0db15e60bfdd
+```
 
-<sub>Those two erasure/access rows are easy to say the wrong way round on camera, so they are
-written out: <code>dos_access_oncall</code> holds <b>no</b> signatures and offers Countersign;
-<code>dos_erasure_dana</code> holds <b>one</b>, which makes your press the final one and turns
-the control into the armed destroy. Both labels are asserted in
-<a href="../scripts/check-demo-ui.mjs"><code>check-demo-ui.mjs</code></a>.</sub>
+> First: approving the sealed change over `curl`, with no browser involved, is refused with the
+> same reason the UI gives — the gate is re-run on the server against the stored dossier, so it
+> is not a UI state you can route around.
+>
+> Second: the receipt is sealed into a hash chain. Keep that head hash somewhere we cannot
+> reach, and any future edit to any record will change it.
 
-Approve `dos_tier_migration`. It moves to **DID** with a receipt attached — **and a countdown
-starts.**
+### 2:35 — 3:00 · Why it is TrueForge
 
-> Thirty minutes to take it back. Not because undo is easy, but because this change already
-> proved its own rollback against a shadow copy before it was allowed to ask. That inverse is
-> still known-good, and this is how long AIRLOCK is willing to vouch for it.
-
-If there is time, press it. If not, open `dos_plan_column` in **DID** instead — applied,
-health-checked *clean*, and taken back anyway eleven minutes later because finance's nightly
-report read the column that was dropped.
-
-> That is the case a health check can never catch. Every checksum agreed. It was still the
-> wrong change, and only a person was ever going to know that.
-
-Then click the **4.21 s lock estimate** on any certificate.
-
-> Every figure here says where it came from. This one was measured, in the sandbox, and that is
-> the log line that produced it. Click the record count instead and it says *the agent asserted
-> this, and nothing checked it* — because a number a system merely believes should not render
-> identically to one it measured.
-
-### 2:20 — 2:40 · The control room
-
-Open `/control`.
-
-> This is the other audience. Not *"should I approve this one"* but *"what is this system
-> holding, what has it refused, and can I still trust the record of what it did."*
-
-Point at the headline: the number is what the gate **refused**, not what it approved. Then the
-ledger panel, re-verified in the browser, with the head hash.
-
-### 2:40 — 3:00 · Why it is TrueForge
-
-Back to `/console`. Point at the Harness Panel.
+Open `/console` and point at the Harness Panel.
 
 > Twenty-three capabilities. Each lights only when a real harness event proves it — the only
 > writer is a passthrough tap on the event stream. A run that does not exercise one ends below
@@ -174,106 +186,58 @@ Close on the agent spec:
 
 ---
 
-## The refusals, and how to reproduce each
+## The agent path
 
-Every one of these is a fixture in the seeded queue. None of them are staged for the video —
-`npm run check:fixtures` asserts in CI that each produces exactly the verdict listed here.
-
-| Fixture | Gate says | Why |
-| --- | --- | --- |
-| `dos_tier_migration` | **OPEN** | Undo certificate, checksums match, rollback executed |
-| `dos_erasure_dana` | **OPEN**, final | Scope certificate, one of two signatures already held |
-| `dos_access_oncall` | **OPEN**, countersign | Proven and permitted, but needs two people |
-| `dos_currency_fix` | `CERTIFICATE_FAILED` | Rollback restored 1,199,998 of 1,200,000 rows |
-| `dos_access_standing` | `GRANT_WITHOUT_EXPIRY` | Perfect certificate; policy forbids standing access |
-| `dos_refund_stripe` | `POLICY_AMOUNT_CEILING` | £41,904 against a £25,000 ceiling |
-| `dos_incident_email` | `POLICY_PEOPLE_CEILING` | 61,400 people against a 50,000 ceiling |
-| `dos_replica_scaledown` | `PRODUCTION_DRIFTED` | Pool autoscaled from 3 to 4 while the change queued |
-| `dos_orders_backfill` | `POLICY_LOCK_CEILING` | 9.48 s lock against a 2.00 s ceiling — proven, and still refused |
-
-### The undo window, and the four ways it refuses
-
-Same discipline: each is a seeded record, and `undo.test.mjs` pins the rule behind it.
+The demo above drives AIRLOCK's MCP server directly, which is deterministic and fast — the
+right choice for a recording. To show a **live model** doing the same work:
 
 ```bash
-curl -s localhost:3000/api/dossiers/dos_plan_column/undo | jq -r .state    # ALREADY_UNDONE
-curl -s localhost:3000/api/dossiers/dos_gdpr_batch/undo  | jq -r .state    # UNPROVEN
-curl -s localhost:3000/api/dossiers/dos_orders_index/undo | jq -r .state   # CLOSED
-curl -s localhost:3000/api/dossiers/dos_email_unique/undo | jq -r .state   # SUPERSEDED
+npm run harness:turn -- "Drop the legacy column users.plan_name. Confirm against the live \
+schema that it exists, count the rows and the dependent objects, then open a SCHEMA_MIGRATION \
+change with forward and rollback SQL and request approval."
 ```
 
-| State | Why, in one line |
-| --- | --- |
-| `UNPROVEN` | An erasure has no inverse to keep warm. It was never undoable and never claimed to be. |
-| `CLOSED` | Applied three days ago. The proof describes a database that has since moved on. |
-| `SUPERSEDED` | The health check already reverted it automatically. Nothing left to take back. |
-| `ALREADY_UNDONE` | Somebody took it back inside the window, and the record says who and why. |
+The run prints the event stream rather than the answer, because what crossed the wire is the
+evidence: which MCP servers initialised, which tools were called, whether it stopped for a
+human. A real run of that prompt reads the live schema, finds the dependent index via
+`pg_depend`, opens the change, fails verification **three times for three different and correct
+reasons**, and refuses to request approval — the same story as Act 1, arrived at by a model
+rather than by a script.
 
-The one worth saying out loud on camera: **the window is judged on the server.** Approve a
-change, wait, then press undo after it closes — refused, with the closing time quoted back,
-even though the countdown on screen was still drawing a moment earlier.
+Two of those three failures are worth pausing on, because they are the verifier defending
+itself:
 
-## Attacking it from the terminal, on camera
-
-If there is room for one more beat, this is the most convincing twenty seconds in the project,
-because it happens with no browser involved:
-
-```bash
-curl -XPOST localhost:3000/api/dossiers/dos_currency_fix/decision \
-     -H 'content-type: application/json' -d '{"decision":"approved"}'
-# {"error":"CERTIFICATE_FAILED", …}   403
-
-curl -XPOST localhost:3000/api/dossiers/dos_refund_stripe/decision \
-     -H 'content-type: application/json' -d '{"decision":"approved"}'
-# {"error":"POLICY_AMOUNT_CEILING", …}   403
-
-curl -XPOST localhost:3000/api/dossiers/dos_access_oncall/decision \
-     -H 'content-type: application/json' -d '{"decision":"approved"}'
-# {"state":"countersigned","message":"Signature recorded. 1 more approver required, and it cannot be you."}
-
-curl -XPOST localhost:3000/api/dossiers/dos_access_oncall/decision \
-     -H 'content-type: application/json' -d '{"decision":"approved"}'
-# {"error":"SELF_APPROVAL","message":"You have already signed this change. A quorum counts people, not clicks."}
-```
-
-Then break the ledger and get caught:
-
-```bash
-node -e "const f='apps/console/.airlock/ledger.json',j=require('./'+f);
-         j.dos_gdpr_batch.approval.approver='someone.else@airlock.dev';
-         require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
-
-npm run verify:ledger
-#   FAIL #001  dos_gdpr_batch   fault: content-modified
-# FAIL — the chain breaks at record 1. Every record after that point is no longer trustworthy.
-```
+- `alter table public.users …` is **refused before anything runs**. A qualified name ignores
+  `search_path`, so it would have hit production rather than the shadow. It is rejected, not
+  rewritten — rewriting it would produce a certificate about a statement nobody is going to
+  run.
+- `DROP INDEX CONCURRENTLY` cannot run inside a transaction block, and the shadow runs
+  everything in one. The proof reports that rather than quietly dropping the index a different
+  way.
 
 ## Resetting between takes
 
-```bash
-rm -rf apps/console/.airlock       # the queue re-seeds on the next request
+Nothing to reset. A decided change is immutable and there is no route that deletes one — that
+is the property the ledger exists to provide, and adding a back door to make the demo tidier
+would remove the thing being demonstrated. Re-running `npm run demo` takes the next free
+dossier id and says so:
+
+```
+dos_demo_expand_plan_tier is already decided and immutable — this run is dos_demo_expand_plan_tier_2
 ```
 
-Undecided fixtures are re-based to the current time when they are seeded, so the certificates
-are always fresh and the queue is always live. Decided records are **not** re-based — their
-receipts commit to their timestamps, and moving them would break the chain the demo then
-invites you to verify.
+To reset the *console fixtures* (not the demo), delete `apps/console/.airlock` and they re-seed
+on the next request.
 
-## If a TrueForge server is available
+## If something is wrong
 
-Everything above is the fixture path, which is what makes the demo reproducible on any machine.
-With a harness running, two extra beats become available:
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `real rows behind it ✗` | the demo database is empty or has the wrong shape | `npm run seed:supabase -- --reset` |
+| `the AIRLOCK MCP server ✗` | the MCP server is not on :8975 | `npm run mcp:http` |
+| `the console ✗` | nothing on :3000 | `npm run up` |
+| a live agent turn dies on a 429 | the harness is registered on a 30k-TPM model | `npm run harness:setup`, which now registers `gpt-5.2` and `gpt-5-mini` |
+| a live agent turn stops on `execute_sql` | an old agent spec still gates `@destructive` on a read-only connector | `npm run register:agent` |
 
-```bash
-npx @truefoundry/trueforge@latest     # macOS/Linux; on Windows use Docker
-NEXT_PUBLIC_TRUEFORGE_BASE_URL=http://localhost:8790 npm run dev --workspace @airlock/console
-```
-
-- **The Harness Panel lights up as the run proceeds** — one lamp at a time, each with a
-  timestamp and a link to the step that proved it.
-- **The agent hits the gate itself.** Mount `@airlock/mcp` in the agent spec and the run stops
-  at `airlock_request_approval`, held by the harness, with the approval card rendered by the
-  SDK's own component inside AIRLOCK's chrome.
-
-Do not fake either of these. An unlit panel is an honest panel, and a judge who clicks a lamp
-and finds nothing behind it discredits everything else on the screen.
+The last two are the two bugs that made every previous live demo fail; both are written up in
+the README under [The model the agent thinks with](../README.md#the-model-the-agent-thinks-with).

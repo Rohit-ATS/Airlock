@@ -68,16 +68,44 @@ if (!openai && !anthropic) {
  * one vendor. It does not need two vendors, and pretending otherwise would put
  * a second API key between a judge and a working demo.
  *
- * The OpenAI entries are the 4.1 family rather than 5.x because these specs
- * send `temperature` and `max_tokens`, and gpt-5* rejects both with a 400. The
- * treasury agent's temperature-zero design is load-bearing, so the model choice
- * follows the design rather than the other way round.
+ * WHICH OpenAI MODELS, AND WHY IT WAS THE BUG
+ *
+ * TrueForge ships no model catalog. `GET /api/v1/models` returns exactly what
+ * this call registers and nothing else — so the list below is not a preference,
+ * it is the entire set of models the agents are able to name. For most of this
+ * project's life it registered the 4.1 family, and that was the single largest
+ * cause of "AIRLOCK does not work": measured against this account's own key,
+ *
+ *     gpt-4.1        30,000 TPM      <- what the primary agent used to run on
+ *     gpt-4.1-mini  200,000 TPM
+ *     gpt-5-mini    500,000 TPM
+ *     gpt-5.2       500,000 TPM
+ *
+ * One change-control iteration costs about 8.1k input tokens, so on a 30k-per-
+ * minute ceiling a real run is throttled every third or fourth step and usually
+ * dies mid-investigation. The resume-on-429 path in `packages/contract/src/
+ * resume.ts` was built to survive exactly that, and it works — but surviving a
+ * self-inflicted ceiling sixteen times a run is not the same as not having one.
+ *
+ * The reason recorded here previously — that "gpt-5* rejects temperature and
+ * max_tokens with a 400" — was true of the earliest gpt-5 preview and is not
+ * true now. Re-measured 2026-08-29: gpt-5.2 accepts `temperature: 0.1`, accepts
+ * `max_tokens` (the AI SDK in the harness image translates it to
+ * `max_completion_tokens`), and emits ordinary `tool_calls`. The treasury
+ * agent's temperature-zero design therefore survives the move intact, which was
+ * the thing worth checking before making it.
+ *
+ * The 4.1 pair stays registered underneath as the fallback chain's lower rungs.
+ * They cost nothing to leave in the catalog and a rate-limited failover wants
+ * somewhere to fail over to.
  */
 const PROVIDERS = openai
   ? {
       type: 'openai',
       key: openai,
       models: [
+        { model_id: 'gpt-5.2', name: 'gpt-5.2', properties: { context_length: 400_000, max_output_tokens: 128_000 } },
+        { model_id: 'gpt-5-mini', name: 'gpt-5-mini', properties: { context_length: 400_000, max_output_tokens: 128_000 } },
         { model_id: 'gpt-4.1', name: 'gpt-4.1' },
         { model_id: 'gpt-4.1-mini', name: 'gpt-4.1-mini' },
       ],
@@ -123,9 +151,13 @@ const provider = await api('PUT', '/api/v1/settings/model-providers', {
   manifest: {
     type: PROVIDERS.type,
     auth: { api_key: PROVIDERS.key },
+    // Per-model `properties` win. The default below is the 4.1 window; the
+    // gpt-5 entries carry their own, and a spread that clobbered them would
+    // advertise a 1M context on a 400k model — which the harness believes, and
+    // then hands the provider a request it rejects at the worst possible moment.
     models: PROVIDERS.models.map((m) => ({
-      ...m,
       properties: { context_length: 1_047_576, max_output_tokens: 32_768 },
+      ...m,
     })),
   },
 });

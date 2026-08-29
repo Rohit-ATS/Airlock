@@ -56,12 +56,27 @@ description: Change-control agent with production read access and no production 
 # Before it existed the routing was an assertion; now it is a measurement, and
 # the numbers are in docs/BENCHMARK.md.
 
+# A note on the ceilings, because the tier is part of the routing decision and
+# was for a long time the reason AIRLOCK appeared not to work. Measured against
+# this account's own key on 2026-08-29:
+#
+#     gpt-4.1        30,000 TPM
+#     gpt-4.1-mini  200,000 TPM
+#     gpt-5-mini    500,000 TPM
+#     gpt-5.2       500,000 TPM
+#
+# A change-control iteration costs ~8.1k input tokens. Putting the primary tier
+# on the 30k model meant a real run was throttled every few steps and frequently
+# died mid-investigation, which reads to anyone watching as a broken product
+# rather than as a rate limit. It is neither clever nor cheap to run the most
+# token-hungry agent on the narrowest pipe available.
+
 models:
   primary:
-    - id: openai/gpt-4.1
+    - id: openai/gpt-5.2
       weight: 100
   scout:
-    - id: openai/gpt-4.1-mini
+    - id: openai/gpt-5-mini
       weight: 100
 
 # ---------------------------------------------------------------------------
@@ -85,7 +100,8 @@ fallback:
     - timeout
     - server_error           # 5xx
   chain:
-    - openai/gpt-4.1
+    - openai/gpt-5.2
+    - openai/gpt-5-mini
     - openai/gpt-4.1-mini
     - anthropic/claude-sonnet-4-6
   # A run that failed over says so on the certificate rather than quietly

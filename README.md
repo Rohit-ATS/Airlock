@@ -16,7 +16,7 @@
   <img alt="write path" src="https://img.shields.io/badge/tools%20that%20write%20to%20production-0-ff5257?style=flat">
 </p>
 
-**[Live demo](https://rohit-ats.github.io/Airlock/)** &nbsp;·&nbsp; **[Run it](#run-it)** &nbsp;·&nbsp; **[Verify every claim](#verify-it)** &nbsp;·&nbsp; **[The benchmark](docs/BENCHMARK.md)** &nbsp;·&nbsp; **[Three-minute demo](docs/DEMO.md)**
+**[The problem](#the-problem)** &nbsp;·&nbsp; **[See it work](#see-it-work)** &nbsp;·&nbsp; **[Run it](#run-it)** &nbsp;·&nbsp; **[Verify every claim](#verify-it)** &nbsp;·&nbsp; **[The demo runbook](docs/DEMO.md)** &nbsp;·&nbsp; **[Live gate](https://rohit-ats.github.io/Airlock/)**
 
 </div>
 
@@ -24,15 +24,83 @@
 
 **Nothing reaches production without passing through the airlock.**
 
-A change-control console for irreversible production work. Every dangerous change — a schema
-migration, a bulk data correction, a right-to-erasure request, a refund, a production access
-grant, forty thousand emails — is requested in English, executed first against a shadow copy
-of the real system, **proven** in a sandbox, and only then presented to a human for approval,
-with the evidence attached.
+AIRLOCK is a change-control system for AI agents that work on production. The agent does the
+investigation, writes the change *and its inverse*, and **proves the change against a copy of
+the real database** — then a human decides. The agent has no tool that writes to production,
+so there is no path around that.
 
 Built on [TrueForge](https://trueforge.dev) for the Agent Harness Hackathon, 24–30 August 2026.
 
-> **Try it without installing anything.** The gate on the
+---
+
+## The problem
+
+Giving an agent production access is the easy part. The hard part is the sentence at the end
+of it:
+
+> **"I'm about to drop `users.plan_name`. Approve?"**
+
+Nobody can answer that. Not honestly. To answer it you would need to know whether the rollback
+actually works, whether the column is still read anywhere, how long the table is locked, and
+what the blast radius is — and none of that is on the screen. So the human does one of two
+things, and both are bad:
+
+- **clicks yes**, because the agent has been right before, and approval becomes a formality; or
+- **clicks no**, because it is 2am and it is not their column, and the agent becomes useless.
+
+Every agent approval flow currently ships the same primitive: *the agent states its intention,
+a human is asked to trust it.* The button is rendered before anyone knows whether the change
+is safe. That is not a control. It is a signature block.
+
+## What AIRLOCK does about it
+
+It refuses to ask the question until the answer exists.
+
+Before any human is shown anything, the change is **executed for real** — against a throwaway
+schema inside your own Postgres, populated from your own rows — and then **undone**, with the
+table checksummed three times: before, after, and after the rollback.
+
+```
+pre  ==  post_rollback     the data came back. The gate may open.
+pre  !=  post_rollback     it did not. The gate is sealed, and nobody is asked.
+```
+
+That is the whole idea. A human is only ever asked about a change that has **already been
+performed and reversed somewhere safe**, with the evidence attached. The question stops being
+*"do you trust this plan?"* and becomes *"here is what it did and what it cost — do you want
+it?"*, which is a question a person can actually answer.
+
+For changes that genuinely cannot be undone — an erasure, a refund, forty thousand emails —
+there is no reversibility to prove, so AIRLOCK proves the other thing: **exactly** what will
+be destroyed, in every system, plus an explicit list of what it is deliberately keeping and
+the obligation justifying each exclusion.
+
+## Who it is for
+
+The person who owns the database and is being asked to let an agent near it. AIRLOCK is the
+thing you put between the two so the answer can be yes.
+
+## See it work
+
+Three real changes against 100,000 real rows, about ninety seconds:
+
+```bash
+npm run up          # harness, MCP server, console — one command
+npm run demo        # the three acts below, live
+```
+
+| | What happens | Why it matters |
+| --- | --- | --- |
+| **Act 1** | An agent asks to drop `users.plan_name`. AIRLOCK runs it and rolls it back; the data does **not** come back. The gate seals. | The agent then tries to ask a human anyway, **and the server refuses to carry the question.** Nobody was interrupted about a change that could not be undone. |
+| **Act 2** | The same goal via expand/contract: add `plan_tier`, backfill it. Run, rolled back, **byte-identical**. Certificate `PROVEN`. | The gate opens — and stops. This is as far as the agent goes; it has no tool that applies anything. |
+| **Act 3** | A human approves. The receipt is sealed into a hash-chained ledger. | Approving the *sealed* change over `curl` is refused with the same reason the UI gives. The gate is re-run server-side; it is not a UI state. |
+
+Every number the demo prints is measured during the run — the row counts come from the live
+database, the checksums are sha256 over real rows, and the verdicts come from the same
+`openGate()` the console calls. If the harness is down or the database is unseeded, the demo
+**stops** rather than falling back to something that looks identical on camera.
+
+> **Try the gate without installing anything.** The gate on the
 > [live page](https://rohit-ats.github.io/Airlock/) is the real `openGate()` compiled to the
 > browser, not a recording. Every combination you set is a genuine evaluation.
 > **See if you can find one that opens a door it shouldn't.**
@@ -224,6 +292,11 @@ stops working here fails the build instead of failing in front of you.
 
 ## Run it
 
+There are two levels, and they are honestly different. The first shows you the product; the
+second proves it.
+
+### 1. The console, on a bare clone
+
 Node 22.14 or newer ([`.nvmrc`](.nvmrc)). No database, no API key, no signup, no Docker.
 
 ```bash
@@ -233,7 +306,31 @@ npm run build --workspace @airlock/contract
 npm run dev --workspace @airlock/console
 ```
 
-Four commands, about ninety seconds, most of it `npm install`. Then:
+Four commands, about ninety seconds, most of it `npm install`. This runs against seeded
+fixtures: the queue, the certificate card, the policy engine and the ledger are all real code
+on demo data. **It proves the system behaves correctly. It does not prove anything about a
+database**, and the console says so on screen rather than letting you assume otherwise.
+
+### 2. The whole thing, against a real database
+
+This is the one that matters, and it is what the demo runs on.
+
+```bash
+npm run up                        # TrueForge in Docker, the MCP server, the console
+npm run seed:supabase -- --reset  # 1,000,000 rows across six tables, once
+npm run demo                      # three changes, proven live, ~90 seconds
+```
+
+`npm run up` brings up four moving parts in the right order and refuses to print success until
+each one answers for itself. `npm run demo` then opens two real changes through the MCP
+server, proves them against a throwaway schema inside your own Postgres, and stops for a human
+— the full runbook is in [docs/DEMO.md](docs/DEMO.md).
+
+You also need a model provider for the *agent* path. AIRLOCK registers `gpt-5.2` and
+`gpt-5-mini`; see [the note on model ceilings](#the-model-the-agent-thinks-with) for why those
+two and not the ones it used to use.
+
+Either way, then:
 
 | Route | What it is |
 | --- | --- |
@@ -975,6 +1072,89 @@ tool name, the large-result offload marker, and whether a compaction event is em
 listed as unverified. If a real run does not prove them, those lamps stay dark and the
 denominator drops. **An honest 20/20 beats a padded 23/23 that a judge disproves by clicking
 one lamp.**
+
+### The model the agent thinks with
+
+For most of this project's life the honest answer to *"does the agent work?"* was **"sometimes,
+for a while."** A real change-control run would read the policy, start investigating, and then
+die partway through with a 429. The cause was not the harness, not the key, and not the agent
+design. It was this repository registering the wrong two models.
+
+TrueForge ships **no model catalog**. `GET /api/v1/models` returns exactly what you registered
+through `PUT /api/v1/settings/model-providers` and nothing else — so the list in
+[`harness-setup.mjs`](scripts/harness-setup.mjs) is not a preference, it is the entire
+vocabulary of models the agents are able to name. It registered the 4.1 family. Measured
+against this account's own key on 29 August 2026:
+
+| model | tokens per minute |
+| --- | --- |
+| `gpt-4.1` | **30,000** ← what the primary agent ran on |
+| `gpt-4.1-mini` | 200,000 |
+| `gpt-5-mini` | **500,000** |
+| `gpt-5.2` | **500,000** |
+
+One change-control iteration costs about 8.1k input tokens (`state.metrics` breaks it down:
+tool definitions, instructions, harness overhead). Against a 30,000-per-minute ceiling that is
+throttled every third or fourth step, and a full investigation frequently did not survive it.
+The most token-hungry agent in the system had been pointed at the narrowest pipe available on
+the account — while two models with **sixteen times the headroom** sat unregistered on the same
+key.
+
+The reason recorded in the code for avoiding gpt-5 was that *"gpt-5 rejects `temperature` and
+`max_tokens` with a 400."* That was true of the earliest preview and is no longer true.
+Re-measured before the change: `gpt-5.2` accepts `temperature: 0.1`, accepts `max_tokens` (the
+harness image's `@ai-sdk/openai` translates it to `max_completion_tokens`), and emits ordinary
+`tool_calls`. The treasury agent's temperature-zero design therefore survives the move intact,
+which was the thing worth checking before making it.
+
+The resume-on-429 machinery in [`resume.ts`](packages/contract/src/resume.ts) is still there
+and still correct — a rate limit arrives as `turn.done` with `status: "error"`, not as an
+exception, and the run is resumed by chaining a turn with empty input. It is simply no longer
+load-bearing. **Surviving a self-inflicted ceiling sixteen times a run is not the same as not
+having one.**
+
+The 4.1 pair stays in the catalog as the lower rungs of the fallback chain in
+[`airlock-gateway.yaml`](gateway/airlock-gateway.yaml). They cost nothing to leave registered,
+and a failover wants somewhere to fail over to.
+
+### The read that was mistaken for a write
+
+The second reason live runs looked broken had nothing to do with models, and was more
+embarrassing: **AIRLOCK held a read for human approval, and stalled every run before it reached
+the gate.**
+
+Supabase's hosted MCP server, mounted read-only, exposes thirteen tools. All thirteen carry
+`readOnlyHint: true`. But `execute_sql` *also* carries `destructiveHint: true` — a leftover
+from the read-write build, where it genuinely can drop a table. TrueForge resolves the
+`@destructive` selector against exactly that hint, so an agent mounting
+
+```json
+"require_approval_for_tools": ["@write", "@destructive"]
+```
+
+held `execute_sql` for a person. The agent would read the policy, go to look up its first fact,
+and stop — before opening a change, before any certificate, before the gate it exists to reach.
+To anyone watching, AIRLOCK did not work. What it actually was is a safety rule firing on a
+`SELECT`.
+
+The hold bought nothing, and that is checkable rather than arguable. The connector URL carries
+`read_only=true`, and Postgres refuses the write itself:
+
+```console
+$ execute_sql "CREATE TABLE airlock_probe_should_never_exist (id int);"
+ERROR:  25006: cannot execute CREATE TABLE in a read-only transaction
+```
+
+That is enforcement one layer below anything an agent spec can say, which is the right place
+for it. Gating a read on top of it did not add a control — it just moved the demo's failure
+earlier. So the Supabase connector's approval list is now empty, with the reasoning written
+into [the agent spec](agents/airlock-change-control.agent.json) next to it, and the tool that
+moves a change towards production is still held: `airlock_request_approval`, which
+[`check-agents.mjs`](scripts/check-agents.mjs) fails the build over if it ever is not.
+
+**The lesson worth keeping:** a control that fires on the wrong thing is not a safe default.
+It spends the same human attention as a real one, teaches people to click through it, and in
+this case it stopped the product from ever demonstrating the control that *is* real.
 
 ### What a clean clone found
 
