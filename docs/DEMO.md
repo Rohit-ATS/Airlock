@@ -13,6 +13,48 @@ npm run demo                      # the three acts, ~90 seconds
 
 ---
 
+## Setting this up on a second machine
+
+Nothing here is machine-specific, but two things are account-specific and neither can be
+committed to the repo. Both go in `.env` — copy `.env.example`, which explains each one in
+place.
+
+**1. A Supabase project you do not mind seeding.** `npm run seed:supabase -- --reset` **drops
+and rebuilds** six tables, so point it at a scratch project, not at anything you care about.
+You need:
+
+| | where it comes from |
+| --- | --- |
+| `SUPABASE_URL` | Settings → API on the project. The project ref is its subdomain, and is derived from this. |
+| `SUPABASE_ACCESS_TOKEN` | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) — a *personal access token*, **not** the anon key and **not** the service role key. |
+
+Then `npm run seed:supabase -- --check` reports what is actually there and changes nothing.
+Run it first; it is the fastest way to find out whether the demo will work.
+
+The seeder writes with that admin token, from a terminal, as a human. **The agent never sees
+it** — it reads the same database over `read_only=true`, where Postgres refuses writes itself.
+Setting the demo up and running the demo are deliberately different privileges.
+
+**2. A model key, but only for the agent path.** `npm run demo` drives AIRLOCK's own MCP server
+and proves the gate **without any model key at all**, which is the point of driving it that way
+— the demo cannot fail for a reason that has nothing to do with the product. You only need
+`OPENAI_API_KEY` for `npm run harness:turn`, and then `npm run harness:setup` registers it.
+
+So the shortest path to seeing the whole thing work on a new machine is:
+
+```bash
+npm install
+cp .env.example .env          # fill in the two SUPABASE_ lines
+npm run up
+npm run seed:supabase -- --reset
+npm run demo
+```
+
+If `npm run demo` prints a red ✗ in its preflight, the table at the bottom of this page names
+the command that fixes it.
+
+---
+
 ## What this replaced, and why
 
 The previous runbook was a list of things to click in a console seeded with hand-written

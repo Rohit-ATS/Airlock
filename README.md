@@ -326,9 +326,21 @@ each one answers for itself. `npm run demo` then opens two real changes through 
 server, proves them against a throwaway schema inside your own Postgres, and stops for a human
 — the full runbook is in [docs/DEMO.md](docs/DEMO.md).
 
-You also need a model provider for the *agent* path. AIRLOCK registers `gpt-5.2` and
-`gpt-5-mini`; see [the note on model ceilings](#the-model-the-agent-thinks-with) for why those
-two and not the ones it used to use.
+Two things are account-specific and cannot be committed, both explained in place in
+[`.env.example`](.env.example):
+
+- **`SUPABASE_URL` and `SUPABASE_ACCESS_TOKEN`** — a scratch Supabase project for the seeder to
+  build in. `--reset` drops and rebuilds six tables, so do not point it at anything you care
+  about. `npm run seed:supabase -- --check` reports what is there and changes nothing; run that
+  first.
+- **`OPENAI_API_KEY`** — only for the *agent* path (`npm run harness:turn`). `npm run demo`
+  drives AIRLOCK's own MCP server and proves the gate with no model key at all, deliberately:
+  the demo should not be able to fail for a reason that has nothing to do with the product.
+  AIRLOCK registers `gpt-5.2` and `gpt-5-mini`; see
+  [the note on model ceilings](#the-model-the-agent-thinks-with) for why those two and not the
+  ones it used to use.
+
+The full second-machine setup is in [docs/DEMO.md](docs/DEMO.md#setting-this-up-on-a-second-machine).
 
 Either way, then:
 
