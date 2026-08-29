@@ -89,19 +89,36 @@ function readEnv(key) {
   }
 }
 
-/** The ids that ship with the repo. Anything else is somebody's real change. */
-function shippedIds() {
+/**
+ * The fixtures that ship with the repo, by id. Anything else is somebody's real
+ * change and is never touched.
+ *
+ * The shipped object is kept, not just the id, because re-dating is not the only
+ * way a demo fixture drifts. Signatures drift too, and they drift *because of our
+ * own checks*: `check-demo-ui.mjs` asserts that `dos_access_oncall` offers a
+ * countersign control by pressing it, and `check-console-http.mjs` replays the
+ * documented approvals against a running console. Either one leaves that fixture
+ * holding a real countersignature, so the next run finds one of two signatures
+ * already held, correctly declines to offer the same person the second, and
+ * fails with "no countersign control".
+ *
+ * The check was right both times. The fixture had moved. That made the whole
+ * suite pass once per machine and fail on every re-run, which is the worst
+ * failure mode a demo check can have — it is green when you write it and red
+ * when you rehearse.
+ */
+function shippedFixtures() {
   const dir = path.join(root, 'contracts', 'examples');
-  const ids = new Set();
+  const byId = new Map();
   for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.json'))) {
     try {
       const fixture = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
-      if (fixture?.dossier_id) ids.add(fixture.dossier_id);
+      if (fixture?.dossier_id) byId.set(fixture.dossier_id, fixture);
     } catch {
       // A fixture that will not parse is check-fixtures' problem, not ours.
     }
   }
-  return ids;
+  return byId;
 }
 
 const file = ledgerPath();
@@ -111,7 +128,8 @@ if (!fs.existsSync(file)) {
 }
 
 const ledger = JSON.parse(fs.readFileSync(file, 'utf8'));
-const ids = shippedIds();
+const shipped = shippedFixtures();
+const ids = new Set(shipped.keys());
 
 const entries = Object.entries(ledger);
 const fixtures = entries.filter(([id, d]) => ids.has(id) && !d.receipt && !d.approval?.decision && !d.audit?.applied_at);
@@ -129,8 +147,24 @@ const freshened = freshenFixtures(
 );
 
 const next = { ...ledger };
+let unsigned = 0;
 freshened.forEach((d, i) => {
-  next[fixtures[i][0]] = d;
+  const id = fixtures[i][0];
+
+  /*
+   * Restore the shipped signature list along with the dates.
+   *
+   * Only for open shipped fixtures — the filter above has already excluded
+   * anything decided, applied or carrying a receipt, so nothing in a hash chain
+   * can reach this line. Within that set the shipped value is the truth: these
+   * are demo data, and a seal one of our own test replays added is not a record
+   * of a person deciding anything.
+   */
+  const want = shipped.get(id)?.signatures ?? [];
+  const have = d.signatures ?? [];
+  if (JSON.stringify(have) !== JSON.stringify(want)) unsigned += 1;
+
+  next[id] = { ...d, signatures: want };
 });
 
 fs.writeFileSync(file, JSON.stringify(next, null, 2), 'utf8');
@@ -138,6 +172,9 @@ fs.writeFileSync(file, JSON.stringify(next, null, 2), 'utf8');
 console.log('');
 console.log(`${BOLD}Demo fixtures refreshed${OFF}`);
 console.log(`   ${GREEN}ok${OFF}   ${fixtures.length} open fixture(s) re-dated ${DIM}(they were ${fmt(staleBy)} stale)${OFF}`);
+if (unsigned > 0) {
+  console.log(`   ${GREEN}ok${OFF}   ${unsigned} fixture(s) restored to their shipped signatures`);
+}
 console.log(`   ${DIM}left alone: ${untouched} sealed, decided or real record(s)${OFF}`);
 
 // Say how many are now actually approvable. That number is the whole reason
