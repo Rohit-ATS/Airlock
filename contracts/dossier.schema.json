@@ -424,12 +424,6 @@
       ]
     },
     "magnitude": {
-      "default": {
-        "records": 0,
-        "people": 0,
-        "amount_minor": 0,
-        "undo_window_seconds": null
-      },
       "type": "object",
       "properties": {
         "records": {
