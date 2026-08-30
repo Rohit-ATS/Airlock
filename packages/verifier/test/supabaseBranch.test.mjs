@@ -126,6 +126,22 @@ test('redacts Supabase tokens from Management API errors', async () => {
   });
 });
 
+test('preserves a 402 branch limit so callers can fall back safely', async () => {
+  const c = client(async () => ({
+    ok: false,
+    status: 402,
+    text: async () => 'Branching requires Pro for Bearer sbp_secret_token_for_tests',
+  }));
+
+  await assert.rejects(c.create({ name: 'airlock/free_project' }), (error) => {
+    assert.ok(error instanceof SupabaseBranchError);
+    assert.equal(error.status, 402);
+    assert.match(error.message, /requires Pro/);
+    assert.doesNotMatch(error.message, /sbp_secret_token_for_tests/);
+    return true;
+  });
+});
+
 test('verifies on the ready Supabase branch ref and tears it down afterwards', async () => {
   const calls = [];
   const digestA = 'a'.repeat(64);

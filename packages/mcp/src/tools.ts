@@ -48,7 +48,12 @@ import {
   scanResolvedFacts,
   operationsFingerprint,
 } from '@airlock/contract';
-import { verifyOnSqliteShadow, verifyOnSupabaseBranch } from '@airlock/verifier';
+import {
+  SupabaseBranchError,
+  verifyOnPostgresShadow,
+  verifyOnSqliteShadow,
+  verifyOnSupabaseBranch,
+} from '@airlock/verifier';
 import path from 'node:path';
 import type { ToolDefinition } from './protocol.js';
 
@@ -648,9 +653,14 @@ export function airlockTools(): ToolDefinition[] {
         // proof of somebody else's database proves nothing about this change.
         // The local SQLite file remains the fallback so a fresh clone still runs
         // with no credentials at all.
-        const useSupabaseBranch = Boolean(SUPABASE_PROJECT_REF && SUPABASE_ACCESS_TOKEN);
-        const result = useSupabaseBranch
-          ? await verifyOnSupabaseBranch({
+        const useSupabase = Boolean(SUPABASE_PROJECT_REF && SUPABASE_ACCESS_TOKEN);
+        let proofSurface: 'supabase-branch' | 'postgres-shadow' | 'sqlite-shadow';
+        let proofNote: string | null = null;
+        let result;
+        if (useSupabase) {
+          proofSurface = 'supabase-branch';
+          try {
+            result = await verifyOnSupabaseBranch({
               projectRef: SUPABASE_PROJECT_REF,
               accessToken: SUPABASE_ACCESS_TOKEN,
               runId,
@@ -658,8 +668,26 @@ export function airlockTools(): ToolDefinition[] {
               tables,
               forward,
               rollback,
-            })
-          : verifyOnSqliteShadow({
+            });
+          } catch (error) {
+            if (!(error instanceof SupabaseBranchError) || error.status !== 402) {
+              throw error;
+            }
+            proofSurface = 'postgres-shadow';
+            proofNote =
+              'Supabase branching is not enabled for this project, so AIRLOCK used a throwaway schema in the same Postgres project instead.';
+            result = await verifyOnPostgresShadow({
+              projectRef: SUPABASE_PROJECT_REF,
+              accessToken: SUPABASE_ACCESS_TOKEN,
+              runId,
+              tables,
+              forward,
+              rollback,
+            });
+          }
+        } else {
+          proofSurface = 'sqlite-shadow';
+          result = verifyOnSqliteShadow({
               databasePath: SQLITE_PATH,
               shadowDir: SHADOW_DIR,
               runId,
@@ -667,6 +695,7 @@ export function airlockTools(): ToolDefinition[] {
               forward,
               rollback,
             });
+        }
 
         // Row counts come back from COUNT(*) on the shadow, so `affected_tables`
         // stops being a number the agent asserted and becomes one that was
@@ -693,13 +722,16 @@ export function airlockTools(): ToolDefinition[] {
           // The scheme is not decoration. `local-shadow://` says the proof ran
           // against a copy of a local file on this host — a real measurement of
           // a database that may not be the one the change is destined for.
-          // `pg-branch://` says the proof ran inside a disposable Supabase
-          // preview branch copied from the operator's own project. A reader
-          // deciding how much a certificate is worth needs to be able to tell
-          // that apart from a local file copy.
-          sandbox_artifact_url: useSupabaseBranch
-            ? `pg-branch://${SUPABASE_PROJECT_REF}/${runId}`
-            : `local-shadow://${runId}`,
+          // The scheme says what the proof actually ran against: a provider
+          // branch, a throwaway schema in the same Postgres project, or a local
+          // SQLite file. A reader deciding how much a certificate is worth
+          // needs to be able to tell those apart.
+          sandbox_artifact_url:
+            proofSurface === 'supabase-branch'
+              ? `pg-branch://${SUPABASE_PROJECT_REF}/${runId}`
+              : proofSurface === 'postgres-shadow'
+                ? `pg-shadow://${SUPABASE_PROJECT_REF}/${runId}`
+                : `local-shadow://${runId}`,
           // The statements this proof is about. The gate recomputes the
           // dossier's own fingerprint and refuses if they have diverged, so a
           // genuinely measured certificate cannot be carried by a dossier whose
@@ -727,6 +759,7 @@ export function airlockTools(): ToolDefinition[] {
           rollback: dossier.rollback.map((op, i) => ({ ...op, proven: result.rollback_proven[i] === true })),
           affected_tables: affected.length > 0 ? affected : dossier.affected_tables,
           certificate,
+          risk_notes: proofNote ? [...dossier.risk_notes, { note: proofNote }] : dossier.risk_notes,
         };
 
         const parsed = safeParseDossier(next);
@@ -761,8 +794,10 @@ export function airlockTools(): ToolDefinition[] {
         // Postgres must not describe itself as a local file — that understates
         // the evidence exactly as badly as the reverse would overstate it.
         lines.push(
-          useSupabaseBranch
+          proofSurface === 'supabase-branch'
             ? `  ran in      : Supabase preview branch copied from live rows, deleted on exit`
+            : proofSurface === 'postgres-shadow'
+              ? `  ran in      : throwaway schema in your Postgres, copied from live rows, dropped on exit`
             : `  ran in      : local shadow copy, destroyed on exit`,
           '',
           renderGate(saved),

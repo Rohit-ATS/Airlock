@@ -132,7 +132,10 @@ After the schema migration works:
    the preview project is healthy, run the Postgres verifier on the branch ref,
    and always tear it down after the verification callback fails or succeeds.
    Implemented in the MCP verification path; live smoke needs
-   `SUPABASE_ACCESS_TOKEN=sbp_...` and runs with `npm run branch:supabase -- airlock/smoke-test`;
+   `SUPABASE_ACCESS_TOKEN=sbp_...` and runs with `npm run branch:supabase -- airlock/smoke-test`.
+   Supabase Free projects cannot create branches, so MCP verification falls back
+   to a throwaway schema in the same live Postgres project rather than blocking
+   the demo;
 2. data-operation verifier: intentionally detect a failed rollback and emit
    `status: "FAILED"` with a precise `failure_reason`. Started with
    `npm run verify:sqlite:failed -- --emit-only`, which executes rollback SQL but
