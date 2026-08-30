@@ -58,10 +58,10 @@ const short = (hex: string) => `sha256:${hex.slice(0, 16)}…${hex.slice(-6)}`;
 export function Hero() {
   return (
     <div id="top" className="p-4 sm:p-7">
-      <div className="lp-card relative overflow-hidden">
+      <div className="lp-card relative flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden">
         <Nav />
 
-        <div className="grid gap-10 px-6 pt-10 pb-24 sm:px-10 lg:grid-cols-12 lg:gap-9 lg:px-12 lg:pt-14 lg:pb-24">
+        <div className="grid gap-10 px-6 pt-10 pb-16 sm:px-10 lg:grid-cols-12 lg:gap-9 lg:px-12 lg:pt-14 lg:pb-20">
           {/* ---- the argument, in words ---------------------------------- */}
           <div className="lg:col-span-5 lg:pt-6">
             <Reveal>
@@ -89,13 +89,13 @@ export function Hero() {
                 <div className="mt-9 flex flex-wrap gap-3.5">
                   <Link
                     href="/console"
-                    className="rounded-[9px] bg-[linear-gradient(180deg,var(--lp-orange-a),var(--lp-orange-b))] px-8 py-3.5 text-[15.5px] font-medium text-white shadow-[0_10px_26px_-12px_rgba(189,86,10,.9)] transition-transform hover:scale-[1.02]"
+                    className="rounded-[8px] bg-[var(--lp-signal)] px-7 py-3 text-[15px] font-semibold text-[var(--color-void)] transition-[filter] hover:brightness-110"
                   >
                     Open the console
                   </Link>
                   <a
                     href="#gate"
-                    className="rounded-[9px] bg-[var(--lp-grey-btn)] px-8 py-3.5 text-[15.5px] font-medium text-[var(--lp-ink)] transition-colors hover:brightness-95"
+                    className="rounded-[8px] border border-[var(--lp-line-2)] px-7 py-3 text-[15px] font-medium text-[var(--lp-ink)] transition-colors hover:bg-[var(--lp-raised-2)]"
                   >
                     Try to break the gate
                   </a>
@@ -137,10 +137,10 @@ export function Hero() {
                     {/* Spans, not buttons: this is a depiction of someone else's
                         UI, and a focusable control that does nothing is a worse
                         lie than a picture of one. */}
-                    <span className="flex-1 rounded-[6px] bg-[#2f6f52] px-3 py-2 text-center text-[12.5px] font-medium text-[#eaf5ee]">
+                    <span className="flex-1 rounded-[6px] bg-[var(--lp-proven-bg)] px-3 py-2 text-center text-[12.5px] font-medium text-[var(--lp-proven)]">
                       Approve
                     </span>
-                    <span className="rounded-[6px] border border-[#3a4150] px-3 py-2 text-center text-[12.5px] text-[var(--lp-pale-2)]">
+                    <span className="rounded-[6px] border border-[var(--lp-line-2)] px-3 py-2 text-center text-[12.5px] text-[var(--lp-pale-2)]">
                       Reject
                     </span>
                   </div>
@@ -152,7 +152,7 @@ export function Hero() {
                   kicker="AIRLOCK"
                   tone="signal"
                   verdict={
-                    <span className="lp-mono rounded-[3px] border border-[#7d2b2d] bg-[#2a1416] px-1.5 py-[2px] text-[9.5px] tracking-[0.08em] text-[#ff8f91] uppercase">
+                    <span className="lp-mono rounded-[3px] border border-[var(--lp-sealed)]/40 bg-[var(--lp-sealed-bg)] px-1.5 py-[2px] text-[9.5px] tracking-[0.08em] text-[var(--lp-sealed)] uppercase">
                       gate sealed
                     </span>
                   }
@@ -169,7 +169,7 @@ export function Hero() {
                   </dl>
 
                   {/* The absence, drawn. */}
-                  <div className="mt-4 rounded-[6px] border border-dashed border-[#4a5261] px-3 py-3 text-center">
+                  <div className="mt-4 rounded-[6px] border border-dashed border-[var(--lp-line-3)] px-3 py-3 text-center">
                     <p className="lp-mono text-[10.5px] tracking-[0.1em] text-[var(--lp-pale-3)] uppercase">
                       no approval control exists
                     </p>
@@ -210,25 +210,54 @@ export function Hero() {
           ))}
         </div>
 
-        {/* ---- the rise, carrying the scroll cue ------------------------- */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center">
-          <div className="relative w-[min(680px,58%)]">
-            <div className="h-[72px] rounded-t-[100%] bg-[var(--lp-rise)]" aria-hidden />
-            <a
-              href="#rule"
-              className="pointer-events-auto absolute inset-x-0 bottom-3.5 flex flex-col items-center gap-1.5 text-[13.5px] leading-[1.35] text-[var(--lp-ink-2)] transition-colors hover:text-[var(--lp-ink)]"
+        {/*
+          The base of the plate.
+
+          There was ~180px of nothing here, which on the tallest element of the
+          page is the most expensive empty space available. Four figures fill
+          it, and they are the four this project can actually defend: the test
+          count and the capability count are asserted by `verify-claims.mjs`
+          against the README badge, the write-path count is enforced by
+          `check-agents.mjs`, and the row count is what `seed:supabase --check`
+          reports. A hero stat that nothing checks is the one thing this page
+          cannot afford.
+        */}
+        <div className="mt-auto grid grid-cols-2 border-t border-[var(--lp-line)] md:grid-cols-4">
+          {STATS.map((s, i) => (
+            <div
+              key={s.label}
+              className={cx(
+                'px-6 py-5 sm:px-8',
+                i > 0 && 'border-l border-[var(--lp-line)]',
+                i === 2 && 'border-l-0 md:border-l',
+                i >= 2 && 'border-t border-[var(--lp-line)] md:border-t-0',
+              )}
             >
-              <svg width="17" height="25" viewBox="0 0 16 24" fill="none" aria-hidden>
-                <rect x="0.85" y="0.85" width="14.3" height="22.3" rx="7.15" stroke="currentColor" strokeWidth="1.4" />
-                <rect x="7.1" y="5" width="1.8" height="5" rx="0.9" fill="currentColor" />
-              </svg>
-              <span className="text-center">
-                Scroll to
-                <br />
-                explore more
-              </span>
-            </a>
-          </div>
+              <div
+                className={cx(
+                  'lp-mono text-[clamp(1.3rem,2.2vw,1.75rem)] leading-none',
+                  s.tone === 'proven' ? 'text-[var(--lp-proven)]' : 'text-[var(--lp-ink)]',
+                )}
+              >
+                {s.value}
+              </div>
+              <div className="lp-legend mt-2.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ---- the scroll cue -------------------------------------------- */}
+        <div className="flex justify-center pb-8">
+          <a
+            href="#rule"
+            className="lp-legend flex items-center gap-2 text-[var(--lp-ink-3)] transition-colors hover:text-[var(--lp-ink)]"
+          >
+            <svg width="13" height="19" viewBox="0 0 16 24" fill="none" aria-hidden>
+              <rect x="0.85" y="0.85" width="14.3" height="22.3" rx="7.15" stroke="currentColor" strokeWidth="1.4" />
+              <rect x="7.1" y="5" width="1.8" height="5" rx="0.9" fill="currentColor" />
+            </svg>
+            the rule
+          </a>
         </div>
       </div>
     </div>
@@ -258,12 +287,12 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <article className="flex h-full flex-col rounded-[10px] border border-[#232a35] bg-[var(--lp-void)] p-4 shadow-[0_18px_44px_-28px_rgba(0,0,0,.75)]">
+    <article className="flex h-full flex-col rounded-[8px] border border-[var(--lp-line)] bg-[var(--lp-raised)] p-5">
       <div className="flex items-baseline justify-between gap-2">
         <p
           className={cx(
             'lp-mono text-[10.5px] tracking-[0.13em] uppercase',
-            tone === 'signal' ? 'text-[var(--lp-orange-a)]' : 'text-[var(--lp-pale-3)]',
+            tone === 'signal' ? 'text-[var(--lp-signal)]' : 'text-[var(--lp-pale-3)]',
           )}
         >
           {kicker}
@@ -273,7 +302,7 @@ function Panel({
 
       <div className="mt-3.5 flex-1">{children}</div>
 
-      <p className="mt-4 border-t border-[#232a35] pt-3 text-[11.5px] leading-[1.45] text-[var(--lp-pale-3)]">
+      <p className="mt-4 border-t border-[var(--lp-line)] pt-3 text-[11.5px] leading-[1.45] text-[var(--lp-pale-3)]">
         {caption}
       </p>
     </article>
@@ -285,7 +314,7 @@ function Request() {
   return (
     <div>
       <p className="text-[12.5px] leading-[1.5] text-[var(--lp-pale-2)]">The agent wants to:</p>
-      <p className="lp-mono mt-2 rounded-[5px] border border-[#232a35] bg-[#11151c] px-2.5 py-2 text-[11.5px] leading-[1.5] text-[var(--lp-pale)]">
+      <p className="lp-mono mt-2 rounded-[5px] border border-[var(--lp-line)] bg-[var(--lp-void)] px-2.5 py-2 text-[11.5px] leading-[1.5] text-[var(--lp-pale)]">
         alter table users
         <br />
         drop column plan_name
@@ -308,12 +337,12 @@ function Digest({ label, value, dim, bad }: { label: string; value: string; dim?
     <div>
       <dt className="lp-mono flex items-baseline gap-2 text-[10px] tracking-[0.1em] text-[var(--lp-pale-3)] uppercase">
         {label}
-        {bad ? <span className="text-[#ff8f91] normal-case">— not line 1</span> : null}
+        {bad ? <span className="text-[var(--lp-sealed)] normal-case">— not line 1</span> : null}
       </dt>
       <dd
         className={cx(
           'lp-mono mt-0.5 text-[11.5px] leading-none',
-          bad ? 'text-[#ff8f91]' : dim ? 'text-[var(--lp-pale-3)]' : 'text-[var(--lp-pale)]',
+          bad ? 'text-[var(--lp-sealed)]' : dim ? 'text-[var(--lp-pale-3)]' : 'text-[var(--lp-pale)]',
         )}
       >
         {value}
@@ -334,10 +363,18 @@ function Missing({ label }: { label: string }) {
         argument only to people with good monitors. This clears 4.99:1 and stays
         visibly quieter than the digests opposite.
       */}
-      <dd className="lp-mono mt-0.5 text-[11.5px] leading-none text-[#7c828d]">— not attached</dd>
+      <dd className="lp-mono mt-0.5 text-[11.5px] leading-none text-[var(--lp-ink-3)]">— not attached</dd>
     </div>
   );
 }
+
+/** Four figures, each checked by something in `npm test`. See the note above. */
+const STATS = [
+  { value: '0', label: 'tools that write to production', tone: 'proven' as const },
+  { value: '1,000,000', label: 'rows the demo proves against', tone: 'ink' as const },
+  { value: '345', label: 'tests', tone: 'ink' as const },
+  { value: '23', label: 'harness capabilities', tone: 'ink' as const },
+];
 
 const RAIL = [
   {

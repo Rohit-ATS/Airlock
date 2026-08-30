@@ -563,55 +563,98 @@ body {
   border-radius: 99px;
   transition: width 700ms var(--ease-instrument);
 }
-
-
-
-
 /* ===========================================================================
    THE FRONT DOOR
 
-   Matched to the reference: a very light page, one large rounded plate carrying
-   a subtle diagonal gradient (darker top-left, lighter bottom-right), a
-   floating pill nav, a four-line staggered headline in a heavy grotesk, a
-   centre object with props drifting round it, a giant white pixel wordmark
-   behind, and a soft rise at the foot.
+   Built in "Instrument" — the same design system as the console, and that is
+   the whole of the change.
 
-   Scoped under `.lp`, inside @layer base so utilities still win the cascade —
-   unlayered, `.lp`'s own colour beat every Tailwind text utility on
-   inheritance, which surfaces as a contrast number rather than as the styling
-   bug it is.
+   This page used to be a separate visual language: a very light grey page, one
+   large rounded plate with a diagonal gradient, a floating pill nav, a cartoon
+   object with props drifting round it. It was matched carefully to a reference,
+   and the reference was for a different kind of product. Two consequences,
+   neither of them cosmetic:
 
-   Two colours are the reference's hue taken down until they are legible, and
-   the difference is invisible side by side:
+     1. THE MARKETING PAGE DID NOT LOOK LIKE THE PRODUCT. A reader crossed from
+        `/` to `/console` and arrived somewhere else entirely — light to dark,
+        grey to instrument, rounded plates to milled panels. A change-control
+        tool's front door claiming continuity with a control room it visually
+        disowns is the wrong first impression to make twice.
 
-     --lp-orange   white on the reference's button measures 3.20:1. At #bd560a
-                   it clears 4.67:1.
-     --lp-ink      the reference's charcoal is around #4a4a4a, which is 3.51:1
-                   on the darkest nav pill. #2b2b2b clears 5.61:1 everywhere.
+     2. THE PAGE HAD NO COLOUR VOCABULARY. Instrument's palette is a state
+        machine: --seal is proven and only proven, --fault is blocked and only
+        blocked, --hazard means irreversible and NOTHING else. The old landing
+        used orange for its brand, its buttons, its links and its emphasis — the
+        same hue as --hazard, spent on decoration. By the time a reader reached
+        a real hazard chip the colour had been trained to mean "AIRLOCK".
+
+   So the tokens below no longer define a palette. They MAP onto the console's,
+   which is already contrast-audited (an axe-core pass over all three routes,
+   106 nodes rebalanced rather than tuned by eye — see the ink scale above).
+   Every `--lp-*` name is kept because ~150 call sites use them; only what they
+   point at has changed.
+
+   THE ONE COLOUR THAT MOVED
+
+   The brand accent is now --ice, the console's single interactive accent, not
+   orange. Orange survives in exactly one place: the AIRLOCK mark in the nav,
+   where it is identity rather than status. This is Instrument's Rule 2 applied
+   honestly — if the brand colour and the alarm colour are the same hue, the
+   alarm stops being an alarm.
    =========================================================================== */
 
 @layer base {
   .lp {
-    --lp-page: #ececec; /* outside the plate */
-    --lp-card-a: #c4c4c4; /* plate, top-left */
-    --lp-card-b: #dcdcdc; /* plate, bottom-right */
-    --lp-nav: #b0b0b0;
-    --lp-active: #a3a3a3; /* darkest surface any text sits on */
-    --lp-grey-btn: #9e9e9e;
-    --lp-rail: #adadad;
-    --lp-rise: #c4c4c4;
+    /* --- surfaces: the Instrument ladder, reused verbatim --------------- */
+    --lp-page: var(--color-void);
+    --lp-card-a: var(--color-panel);
+    --lp-card-b: var(--color-panel);
+    --lp-void: var(--color-void);
+    --lp-raised: var(--color-raised);
+    --lp-raised-2: var(--color-raised-2);
+    --lp-nav: var(--color-raised-2);
+    --lp-active: var(--color-raised-3);
+    --lp-grey-btn: var(--color-raised-2);
+    --lp-rail: var(--color-raised-2);
+    --lp-rise: var(--color-raised);
 
-    --lp-ink: #2b2b2b;
-    --lp-ink-2: #333333;
+    --lp-line: var(--color-hairline);
+    --lp-line-2: var(--color-hairline-2);
+    --lp-line-3: var(--color-hairline-3);
 
-    --lp-orange-a: #f7942f; /* fills and gradients only */
-    --lp-orange-b: #bd560a; /* the end that carries white text */
-    --lp-black: #111111;
+    /* --- ink: four weights, every step measured against every surface --- */
+    --lp-ink: var(--color-ink);
+    --lp-ink-2: var(--color-ink-2);
+    --lp-ink-3: var(--color-ink-3);
+    --lp-pale: var(--color-ink);
+    --lp-pale-2: var(--color-ink-2);
+    --lp-pale-3: var(--color-ink-3);
 
-    --lp-void: #0b0d11;
-    --lp-pale: #f0efec;
-    --lp-pale-2: #a8adb6;
-    --lp-pale-3: #868c96;
+    /* --- the index ------------------------------------------------------
+       Four colours, four meanings, and none of them decorative. The Legend
+       section on the page prints this table for the reader, because a system
+       whose whole claim is legibility of state should be willing to publish
+       its own key. */
+    --lp-signal: var(--color-ice); /* interactive: links, focus, the brand */
+    --lp-signal-deep: var(--color-ice-deep);
+    --lp-signal-bg: var(--color-ice-bg);
+    --lp-proven: var(--color-seal); /* PROVEN. The data came back. */
+    --lp-proven-bg: var(--color-seal-bg);
+    --lp-sealed: var(--color-fault); /* SEALED. Refused, failed, blocked. */
+    --lp-sealed-bg: var(--color-fault-bg);
+    --lp-irreversible: var(--color-hazard); /* cannot be undone. Nothing else. */
+    --lp-irreversible-bg: var(--color-hazard-bg);
+
+    /* Identity only. Never a status, never an emphasis. */
+    --lp-mark: #f7942f;
+
+    /* Kept so the ~11 call sites that name them still resolve. Both now point
+       at the interactive accent rather than at a second orange competing with
+       --hazard for the reader's attention. */
+    --lp-orange-a: var(--color-ice);
+    --lp-orange-b: var(--color-ice);
+    --lp-black: var(--color-ink);
+    --lp-signal-pale: var(--color-ice);
 
     background: var(--lp-page);
     color: var(--lp-ink);
@@ -619,11 +662,27 @@ body {
   }
 }
 
-/* The plate. */
+/* ---------------------------------------------------------------------------
+   Surfaces are milled, not floating.
+
+   The plate was a rounded card with a diagonal gradient and a 80px drop
+   shadow. Instrument's third rule is that depth comes from 1px hairlines and
+   background steps — a shadow is a thing a card casts in space, and none of
+   these are in space. So the plate is now a panel: one step up from the page,
+   one hairline, a small radius.
+   --------------------------------------------------------------------------- */
 .lp-card {
-  background: linear-gradient(135deg, var(--lp-card-a) 0%, var(--lp-card-b) 78%);
-  border-radius: 18px;
-  box-shadow: 0 30px 80px -40px rgb(0 0 0 / 35%);
+  background: var(--lp-card-a);
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+}
+
+/* A section that is the product running rather than prose about it. One step
+   DOWN, into the void, so it reads as looking into the machine. */
+.lp-deep {
+  background: var(--lp-void);
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
 }
 
 /* Display type. No `color` — a type utility that owns colour follows the
@@ -641,46 +700,67 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* The accent phrase inside a display heading.
+   `lp-serif-em` was used in three places and defined in none of them, so those
+   words rendered as ordinary uppercase display type and the emphasis the
+   sentence was built around silently did nothing. No serif is loaded for the
+   app, and loading a webfont for six words is not worth the request, so this
+   uses the platform's own serif — which is the right kind of contrast against
+   Geist anyway: a different voice, not a different weight. */
+.lp-serif-em {
+  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: -0.005em;
+}
+
+/* The section legend: index and label, in the console's own legend voice. */
+.lp-legend {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lp-ink-3);
+}
+
 /* The nav group. */
 .lp-nav {
-  background: color-mix(in srgb, var(--lp-nav) 76%, transparent);
-  border-radius: 15px;
+  background: color-mix(in srgb, var(--lp-nav) 88%, transparent);
+  border: 1px solid var(--lp-line);
+  border-radius: 11px;
   backdrop-filter: blur(8px);
 }
 .lp-nav a {
-  border-radius: 11px;
-  transition: background 200ms ease;
+  border-radius: 7px;
+  transition:
+    background 200ms var(--ease-instrument),
+    color 200ms var(--ease-instrument);
 }
 .lp-nav a[data-active='true'] {
   background: var(--lp-active);
 }
 
 .lp-rail {
-  background: color-mix(in srgb, var(--lp-rail) 82%, transparent);
-  border-radius: 13px;
+  background: color-mix(in srgb, var(--lp-rail) 88%, transparent);
+  border: 1px solid var(--lp-line);
+  border-radius: 11px;
   backdrop-filter: blur(8px);
 }
 
-/* The wordmark behind the object. */
+/* A hairline that fades out, for section rules that should not read as a box. */
+.lp-rule {
+  height: 1px;
+  background: linear-gradient(90deg, var(--lp-line-2), transparent);
+}
+
+/* The wordmark, on the dark page. */
 .lp-wordmark rect {
-  fill: #fff;
+  fill: var(--color-raised-3);
 }
 
-/* Drift + reveal. */
-@keyframes lp-drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) rotate(var(--lp-rot, 0deg));
-  }
-  50% {
-    transform: translate3d(0, -18px, 0) rotate(calc(var(--lp-rot, 0deg) * -1));
-  }
-}
-.lp-drift {
-  animation: lp-drift var(--lp-dur, 8s) ease-in-out infinite;
-  animation-delay: var(--lp-delay, 0s);
-}
-
+/* Reveal. The drift animation went with the props it was moving. */
 .lp-reveal {
   opacity: 0;
   transform: translate3d(0, 18px, 0);
@@ -694,9 +774,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-drift {
-    animation: none;
-  }
   .lp-reveal {
     opacity: 1;
     transform: none;

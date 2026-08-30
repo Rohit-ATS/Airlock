@@ -1,6 +1,7 @@
 'use client';
 
 import { GateDemo } from './GateDemo';
+import { Legend } from './Legend';
 import { LedgerDemo } from './LedgerDemo';
 import { Band } from './Rise';
 import { Hero } from './Hero';
@@ -39,7 +40,7 @@ export function Landing() {
 
       <Band
         id="gate"
-        index="03 / 07"
+        index="03 / 08"
         label="Try the gate"
         dark
         title={
@@ -65,7 +66,7 @@ export function Landing() {
 
       <Band
         id="ledger"
-        index="06 / 07"
+        index="07 / 08"
         label="The ledger"
         dark
         title={
@@ -84,6 +85,27 @@ export function Landing() {
         }
       >
         <LedgerDemo />
+      </Band>
+
+      <Band
+        id="legend"
+        index="08 / 08"
+        label="The index"
+        title={
+          <>
+            Four colours. <span className="lp-serif-em text-[var(--lp-signal)]">Four meanings.</span>
+          </>
+        }
+        lede={
+          <>
+            Everything above is an argument that the state of a change should be legible at a glance. That is only
+            true if the vocabulary is small and nothing decorative is allowed to borrow from it — so here is the whole
+            of it, and the count of places each one may appear. The console you are about to open uses exactly these
+            and no others.
+          </>
+        }
+      >
+        <Legend />
       </Band>
 
       <NumbersSection />

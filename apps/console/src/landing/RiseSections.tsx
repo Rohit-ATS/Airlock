@@ -57,12 +57,12 @@ export function RuleSection() {
   return (
     <Band
       id="rule"
-      index="02 / 07"
+      index="02 / 08"
       label="The rule"
       title={
         <>
           The gate is not a conditional.{' '}
-          <span className="italic font-light normal-case tracking-[-0.01em] text-[var(--lp-orange-b)]">It is a type.</span>
+          <span className="lp-serif-em text-[var(--lp-signal)]">It is a type.</span>
         </>
       }
       lede={
@@ -143,12 +143,12 @@ export function ProofSection() {
   return (
     <Band
       id="proof"
-      index="04 / 07"
+      index="04 / 08"
       label="Two kinds of proof"
       title={
         <>
           You cannot prove a deletion{' '}
-          <span className="italic font-light normal-case tracking-[-0.01em] text-[var(--lp-orange-b)]">reversible.</span>
+          <span className="lp-serif-em text-[var(--lp-signal)]">reversible.</span>
         </>
       }
       lede="So for the changes that genuinely cannot be undone, the agent proves the opposite thing instead — not that you can take it back, but that it knows exactly what “it” is."
@@ -266,12 +266,12 @@ export function PolicySection() {
   return (
     <Band
       id="policy"
-      index="05 / 07"
+      index="05 / 08"
       label="Policy"
       title={
         <>
           Allowed, by whom, and{' '}
-          <span className="italic font-light normal-case tracking-[-0.01em] text-[var(--lp-orange-b)]">right now?</span>
+          <span className="lp-serif-em text-[var(--lp-signal)]">right now?</span>
         </>
       }
       lede="A certificate answers “is this change what it claims to be”. It cannot answer whether your organisation permits it — that is not a property of the change. Seven classes, each with its own rules, in a YAML file a team can argue with."
@@ -350,12 +350,12 @@ export function PolicySection() {
 export function AfterSection() {
   return (
     <Band
-      index="06 / 07"
+      index="06 / 08"
       label="After it lands"
       title={
         <>
           The proof has a{' '}
-          <span className="italic font-light normal-case tracking-[-0.01em] text-[var(--lp-orange-b)]">second life.</span>
+          <span className="lp-serif-em text-[var(--lp-signal)]">second life.</span>
         </>
       }
       lede="Having demonstrated the inverse once, the system can offer something almost nothing else can: a one-press undo on a production database, for as long as it is willing to vouch for that demonstration."
@@ -393,10 +393,21 @@ export function AfterSection() {
 /* Numbers                                                                     */
 /* -------------------------------------------------------------------------- */
 
+/*
+ * Checked by `scripts/verify-claims.mjs`, which counts the real things and fails
+ * the build if these drift.
+ *
+ * They had drifted. This said 201 tests and 16 fixtures against an actual 345
+ * and 18 — while the README's copies of the same numbers were correct, because
+ * the README was checked and this was not. The comment in verify-claims.mjs
+ * explaining why the check exists opens with the words "201 tests was true when
+ * it was typed and wrong a day later", which is exactly what happened here, one
+ * file over, for a year.
+ */
 const NUMBERS = [
-  { value: '201', label: 'tests', note: 'properties, not implementations' },
+  { value: '345', label: 'tests', note: 'properties, not implementations' },
   { value: '23', label: 'harness capabilities', note: 'each lit only by a real event' },
-  { value: '16', label: 'fixtures', note: 'seven distinct refusals' },
+  { value: '18', label: 'fixtures', note: 'seven distinct refusals' },
   { value: '0', label: 'tools that write to production', note: 'asserted in CI' },
 ];
 
@@ -430,10 +441,10 @@ export function Closing() {
     <section className="relative overflow-hidden border-t border-[var(--lp-line-dark)] bg-[var(--lp-void)] px-6 pt-28 pb-0 text-[var(--lp-pale)] sm:px-10 md:pt-40">
       <div className="mx-auto max-w-[1100px] text-center">
         <Reveal>
-          <span className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-2)] !text-[var(--lp-pale-3)]">07 / 07</span>
+          <span className="lp-legend">The whole of it</span>
           <h2 className="lp-display mx-auto mt-8 max-w-[16ch] text-[clamp(2.4rem,7.5vw,6.4rem)]">
             Build the agent you would{' '}
-            <span className="italic font-light normal-case tracking-[-0.01em] text-[#f2a054]">trust with root</span>
+            <span className="lp-serif-em text-[var(--lp-signal)]">trust with root</span>
           </h2>
           <p className="mx-auto mt-9 max-w-[58ch] text-[clamp(1rem,1.4vw,1.2rem)] leading-relaxed text-[var(--lp-pale-2)]">
             AIRLOCK is the literal answer — an agent that behaves as though it is{' '}
