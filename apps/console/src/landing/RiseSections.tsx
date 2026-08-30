@@ -127,7 +127,7 @@ function Point({ n, title, body }: { n: string; title: string; body: string }) {
   return (
     <Reveal>
       <div className="border-t border-[var(--lp-active)] pt-6">
-        <span className="evidence text-[12px] text-[var(--lp-orange-b)]">{n}</span>
+        <span className="evidence text-[12px] text-[var(--lp-ink-3)]">{n}</span>
         <h3 className="mt-4 text-[21px] leading-tight font-semibold tracking-[-0.02em]">{title}</h3>
         <p className="mt-3 text-[14.5px] leading-relaxed text-[var(--lp-ink-2)]">{body}</p>
       </div>
@@ -157,7 +157,7 @@ export function ProofSection() {
         <Reveal>
           <div>
             <div className="flex items-baseline gap-3">
-              <span className="evidence text-[13px] font-semibold tracking-[0.1em] text-[#0b6349]">UNDO</span>
+              <span className="evidence text-[13px] font-semibold tracking-[0.1em] text-[var(--lp-proven)]">UNDO</span>
               <span className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-2)]">for reversible work</span>
             </div>
             <h3 className="lp-display mt-6 text-[clamp(1.7rem,3vw,2.6rem)]">Three checksums</h3>
@@ -182,7 +182,7 @@ export function ProofSection() {
         <Reveal delay={90}>
           <div>
             <div className="flex items-baseline gap-3">
-              <span className="evidence text-[13px] font-semibold tracking-[0.1em] text-[var(--lp-orange-b)]">
+              <span className="evidence text-[13px] font-semibold tracking-[0.1em] text-[var(--lp-irreversible)]">
                 SCOPE
               </span>
               <span className="lp-mono text-[11px] tracking-[0.16em] uppercase text-[var(--lp-ink-2)]">for the irreversible</span>
@@ -222,7 +222,7 @@ function Digest({ label, value, match, dim }: { label: string; value: string; ma
       >
         {value}
       </span>
-      {match ? <span className="shrink-0 text-[12.5px] font-semibold text-[#0b6349]">match</span> : null}
+      {match ? <span className="shrink-0 text-[12.5px] font-semibold text-[var(--lp-proven)]">match</span> : null}
     </div>
   );
 }
@@ -243,7 +243,7 @@ function ScopeRow({
       <span
         className={cx(
           'evidence w-[84px] shrink-0 text-[11px] tracking-[0.08em]',
-          kind === 'keep' ? 'text-[#0b6349]' : 'text-[var(--lp-orange-b)]',
+          kind === 'keep' ? 'text-[var(--lp-proven)]' : 'text-[var(--lp-irreversible)]',
         )}
       >
         {kind === 'keep' ? 'KEEP' : 'DESTROY'}
@@ -301,9 +301,9 @@ export function PolicySection() {
                       className={cx(
                         'evidence text-[12px] font-semibold tracking-[0.08em]',
                         rule.requires === 'SCOPE'
-                          ? 'text-[var(--lp-orange-b)]'
+                          ? 'text-[var(--lp-irreversible)]'
                           : rule.requires === 'UNDO'
-                            ? 'text-[#0b6349]'
+                            ? 'text-[var(--lp-proven)]'
                             : 'text-[var(--lp-ink-2)]',
                       )}
                     >
