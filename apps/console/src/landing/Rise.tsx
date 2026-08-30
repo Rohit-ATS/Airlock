@@ -65,36 +65,6 @@ export function Reveal({ children, delay = 0, className }: { children: ReactNode
   );
 }
 
-export function Drift({
-  children,
-  className,
-  dur = 8,
-  delay = 0,
-  rot = 0,
-}: {
-  children: ReactNode;
-  className?: string;
-  dur?: number;
-  delay?: number;
-  rot?: number;
-}) {
-  return (
-    <div
-      className={cx('lp-drift pointer-events-none absolute', className)}
-      style={
-        {
-          ['--lp-dur' as string]: `${dur}s`,
-          ['--lp-delay' as string]: `${delay}s`,
-          ['--lp-rot' as string]: `${rot}deg`,
-        } as React.CSSProperties
-      }
-      aria-hidden
-    >
-      {children}
-    </div>
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /* Nav                                                                         */
 /* -------------------------------------------------------------------------- */
@@ -112,14 +82,14 @@ export function Nav() {
     <div className="flex items-center gap-4 px-5 pt-6 sm:gap-6 sm:px-12 sm:pt-7">
       <Link href="/" className="flex shrink-0 items-center gap-3" aria-label="AIRLOCK — home">
         {/* the checkered mark */}
-        <span className="grid size-10 shrink-0 place-items-center rounded-[9px] bg-[var(--lp-orange-b)]">
+        <span className="grid size-8 shrink-0 place-items-center rounded-[7px] bg-[var(--lp-mark)]">
           <span className="grid grid-cols-3 gap-[2px]">
             {[1, 0, 1, 0, 1, 0, 1, 0, 1].map((on, i) => (
               <span key={i} className={cx('size-[4px] rounded-[1px]', on ? 'bg-white' : 'bg-white/35')} />
             ))}
           </span>
         </span>
-        <span className="text-[21px] font-semibold tracking-[-0.02em] text-[var(--lp-ink)]">AIRLOCK</span>
+        <span className="text-[18px] font-semibold tracking-[0.02em] text-[var(--lp-ink)]">AIRLOCK</span>
       </Link>
 
       <nav className="lp-nav mx-auto hidden items-center gap-1 p-1.5 lg:flex" aria-label="Sections">
@@ -128,7 +98,7 @@ export function Nav() {
             key={item.label}
             href={item.href}
             data-active={item.active ? 'true' : undefined}
-            className="px-5 py-2.5 text-[16px] text-[var(--lp-ink)]"
+            className="px-3.5 py-2 text-[13.5px] text-[var(--lp-ink-2)] hover:text-[var(--lp-ink)]"
           >
             {item.label}
           </a>
@@ -137,7 +107,7 @@ export function Nav() {
           href="https://github.com/Rohit-ATS/Airlock"
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-2 px-5 py-2.5 text-[16px] text-[var(--lp-ink)]"
+          className="flex items-center gap-2 px-3.5 py-2 text-[13.5px] text-[var(--lp-ink-2)] hover:text-[var(--lp-ink)]"
         >
           <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden>
             <circle cx="8" cy="8" r="6.7" stroke="currentColor" strokeWidth="1.25" />
@@ -159,7 +129,7 @@ export function Nav() {
       */}
       <Link
         href="/console"
-        className="ml-auto shrink-0 rounded-[11px] bg-[var(--lp-black)] px-5 py-3 text-[15px] font-medium text-white transition-transform hover:scale-[1.02] sm:px-8 sm:py-4 sm:text-[16px] lg:ml-0"
+        className="ml-auto shrink-0 rounded-[8px] bg-[var(--lp-signal)] px-5 py-2.5 text-[14.5px] font-semibold text-[var(--color-void)] transition-[filter] hover:brightness-110 sm:px-7 sm:py-3 sm:text-[15px] lg:ml-0"
       >
         <span className="sm:hidden">Console</span>
         <span className="hidden sm:inline">Open the console</span>
@@ -176,6 +146,31 @@ export function Nav() {
 /* Section shell used down the page                                            */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The section shell.
+ *
+ * WHAT CHANGED, AND WHY IT WAS WORTH CHANGING
+ *
+ * Every section used to be the same object: a rounded grey plate with a
+ * diagonal gradient and a drop shadow, carrying a 190px sticky column on the
+ * left that held two words. Three problems, all visible in a screenshot:
+ *
+ *   - Nine identical plates down a page is not a rhythm, it is a list. Nothing
+ *     told the reader that §03 is a thing they can operate and §05 is a table
+ *     they can read.
+ *   - The sticky column cost 190px of every row to carry "The rule", and the
+ *     title beside it was capped at 18ch — so the widest part of the page was
+ *     empty and the narrowest part was the headline.
+ *   - Shadows. Instrument's third rule is that depth comes from hairlines and
+ *     background steps, because none of these surfaces are floating in space.
+ *
+ * Now: the index and label run across the top as a legend with a rule fading
+ * out of it — the same voice the console's panel legends use — and the title
+ * and lede sit side by side beneath it, so the measure is right for both. The
+ * `deep` variant drops one surface step into the void instead of inverting the
+ * palette, which is what "you have stopped reading and started operating this"
+ * has to mean now that the whole page is dark.
+ */
 export function Band({
   id,
   index,
@@ -191,58 +186,42 @@ export function Band({
   title?: ReactNode;
   lede?: ReactNode;
   children?: ReactNode;
+  /** Kept as `dark` because call sites name it; it now means "one step deeper". */
   dark?: boolean;
 }) {
   return (
     <section id={id} className="px-4 pb-4 sm:px-7 sm:pb-7">
-      <div className={cx('lp-card px-8 py-16 sm:px-12 md:py-24', dark && '!bg-[var(--lp-void)] text-[var(--lp-pale)]')}>
-        <div className="grid gap-y-10 lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-x-14">
-          <div className="lg:sticky lg:top-8 lg:self-start">
-            {index ? (
-              <div className={cx('lp-mono text-[13px]', dark ? 'text-[var(--lp-pale-3)]' : 'text-[var(--lp-ink-2)]')}>
-                {index}
-              </div>
-            ) : null}
-            {label ? (
-              <div
-                className={cx(
-                  'mt-2 text-[15px] font-medium',
-                  dark ? 'text-[var(--lp-pale-2)]' : 'text-[var(--lp-ink-2)]',
-                )}
-              >
-                {label}
-              </div>
-            ) : null}
+      <div className={cx(dark ? 'lp-deep' : 'lp-card', 'px-6 py-14 sm:px-10 md:py-20')}>
+        {index || label ? (
+          <div className="flex items-center gap-4">
+            {index ? <span className="lp-legend text-[var(--lp-signal)]">{index}</span> : null}
+            {label ? <span className="lp-legend">{label}</span> : null}
+            <span className="lp-rule min-w-8 flex-1" aria-hidden />
           </div>
+        ) : null}
 
-          <div>
+        {title || lede ? (
+          <div className="mt-9 grid gap-y-7 lg:grid-cols-12 lg:gap-x-12">
             {title ? (
-              <Reveal>
-                <h2
-                  className={cx(
-                    'lp-display max-w-[18ch] text-[clamp(1.9rem,4.2vw,3.4rem)]',
-                    dark ? 'text-[var(--lp-pale)]' : 'text-[var(--lp-ink)]',
-                  )}
-                >
-                  {title}
-                </h2>
-              </Reveal>
+              <div className="lg:col-span-7">
+                <Reveal>
+                  <h2 className="lp-display max-w-[20ch] text-[clamp(1.85rem,3.9vw,3.1rem)] text-[var(--lp-ink)]">
+                    {title}
+                  </h2>
+                </Reveal>
+              </div>
             ) : null}
             {lede ? (
-              <Reveal delay={80}>
-                <div
-                  className={cx(
-                    'mt-6 max-w-[62ch] text-[16px] leading-[1.55]',
-                    dark ? 'text-[var(--lp-pale-2)]' : 'text-[var(--lp-ink-2)]',
-                  )}
-                >
-                  {lede}
-                </div>
-              </Reveal>
+              <div className={cx('lg:col-span-5 lg:pt-2', !title && 'lg:col-start-1')}>
+                <Reveal delay={80}>
+                  <div className="max-w-[58ch] text-[15px] leading-[1.6] text-[var(--lp-ink-2)]">{lede}</div>
+                </Reveal>
+              </div>
             ) : null}
-            {children ? <div className={title || lede ? 'mt-12' : ''}>{children}</div> : null}
           </div>
-        </div>
+        ) : null}
+
+        {children ? <div className={title || lede ? 'mt-14' : ''}>{children}</div> : null}
       </div>
     </section>
   );

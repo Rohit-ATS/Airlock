@@ -513,6 +513,48 @@ counts.push({
 });
 counts.push({ what: 'claims', actual: results.length, pattern: /1 policy file, (\d+) claims/ });
 
+/*
+ * The landing page quotes the same figures, and until now nothing checked it.
+ *
+ * It said 201 tests and 16 fixtures against an actual 345 and 18 — numbers that
+ * had been right when typed and were a year stale by the time anyone looked.
+ * The README's copies were correct the whole time, for the single reason that
+ * the README was the only thing this script read.
+ *
+ * That is a worse failure than the one this file was written to prevent. The
+ * landing page is the first thing a stranger sees and the last thing anyone
+ * re-reads, and a hero that boasts a test count lower than the suite actually
+ * runs is not a small error — on a page whose entire argument is "every figure
+ * here was measured", it is the argument failing in public.
+ *
+ * So the same measurements now check both. Adding a test stays cheap; forgetting
+ * to update a number in either place fails the build.
+ */
+const landingNumbers = fs.readFileSync(path.join(root, 'apps/console/src/landing/RiseSections.tsx'), 'utf8');
+const landingHero = fs.readFileSync(path.join(root, 'apps/console/src/landing/Hero.tsx'), 'utf8');
+
+counts.push({
+  what: 'tests',
+  actual: Number(passed[1]),
+  pattern: /value: '([\d,]+)', label: 'tests'/,
+  src: landingNumbers,
+  where: 'the landing page',
+});
+counts.push({
+  what: 'fixtures',
+  actual: fs.readdirSync(path.join(root, 'contracts/examples')).filter((f) => f.endsWith('.json')).length,
+  pattern: /value: '(\d+)', label: 'fixtures'/,
+  src: landingNumbers,
+  where: 'the landing page',
+});
+counts.push({
+  what: 'tests',
+  actual: Number(passed[1]),
+  pattern: /value: '([\d,]+)', label: 'tests'/,
+  src: landingHero,
+  where: "the landing page's hero",
+});
+
 // The badges at the top of the page. These are the first numbers anyone reads
 // and they were the last ones checked, which is how both of them came to be
 // wrong at once. A number rendered as an image rots exactly like a number
@@ -541,22 +583,24 @@ const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'e
 
 const wrong = [];
 for (const c of counts) {
-  const m = c.pattern.exec(readme);
+  const m = c.pattern.exec(c.src ?? readme);
   if (!m) {
-    wrong.push(`could not find where the README states its ${c.what} count (expected ${c.actual})`);
+    wrong.push(`could not find where ${c.where ?? 'the README'} states its ${c.what} count (expected ${c.actual})`);
     continue;
   }
   const stated = c.words ? WORDS.indexOf(m[1].toLowerCase()) : Number(m[1]);
   if (stated !== c.actual) {
-    wrong.push(`README says ${m[1]} ${c.what}; there are ${c.actual}`);
+    wrong.push(`${c.where ?? 'README'} says ${m[1]} ${c.what}; there are ${c.actual}`);
   }
 }
 
 if (wrong.length > 0) {
-  console.error(`\n${RED}The README's counts have drifted:${OFF}\n`);
+  console.error(`\n${RED}Counts have drifted:${OFF}\n`);
   for (const w of wrong) console.error(`  ${w}`);
-  console.error('\nUpdate the numbers in README.md. They are prose, not generated, because');
-  console.error('they read as sentences — but they are checked, so they cannot quietly rot.');
+  console.error('\nEach line above names where the wrong number is — README.md, or');
+  console.error('apps/console/src/landing/. They are prose and markup, not generated,');
+  console.error('because they read as sentences — but they are checked, so they cannot');
+  console.error('quietly rot.');
   process.exit(1);
 }
 
