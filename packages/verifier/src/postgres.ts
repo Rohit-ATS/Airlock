@@ -69,7 +69,11 @@ export interface PostgresShadowResult {
   status: 'PROVEN' | 'FAILED';
   checksums: { pre: string; post: string; post_rollback: string; match: boolean } | null;
   forward_ms: number | null;
+  /** Whether the forward migration rewrote any table in the shadow schema. */
+  table_rewrite: boolean | null;
   row_counts: Record<string, number>;
+  /** Schema/index/constraint evidence captured around the proof. */
+  metadata: PostgresEvidence | null;
   forward_proven: boolean[];
   rollback_proven: boolean[];
   failure_reason: string | null;
@@ -79,6 +83,23 @@ export interface PostgresShadowResult {
 }
 
 const API = 'https://api.supabase.com/v1/projects';
+
+export interface PostgresTableSnapshot {
+  table: string;
+  relfilenode: string | null;
+  indexes: string[];
+  constraints: string[];
+}
+
+export interface PostgresEvidence {
+  source_schema: string;
+  shadow_schema: string;
+  source_before: PostgresTableSnapshot[];
+  shadow_before: PostgresTableSnapshot[];
+  shadow_after_forward: PostgresTableSnapshot[];
+  shadow_after_rollback: PostgresTableSnapshot[];
+  rewritten_tables: string[];
+}
 
 /** Postgres identifier quoting. Everything interpolated goes through this. */
 function q(name: string): string {
@@ -95,8 +116,12 @@ function q(name: string): string {
  * and a false accept costs the customer's database.
  */
 export function findSchemaQualifier(statement: string): string | null {
-  const withoutStrings = statement.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
-  const match = /\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(withoutStrings);
+  const withoutStrings = statement.replace(/'(?:''|[^'])*'/g, "''");
+  const identifiersVisible = withoutStrings.replace(/"((?:[^"]|"")*)"/g, (_, raw: string) => {
+    const unquoted = raw.replace(/""/g, '"').replace(/[^A-Za-z0-9_]/g, '_');
+    return unquoted || '_';
+  });
+  const match = /\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(identifiersVisible);
   return match ? `${match[1]}.${match[2]}` : null;
 }
 
@@ -178,6 +203,85 @@ function escapeLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+function tableListSql(tables: string[]): string {
+  return tables.map((t) => `(${escapeLiteral(t)})`).join(', ');
+}
+
+/**
+ * Read metadata that affects whether the checksum proof is complete.
+ *
+ * The row digest proves data came back. It does not by itself prove indexes or
+ * constraints came back, and it does not say whether Postgres had to rewrite a
+ * table to perform the change. This snapshot makes those facts explicit.
+ */
+export function snapshotSql(schema: string, tables: string[]): string {
+  return `
+with wanted(table_name) as (values ${tableListSql(tables)})
+select
+  w.table_name as table,
+  c.relfilenode::text as relfilenode,
+  coalesce((
+    select json_agg(i.indexdef order by i.indexname)
+      from pg_indexes i
+     where i.schemaname = ${escapeLiteral(schema)}
+       and i.tablename = w.table_name
+  ), '[]'::json) as indexes,
+  coalesce((
+    select json_agg(con.conname || ': ' || pg_get_constraintdef(con.oid) order by con.conname)
+      from pg_constraint con
+     where con.conrelid = c.oid
+  ), '[]'::json) as constraints
+from wanted w
+left join pg_namespace n
+  on n.nspname = ${escapeLiteral(schema)}
+left join pg_class c
+  on c.relnamespace = n.oid
+ and c.relname = w.table_name
+ and c.relkind in ('r', 'p')
+order by w.table_name`;
+}
+
+function asStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+export function parseSnapshots(rows: unknown[]): PostgresTableSnapshot[] {
+  return rows.map((row) => {
+    const record = row as Record<string, unknown>;
+    return {
+      table: String(record.table),
+      relfilenode: record.relfilenode === null || record.relfilenode === undefined ? null : String(record.relfilenode),
+      indexes: asStringArray(record.indexes),
+      constraints: asStringArray(record.constraints),
+    };
+  });
+}
+
+export function rewrittenTables(before: PostgresTableSnapshot[], after: PostgresTableSnapshot[]): string[] {
+  const next = new Map(after.map((snapshot) => [snapshot.table, snapshot]));
+  return before
+    .filter((snapshot) => {
+      const later = next.get(snapshot.table);
+      return (
+        snapshot.relfilenode !== null &&
+        later !== undefined &&
+        later.relfilenode !== null &&
+        snapshot.relfilenode !== later.relfilenode
+      );
+    })
+    .map((snapshot) => snapshot.table)
+    .sort();
+}
+
 /**
  * Prove a migration against a copy of the real database.
  *
@@ -197,7 +301,9 @@ export async function verifyOnPostgresShadow(input: PostgresShadowInput): Promis
     status: 'FAILED',
     checksums: null,
     forward_ms: null,
+    table_rewrite: null,
     row_counts: {},
+    metadata: null,
     forward_proven: input.forward.map(() => false),
     rollback_proven: input.rollback.map(() => false),
     failure_reason: null,
@@ -228,7 +334,10 @@ export async function verifyOnPostgresShadow(input: PostgresShadowInput): Promis
 
   let created = false;
   try {
+    const readSnapshot = async (whichSchema: string) => parseSnapshots(await runSql(input, snapshotSql(whichSchema, names)));
+
     /* --- the copy ---------------------------------------------------------- */
+    const sourceBefore = await readSnapshot(source);
 
     const copy = [
       `create schema ${q(schema)};`,
@@ -236,6 +345,7 @@ export async function verifyOnPostgresShadow(input: PostgresShadowInput): Promis
     ].join('\n');
     await runSql(input, copy);
     created = true;
+    const shadowBefore = await readSnapshot(schema);
 
     for (let i = 0; i < names.length; i += 1) {
       const rows = (await runSql(
@@ -268,6 +378,7 @@ export async function verifyOnPostgresShadow(input: PostgresShadowInput): Promis
     await runConfined(input.forward);
     const forwardMs = Date.now() - startedAt;
     base.forward_proven = input.forward.map(() => true);
+    const shadowAfterForward = await readSnapshot(schema);
 
     const post = await readDigest();
 
@@ -279,13 +390,25 @@ export async function verifyOnPostgresShadow(input: PostgresShadowInput): Promis
     }
 
     const postRollback = await readDigest();
+    const shadowAfterRollback = await readSnapshot(schema);
     const match = pre === postRollback;
+    const rewritten = rewrittenTables(shadowBefore, shadowAfterForward);
 
     return {
       ...base,
       status: match ? 'PROVEN' : 'FAILED',
       checksums: { pre, post, post_rollback: postRollback, match },
       forward_ms: forwardMs,
+      table_rewrite: rewritten.length > 0,
+      metadata: {
+        source_schema: source,
+        shadow_schema: schema,
+        source_before: sourceBefore,
+        shadow_before: shadowBefore,
+        shadow_after_forward: shadowAfterForward,
+        shadow_after_rollback: shadowAfterRollback,
+        rewritten_tables: rewritten,
+      },
       failure_reason: match
         ? null
         : `The rollback ran without error, but the data did not come back: the post-rollback digest ` +
