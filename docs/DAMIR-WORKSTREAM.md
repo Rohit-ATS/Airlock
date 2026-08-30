@@ -113,6 +113,9 @@ Scope verification also writes offloaded artifacts under `.airlock/`:
 
 - `<dossier>.scope.json`: a small manifest linked from the certificate;
 - `<dossier>.scope.ndjson`: row-level scope details that stay out of the dossier.
+- `packages/verifier/src/scope.ts`: the shared scope builder, so SQLite,
+  Postgres/Supabase and later external connectors produce the same certificate
+  shape instead of hand-rolled lookalikes.
 
 Migration verification also records pre-hosted safety analysis under
 `<dossier>.verification.json`:
@@ -136,7 +139,8 @@ After the schema migration works:
    restores the wrong values so the checksum proof fails;
 3. erasure scope computation: enumerate records across SQLite first, then map the same
    scope shape to Postgres/Supabase and add Stripe, object storage and Slack test
-   connectors. Started with `npm run verify:sqlite:scope -- --emit-only`, which
+   connectors. The shared builder and Postgres SQL shape now live in
+   `packages/verifier/src/scope.ts`; `npm run verify:sqlite:scope -- --emit-only`
    computes a PROVEN Scope Certificate with records and retention exclusions;
 4. artifact output: write large diffs as files and put only the summary into the dossier.
    Started for erasure scope: the dossier carries aggregate counts, while row-level
