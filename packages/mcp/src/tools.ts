@@ -686,6 +686,7 @@ export function airlockTools(): ToolDefinition[] {
           status: result.status,
           ...(result.checksums ? { checksums: result.checksums } : {}),
           ...(result.forward_ms !== null ? { lock_ms_estimate: Math.round(result.forward_ms) } : {}),
+          ...(result.table_rewrite !== null ? { table_rewrite: result.table_rewrite } : {}),
           // Where it ran, in a field that already means "where the evidence is".
           //
           // The scheme is not decoration. `local-shadow://` says the proof ran

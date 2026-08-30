@@ -52,6 +52,8 @@ export interface ShadowRunResult {
   checksums: { pre: string; post: string; post_rollback: string; match: boolean } | null;
   /** Wall-clock milliseconds the forward statements took. Measured, not modelled. */
   forward_ms: number | null;
+  /** SQLite cannot observe Postgres relfilenode rewrites. */
+  table_rewrite: boolean | null;
   /** Rows in each table before the change. Counted, not estimated. */
   row_counts: Record<string, number>;
   /** Which statements actually executed. A statement that threw is not proven. */
@@ -164,6 +166,7 @@ export function verifyOnSqliteShadow(input: ShadowRunInput): ShadowRunResult {
   const base: Omit<ShadowRunResult, 'status' | 'failure_reason'> = {
     checksums: null,
     forward_ms: null,
+    table_rewrite: null,
     row_counts: {},
     forward_proven: [],
     rollback_proven: [],
