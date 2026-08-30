@@ -2,145 +2,190 @@
 
 import Link from 'next/link';
 import { cx } from '@/design/primitives';
-import { Machine, PropArch, PropCamera, PropKey, PropMail, PropNote, PropPebble, PropRing } from './Machine';
-import { Wordmark } from './Wordmark';
-import { Drift, Nav, Reveal } from './Rise';
+import { Nav, Reveal } from './Rise';
 
 /**
- * The hero, as one overlapping composition.
+ * The hero: the question, and why it is the wrong question.
  *
- * The first attempt stacked this as rows — headline, then the object, then the
- * copy — and it could not work: the reference has the object occupying the
- * middle of the plate with the four text blocks pinned *around* it, sharing the
- * same vertical space. Stacked, the machine either collides with the headline
- * or pushes the buttons off the fold, and both happened.
+ * WHAT THIS REPLACED, AND WHY
  *
- * So above `lg` this is a fixed-ratio stage with everything absolutely placed.
- * Below `lg` it falls back to a stack, because absolute placement at phone
- * width just produces a different set of overlaps.
+ * The first version of this page was built from a visual reference — a centre
+ * object with cartoon props drifting around it, a giant pixel wordmark behind,
+ * four staggered display lines. It was executed carefully and it was the wrong
+ * argument, in three ways that a screenshot makes obvious:
+ *
+ *   - The object was an illustrated retro computer orbited by a smiley face, a
+ *     camera and an envelope. This product's claim is that you can hand it a
+ *     production database. Emoji do not survive contact with that claim; the
+ *     tone said "toy" while the copy said "root access".
+ *   - The wordmark sat in white pixel letters on light grey, at 1.2:1 against
+ *     its own background, and collided with the object. It read as texture.
+ *   - Nothing above the fold said what AIRLOCK *is*. "Proving every irreversible
+ *     change first" is a description of a feeling. A reader who does not already
+ *     know what a shadow copy is learns nothing before deciding to scroll.
+ *
+ * So the hero is now the product's actual argument, made with the product's
+ * actual output. Two panels: the request as every other approval flow presents
+ * it, and the same request after AIRLOCK has run it.
+ *
+ * THE DIGESTS ARE REAL
+ *
+ * They are the sha256 triple from dropping `users.plan_name` against a shadow
+ * copy of the 100,000-row demo table — the run `npm run demo` performs in Act 1.
+ * That matters here more than it would on most pages: this is a project whose
+ * entire pitch is that numbers on screen were measured rather than composed, and
+ * a hero illustrated with `sha256:aaaa…` would be the one place it quietly was
+ * not. Re-measure with `npm run demo` and these three lines are what comes back.
+ *
+ * THE EMPTY SLOT IS THE POINT
+ *
+ * The right panel has a deliberate gap where an approve control would be, and it
+ * is drawn — a dashed outline with a caption — rather than merely absent. An
+ * absence nobody notices makes no argument. This is the same claim the README
+ * makes in type: `certificate.status !== "PROVEN"` means the gate is never
+ * offered, because `ApprovalGrant` carries a symbol only `openGate` can mint.
  */
+
+/** Act 1 of `npm run demo`, verbatim. See the note above before editing these. */
+const DIGESTS = {
+  pre: 'd2f21cbcb608ed22ac13e1e944e929d0c40f6be4c719e328eaeba98f3d350d21',
+  post: '62dd725050452f1b9bd9bd32c9f08a6a4d6b494310921a03584486a6ede4cc83',
+  rollback: 'ad8449f8165a8679dcc7ff29e50fa169fb247197fdcebf9acae8b97f682ecfc4',
+} as const;
+
+const short = (hex: string) => `sha256:${hex.slice(0, 16)}…${hex.slice(-6)}`;
+
 export function Hero() {
   return (
     <div id="top" className="p-4 sm:p-7">
       <div className="lp-card relative overflow-hidden">
         <Nav />
 
-        <div className="relative lg:aspect-[16/9.2]">
-          {/* ---- the object, centred ----------------------------------- */}
-          <div className="relative z-20 mt-2 flex justify-center lg:absolute lg:inset-0 lg:mt-0 lg:items-center lg:justify-center">
-            <Machine className="h-[300px] w-auto sm:h-[380px] lg:h-[80%] lg:translate-y-[1%]" />
-          </div>
-
-          {/* ---- wordmark, behind everything --------------------------- */}
-          <div className="pointer-events-none absolute inset-x-0 top-[49%] z-10 hidden px-8 sm:px-12 lg:block">
-            <Wordmark text="AIR" className="h-[16%] w-[37%]" />
-          </div>
-          <div className="pointer-events-none absolute inset-x-0 top-[79%] z-10 hidden justify-end px-8 sm:px-12 lg:flex">
-            <Wordmark text="LOCK" className="h-[16%] w-[42%]" />
-          </div>
-
-          {/* ---- headline, top-left ------------------------------------ */}
-          <div className="relative z-30 px-8 pt-8 sm:px-12 lg:absolute lg:top-[9%] lg:left-0 lg:w-[45%] lg:pt-0">
+        <div className="grid gap-10 px-6 pt-10 pb-24 sm:px-10 lg:grid-cols-12 lg:gap-9 lg:px-12 lg:pt-14 lg:pb-24">
+          {/* ---- the argument, in words ---------------------------------- */}
+          <div className="lg:col-span-5 lg:pt-6">
             <Reveal>
-              <div className="flex gap-5">
-                <span className="lp-mono mt-3 hidden shrink-0 text-[15px] tracking-[0.06em] text-[var(--lp-ink-2)] sm:block">
-                  [1/8]
-                </span>
-                <h1 className="lp-display text-[clamp(1.9rem,3.3vw,3rem)] text-[var(--lp-ink)]">
-                  <span className="block pl-[24%]">Proving</span>
-                  <span className="block">every</span>
-                  <span className="block pl-[11%]">
-                    <span className="mr-1 text-[var(--lp-ink-2)]">.</span>irreversible
-                  </span>
-                  <span className="block">change first</span>
+              <div>
+                <p className="lp-mono text-[12px] tracking-[0.14em] text-[var(--lp-ink-2)] uppercase">
+                  Change control for agents with production access
+                </p>
+
+                <h1 className="lp-display mt-5 text-[clamp(2.3rem,4.1vw,3.5rem)] text-[var(--lp-ink)]">
+                  <span className="block">&ldquo;Approve?&rdquo;</span>
+                  <span className="block">is the wrong</span>
+                  <span className="block">question.</span>
                 </h1>
-              </div>
-            </Reveal>
-          </div>
 
-          {/* ---- stat, top-right --------------------------------------- */}
-          <div className="relative z-30 px-8 pt-8 sm:px-12 lg:absolute lg:top-[10%] lg:right-0 lg:w-[27%] lg:pt-0 lg:pr-12">
-            <Reveal delay={120}>
-              <div>
-                <div className="flex items-baseline gap-3">
-                  <svg width="27" height="31" viewBox="0 0 30 34" fill="none" aria-hidden className="translate-y-1.5 opacity-40">
-                    <path
-                      d="M15 32V3m0 0-9 9m9-9 9 9M6 12h18"
-                      stroke="var(--lp-ink)"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span className="text-[clamp(2rem,3vw,2.8rem)] leading-none font-bold tracking-[-0.03em] text-[var(--lp-ink)]">
-                    100%
-                  </span>
-                  <span className="text-[clamp(1.05rem,1.45vw,1.4rem)] font-semibold text-[var(--lp-ink)]">PROVEN</span>
-                </div>
-                <p className="mt-4 max-w-[34ch] text-[15px] leading-[1.5] text-[var(--lp-ink-2)]">
-                  Every approved change was executed and undone on a shadow copy first, with the checksums attached.
+                <p className="mt-7 max-w-[46ch] text-[16px] leading-[1.55] text-[var(--lp-ink-2)]">
+                  An agent asks to drop a column on a hundred thousand rows. Nobody can answer that honestly —
+                  not without knowing whether the rollback actually works.
                 </p>
-              </div>
-            </Reveal>
-          </div>
+                <p className="mt-4 max-w-[46ch] text-[16px] leading-[1.55] text-[var(--lp-ink-2)]">
+                  So AIRLOCK does not ask it. It runs the change against a copy of your database, undoes it, and
+                  checksums all three states. <span className="text-[var(--lp-ink)]">The gate opens only if the
+                  data came back.</span>
+                </p>
 
-          {/* ---- copy + buttons, bottom-left --------------------------- */}
-          <div className="relative z-30 px-8 pt-10 sm:px-12 lg:absolute lg:bottom-[5%] lg:left-0 lg:w-[42%] lg:pt-0">
-            <Reveal>
-              <div>
-                <p className="max-w-[40ch] text-[15.5px] leading-[1.5] text-[var(--lp-ink-2)]">
-                  We prove migrations, erasures, refunds and access grants against a shadow copy, then hand you the
-                  checksums and let you decide.
-                </p>
-                <div className="mt-7 flex flex-wrap gap-4">
+                <div className="mt-9 flex flex-wrap gap-3.5">
                   <Link
                     href="/console"
-                    className="rounded-[9px] bg-[linear-gradient(180deg,var(--lp-orange-a),var(--lp-orange-b))] px-10 py-3.5 text-[16px] font-medium text-white shadow-[0_10px_26px_-12px_rgba(189,86,10,.9)] transition-transform hover:scale-[1.02]"
+                    className="rounded-[9px] bg-[linear-gradient(180deg,var(--lp-orange-a),var(--lp-orange-b))] px-8 py-3.5 text-[15.5px] font-medium text-white shadow-[0_10px_26px_-12px_rgba(189,86,10,.9)] transition-transform hover:scale-[1.02]"
                   >
                     Open the console
                   </Link>
                   <a
                     href="#gate"
-                    className="rounded-[9px] bg-[var(--lp-grey-btn)] px-10 py-3.5 text-[16px] font-medium text-[var(--lp-ink)] transition-colors hover:brightness-95"
+                    className="rounded-[9px] bg-[var(--lp-grey-btn)] px-8 py-3.5 text-[15.5px] font-medium text-[var(--lp-ink)] transition-colors hover:brightness-95"
                   >
-                    Try the gate
+                    Try to break the gate
                   </a>
                 </div>
+
+                <p className="lp-mono mt-6 text-[12.5px] text-[var(--lp-ink-2)]">
+                  npm run demo
+                  <span className="ml-2 text-[var(--lp-ink-2)] opacity-70">— three real changes, ~90s</span>
+                </p>
               </div>
             </Reveal>
           </div>
 
-          {/* ---- copy, bottom-right ------------------------------------ */}
-          <div className="relative z-30 px-8 pt-8 pb-24 sm:px-12 lg:absolute lg:top-[68%] lg:right-0 lg:w-[32%] lg:pt-0 lg:pb-0 lg:pr-12">
-            <Reveal delay={100}>
-              <p className="max-w-[36ch] text-[15.5px] leading-[1.5] text-[var(--lp-ink-2)] lg:text-right">
-                From the first line of SQL to a sealed, tamper-evident receipt — nothing reaches production unproven.
+          {/* ---- the same argument, as the product's own output ---------- */}
+          <div className="lg:col-span-7">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Reveal delay={90} className="h-full">
+                <Panel
+                  kicker="Every other approval flow"
+                  tone="plain"
+                  caption="You are being asked to trust a plan. Nothing on this screen tells you whether the rollback works."
+                >
+                  <Request />
+
+                  {/*
+                    The same slot the right panel fills with three digests, and it
+                    is empty on purpose. Equal-height panels left a ~90px hole here
+                    and the hole was the most interesting thing about the panel, so
+                    it now says what it is: this is the evidence you are deciding
+                    without.
+                  */}
+                  <dl className="mt-4 space-y-2.5">
+                    <Missing label="certificate" />
+                    <Missing label="rollback proof" />
+                    <Missing label="blast radius" />
+                  </dl>
+
+                  <div className="mt-4 flex gap-2">
+                    {/* Spans, not buttons: this is a depiction of someone else's
+                        UI, and a focusable control that does nothing is a worse
+                        lie than a picture of one. */}
+                    <span className="flex-1 rounded-[6px] bg-[#2f6f52] px-3 py-2 text-center text-[12.5px] font-medium text-[#eaf5ee]">
+                      Approve
+                    </span>
+                    <span className="rounded-[6px] border border-[#3a4150] px-3 py-2 text-center text-[12.5px] text-[var(--lp-pale-2)]">
+                      Reject
+                    </span>
+                  </div>
+                </Panel>
+              </Reveal>
+
+              <Reveal delay={190} className="h-full">
+                <Panel
+                  kicker="AIRLOCK"
+                  tone="signal"
+                  verdict={
+                    <span className="lp-mono rounded-[3px] border border-[#7d2b2d] bg-[#2a1416] px-1.5 py-[2px] text-[9.5px] tracking-[0.08em] text-[#ff8f91] uppercase">
+                      gate sealed
+                    </span>
+                  }
+                  caption="Line 3 is not line 1. The column came back; the hundred thousand values in it did not."
+                >
+                  <p className="text-[12.5px] leading-[1.5] text-[var(--lp-pale-2)]">
+                    Ran it against a copy of the real rows. Then ran the rollback.
+                  </p>
+
+                  <dl className="mt-4 space-y-2.5">
+                    <Digest label="pre" value={short(DIGESTS.pre)} />
+                    <Digest label="post" value={short(DIGESTS.post)} dim />
+                    <Digest label="post-rollback" value={short(DIGESTS.rollback)} bad />
+                  </dl>
+
+                  {/* The absence, drawn. */}
+                  <div className="mt-4 rounded-[6px] border border-dashed border-[#4a5261] px-3 py-3 text-center">
+                    <p className="lp-mono text-[10.5px] tracking-[0.1em] text-[var(--lp-pale-3)] uppercase">
+                      no approval control exists
+                    </p>
+                  </div>
+                </Panel>
+              </Reveal>
+            </div>
+
+            <Reveal delay={280}>
+              <p className="mt-4 text-[13.5px] leading-[1.5] text-[var(--lp-ink-2)]">
+                Not greyed out — <span className="text-[var(--lp-ink)]">never rendered.</span> The value that would
+                represent permission cannot be constructed, so the agent has nothing to offer a human and nobody is
+                interrupted about a change that cannot be undone.
               </p>
             </Reveal>
           </div>
-
-          {/* ---- the props orbiting the object -------------------------- */}
-          <Drift className="top-[11%] left-[38%] z-30 hidden w-[clamp(54px,4.4vw,80px)] lg:block" dur={7.5} rot={-7}>
-            <PropNote className="h-auto w-full" />
-          </Drift>
-          <Drift className="top-[3%] left-[54%] z-30 hidden w-[clamp(60px,5vw,90px)] lg:block" dur={8.5} delay={0.6} rot={5}>
-            <PropCamera className="h-auto w-full" />
-          </Drift>
-          <Drift className="top-[15%] right-[29%] z-30 hidden w-[clamp(64px,5.4vw,96px)] lg:block" dur={9} delay={1.2} rot={6}>
-            <PropMail className="h-auto w-full" />
-          </Drift>
-          <Drift className="top-[36%] left-[32%] z-20 hidden w-[clamp(52px,4.6vw,84px)] lg:block" dur={10} delay={1.9} rot={8}>
-            <PropArch className="h-auto w-full" />
-          </Drift>
-          <Drift className="bottom-[10%] left-[39%] z-30 hidden w-[clamp(76px,6.6vw,118px)] lg:block" dur={9.5} delay={0.9} rot={-5}>
-            <PropRing className="h-auto w-full" />
-          </Drift>
-          <Drift className="top-[47%] left-[30%] z-30 hidden w-[clamp(22px,1.8vw,31px)] xl:block" dur={7} delay={2.2} rot={11}>
-            <PropPebble className="h-auto w-full" tone="#b39184" />
-          </Drift>
-          <Drift className="right-[32%] bottom-[15%] z-30 hidden w-[clamp(34px,2.9vw,50px)] xl:block" dur={8} delay={1.5} rot={-9}>
-            <PropKey className="h-auto w-full" />
-          </Drift>
         </div>
 
         {/* ---- right rail ------------------------------------------------ */}
@@ -186,6 +231,110 @@ export function Hero() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One of the two hero panels.
+ *
+ * Both are dark on a light plate, which is the same signal the `#gate` and
+ * `#ledger` bands use further down the page: you have stopped reading about the
+ * product and started looking at its output.
+ */
+function Panel({
+  kicker,
+  tone,
+  verdict,
+  caption,
+  children,
+}: {
+  kicker: string;
+  tone: 'plain' | 'signal';
+  verdict?: React.ReactNode;
+  caption: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <article className="flex h-full flex-col rounded-[10px] border border-[#232a35] bg-[var(--lp-void)] p-4 shadow-[0_18px_44px_-28px_rgba(0,0,0,.75)]">
+      <div className="flex items-baseline justify-between gap-2">
+        <p
+          className={cx(
+            'lp-mono text-[10.5px] tracking-[0.13em] uppercase',
+            tone === 'signal' ? 'text-[var(--lp-orange-a)]' : 'text-[var(--lp-pale-3)]',
+          )}
+        >
+          {kicker}
+        </p>
+        {verdict}
+      </div>
+
+      <div className="mt-3.5 flex-1">{children}</div>
+
+      <p className="mt-4 border-t border-[#232a35] pt-3 text-[11.5px] leading-[1.45] text-[var(--lp-pale-3)]">
+        {caption}
+      </p>
+    </article>
+  );
+}
+
+/** The change itself, worded the way an agent would put it. */
+function Request() {
+  return (
+    <div>
+      <p className="text-[12.5px] leading-[1.5] text-[var(--lp-pale-2)]">The agent wants to:</p>
+      <p className="lp-mono mt-2 rounded-[5px] border border-[#232a35] bg-[#11151c] px-2.5 py-2 text-[11.5px] leading-[1.5] text-[var(--lp-pale)]">
+        alter table users
+        <br />
+        drop column plan_name
+      </p>
+      <p className="lp-mono mt-2.5 text-[11.5px] text-[var(--lp-pale-3)]">100,000 rows &middot; 1 dependent index</p>
+    </div>
+  );
+}
+
+/**
+ * One line of the checksum triple.
+ *
+ * Label above value rather than beside it. Side by side, a 26-character digest
+ * and its label compete for a 330px column and the digest ends up truncated
+ * mid-hash — which on this page of all pages reads as a number too long to be
+ * bothered with, rather than as the measurement the whole argument rests on.
+ */
+function Digest({ label, value, dim, bad }: { label: string; value: string; dim?: boolean; bad?: boolean }) {
+  return (
+    <div>
+      <dt className="lp-mono flex items-baseline gap-2 text-[10px] tracking-[0.1em] text-[var(--lp-pale-3)] uppercase">
+        {label}
+        {bad ? <span className="text-[#ff8f91] normal-case">— not line 1</span> : null}
+      </dt>
+      <dd
+        className={cx(
+          'lp-mono mt-0.5 text-[11.5px] leading-none',
+          bad ? 'text-[#ff8f91]' : dim ? 'text-[var(--lp-pale-3)]' : 'text-[var(--lp-pale)]',
+        )}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+/** A row of evidence that was never produced. The counterpart to `Digest`. */
+function Missing({ label }: { label: string }) {
+  return (
+    <div>
+      <dt className="lp-mono text-[10px] tracking-[0.1em] text-[var(--lp-pale-3)] uppercase">{label}</dt>
+      {/*
+        #7c828d, not the dimmer grey this started as. `check:a11y` measured that
+        one at 3.12:1 on the panel's near-black and failed the build, which is the
+        guard working: "absent" still has to be legible, or the panel makes its
+        argument only to people with good monitors. This clears 4.99:1 and stays
+        visibly quieter than the digests opposite.
+      */}
+      <dd className="lp-mono mt-0.5 text-[11.5px] leading-none text-[#7c828d]">— not attached</dd>
     </div>
   );
 }

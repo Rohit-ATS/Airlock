@@ -109,7 +109,7 @@ const NAV = [
 
 export function Nav() {
   return (
-    <div className="flex items-center gap-6 px-8 pt-7 sm:px-12">
+    <div className="flex items-center gap-4 px-5 pt-6 sm:gap-6 sm:px-12 sm:pt-7">
       <Link href="/" className="flex shrink-0 items-center gap-3" aria-label="AIRLOCK — home">
         {/* the checkered mark */}
         <span className="grid size-10 shrink-0 place-items-center rounded-[9px] bg-[var(--lp-orange-b)]">
@@ -151,11 +151,18 @@ export function Nav() {
         </a>
       </nav>
 
+      {/*
+        Two labels, because at 390px the long one did not fit and the plate's
+        `overflow-hidden` sliced the button in half rather than scrolling — so
+        the page looked broken on a phone while reporting zero horizontal
+        overflow, which is why it survived this long.
+      */}
       <Link
         href="/console"
-        className="ml-auto shrink-0 rounded-[11px] bg-[var(--lp-black)] px-8 py-4 text-[16px] font-medium text-white transition-transform hover:scale-[1.02] lg:ml-0"
+        className="ml-auto shrink-0 rounded-[11px] bg-[var(--lp-black)] px-5 py-3 text-[15px] font-medium text-white transition-transform hover:scale-[1.02] sm:px-8 sm:py-4 sm:text-[16px] lg:ml-0"
       >
-        Open the console
+        <span className="sm:hidden">Console</span>
+        <span className="hidden sm:inline">Open the console</span>
       </Link>
     </div>
   );
