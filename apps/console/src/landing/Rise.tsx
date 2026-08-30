@@ -191,7 +191,8 @@ export function Band({
 }) {
   return (
     <section id={id} className="px-4 pb-4 sm:px-7 sm:pb-7">
-      <div className={cx(dark ? 'lp-deep' : 'lp-card', 'px-6 py-14 sm:px-10 md:py-20')}>
+      <div className={cx(dark ? 'lp-deep' : 'lp-card', 'lp-atmos lp-lit relative overflow-hidden px-6 py-14 sm:px-10 md:py-16')}>
+        {dark ? <div className="lp-grid-layer" aria-hidden /> : null}
         {index || label ? (
           <div className="flex items-center gap-4">
             {index ? <span className="lp-legend text-[var(--lp-signal)]">{index}</span> : null}
@@ -201,7 +202,7 @@ export function Band({
         ) : null}
 
         {title || lede ? (
-          <div className="mt-9 grid gap-y-7 lg:grid-cols-12 lg:gap-x-12">
+          <div className="mt-8 grid gap-y-6 lg:grid-cols-12 lg:gap-x-12">
             {title ? (
               <div className="lg:col-span-7">
                 <Reveal>
@@ -221,7 +222,7 @@ export function Band({
           </div>
         ) : null}
 
-        {children ? <div className={title || lede ? 'mt-14' : ''}>{children}</div> : null}
+        {children ? <div className={title || lede ? 'mt-12' : ''}>{children}</div> : null}
       </div>
     </section>
   );

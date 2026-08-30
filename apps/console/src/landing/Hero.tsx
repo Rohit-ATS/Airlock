@@ -58,7 +58,8 @@ const short = (hex: string) => `sha256:${hex.slice(0, 16)}…${hex.slice(-6)}`;
 export function Hero() {
   return (
     <div id="top" className="p-4 sm:p-7">
-      <div className="lp-card relative flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden">
+      <div className="lp-card lp-atmos lp-glow lp-lit relative flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden">
+        <div className="lp-grid-layer" aria-hidden />
         <Nav />
 
         <div className="grid gap-10 px-6 pt-10 pb-16 sm:px-10 lg:grid-cols-12 lg:gap-9 lg:px-12 lg:pt-14 lg:pb-20">
@@ -66,21 +67,22 @@ export function Hero() {
           <div className="lg:col-span-5 lg:pt-6">
             <Reveal>
               <div>
-                <p className="lp-mono text-[12px] tracking-[0.14em] text-[var(--lp-ink-2)] uppercase">
+                <p className="lp-mono inline-flex items-center gap-2 rounded-full border border-[var(--lp-line-2)] bg-[var(--lp-raised)] px-3 py-1.5 text-[11px] tracking-[0.12em] text-[var(--lp-ink-2)] uppercase">
+                  <span className="size-1.5 rounded-full bg-[var(--lp-signal)]" aria-hidden />
                   Change control for agents with production access
                 </p>
 
-                <h1 className="lp-display mt-5 text-[clamp(2.3rem,4.1vw,3.5rem)] text-[var(--lp-ink)]">
+                <h1 className="lp-display mt-5 text-[clamp(2.6rem,4.9vw,4.2rem)] text-[var(--lp-ink)]">
                   <span className="block">&ldquo;Approve?&rdquo;</span>
                   <span className="block">is the wrong</span>
                   <span className="block">question.</span>
                 </h1>
 
-                <p className="mt-7 max-w-[46ch] text-[16px] leading-[1.55] text-[var(--lp-ink-2)]">
+                <p className="mt-8 max-w-[44ch] text-[16.5px] leading-[1.6] text-[var(--lp-ink-2)]">
                   An agent asks to drop a column on a hundred thousand rows. Nobody can answer that honestly —
                   not without knowing whether the rollback actually works.
                 </p>
-                <p className="mt-4 max-w-[46ch] text-[16px] leading-[1.55] text-[var(--lp-ink-2)]">
+                <p className="mt-4 max-w-[44ch] text-[16.5px] leading-[1.6] text-[var(--lp-ink-2)]">
                   So AIRLOCK does not ask it. It runs the change against a copy of your database, undoes it, and
                   checksums all three states. <span className="text-[var(--lp-ink)]">The gate opens only if the
                   data came back.</span>
@@ -185,6 +187,30 @@ export function Hero() {
                 interrupted about a change that cannot be undone.
               </p>
             </Reveal>
+
+            {/*
+              The pipeline, compressed to one line.
+
+              This column ran out of content two thirds of the way down and left
+              a 240px hole under the panels — the second most expensive empty
+              space on the page after the one at the foot of the plate. It is
+              also the one question the two panels above do not answer: they
+              show the before and the after, and say nothing about who does
+              what in between. Three steps, and the third is a person.
+            */}
+            <Reveal delay={340}>
+              <ol className="mt-8 grid gap-px overflow-hidden rounded-[8px] border border-[var(--lp-line)] bg-[var(--lp-line)] sm:grid-cols-3">
+                {FLOW.map((step) => (
+                  <li key={step.n} className="bg-[var(--lp-raised)] px-4 py-4">
+                    <div className="flex items-baseline gap-2.5">
+                      <span className="lp-mono text-[11px] text-[var(--lp-signal)]">{step.n}</span>
+                      <span className="text-[13px] font-semibold text-[var(--lp-ink)]">{step.title}</span>
+                    </div>
+                    <p className="mt-2 text-[12px] leading-[1.45] text-[var(--lp-ink-3)]">{step.body}</p>
+                  </li>
+                ))}
+              </ol>
+            </Reveal>
           </div>
         </div>
 
@@ -287,7 +313,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <article className="flex h-full flex-col rounded-[8px] border border-[var(--lp-line)] bg-[var(--lp-raised)] p-5">
+    <article className="lp-lit flex h-full flex-col rounded-[10px] border border-[var(--lp-line)] bg-[var(--lp-raised)] p-5">
       <div className="flex items-baseline justify-between gap-2">
         <p
           className={cx(
@@ -369,6 +395,13 @@ function Missing({ label }: { label: string }) {
 }
 
 /** Four figures, each checked by something in `npm test`. See the note above. */
+/** The three steps, and the fact that the last one is not the agent. */
+const FLOW = [
+  { n: '01', title: 'The agent opens', body: 'Writes the change and its inverse. No certificate yet, so the gate is shut by default.' },
+  { n: '02', title: 'AIRLOCK proves', body: 'Runs it on a copy of the real rows, runs the rollback, checksums all three states.' },
+  { n: '03', title: 'A human decides', body: 'Only reachable from a passing proof. The agent has no tool that applies anything.' },
+];
+
 const STATS = [
   { value: '0', label: 'tools that write to production', tone: 'proven' as const },
   { value: '1,000,000', label: 'rows the demo proves against', tone: 'ink' as const },
