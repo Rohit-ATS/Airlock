@@ -69,6 +69,7 @@ npm run verify:sqlite -- --emit-only
 npm run verify:sqlite:failed -- --emit-only
 npm run verify:sqlite:drift -- --emit-only
 npm run verify:sqlite:scope -- --emit-only
+npm run branch:supabase -- airlock/smoke-test
 npm run dev --workspace @airlock/console
 ```
 
@@ -124,22 +125,25 @@ Migration verification also records pre-hosted safety analysis under
 
 After the schema migration works:
 
-1. data-operation verifier: intentionally detect a failed rollback and emit
+1. Supabase branch lifecycle: create an ephemeral branch with data, poll it until
+   the preview project is healthy, and always tear it down after the verification
+   callback fails or succeeds. Started with `npm run branch:supabase -- airlock/smoke-test`;
+2. data-operation verifier: intentionally detect a failed rollback and emit
    `status: "FAILED"` with a precise `failure_reason`. Started with
    `npm run verify:sqlite:failed -- --emit-only`, which executes rollback SQL but
    restores the wrong values so the checksum proof fails;
-2. erasure scope computation: enumerate records across SQLite first, then map the same
+3. erasure scope computation: enumerate records across SQLite first, then map the same
    scope shape to Postgres/Supabase and add Stripe, object storage and Slack test
    connectors. Started with `npm run verify:sqlite:scope -- --emit-only`, which
    computes a PROVEN Scope Certificate with records and retention exclusions;
-3. artifact output: write large diffs as files and put only the summary into the dossier.
+4. artifact output: write large diffs as files and put only the summary into the dossier.
    Started for erasure scope: the dossier carries aggregate counts, while row-level
    details are written to `.airlock/*.scope.ndjson`;
-4. drift re-check: recompute production checksum just before asking for approval.
+5. drift re-check: recompute production checksum just before asking for approval.
    Started with `npm run verify:sqlite:drift -- --emit-only`: the rollback proof
    still passes, but production changes before approval, so the gate seals as
    `PRODUCTION_DRIFTED`.
-5. destructive-DDL classifier and expand/contract rewriter: started locally for the
+6. destructive-DDL classifier and expand/contract rewriter: started locally for the
    tier migration, where `DROP COLUMN plan_name` is flagged and a staged alternative
    is written into the verification artifact.
 

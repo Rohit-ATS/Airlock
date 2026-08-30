@@ -53,6 +53,7 @@
     "harness:turn": "npm run build --workspace @airlock/contract && node scripts/harness-turn.mjs",
     "harness:approve": "node scripts/harness-approve.mjs",
     "harness:sandbox": "node scripts/harness-sandbox.mjs",
+    "branch:supabase": "npm run build --workspace @airlock/verifier && node scripts/supabase-branch.mjs",
     "check:assets": "node scripts/check-assets.mjs",
     "demo:refresh": "node scripts/demo-refresh.mjs",
     "check:diagrams": "node scripts/check-diagrams.mjs",
