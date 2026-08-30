@@ -9,7 +9,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SupabaseBranchClient } from '../packages/verifier/dist/index.js';
+import { SupabaseBranchClient, SupabaseBranchError } from '../packages/verifier/dist/index.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const args = new Set(process.argv.slice(2));
@@ -54,18 +54,27 @@ if (!token.startsWith('sbp_')) {
 
 const name = process.argv.find((arg) => arg.startsWith('airlock/')) ?? `airlock/${Date.now()}`;
 const client = new SupabaseBranchClient({ projectRef: ref, accessToken: token });
-const created = await client.create({ name, withData: true, persistent: false });
-
-console.log(`created ${created.name} (${created.project_ref || created.id || 'no ref returned yet'})`);
 try {
-  const ready = await client.waitUntilReady({ name: created.name, timeoutMs: 10 * 60_000 });
-  console.log(`ready   ${ready.name} (${ready.project_ref})`);
-  if (KEEP) {
-    console.log('kept    --keep was set; delete it manually when done');
+  const created = await client.create({ name, withData: true, persistent: false });
+
+  console.log(`created ${created.name} (${created.project_ref || created.id || 'no ref returned yet'})`);
+  try {
+    const ready = await client.waitUntilReady({ name: created.name, timeoutMs: 10 * 60_000 });
+    console.log(`ready   ${ready.name} (${ready.project_ref})`);
+    if (KEEP) {
+      console.log('kept    --keep was set; delete it manually when done');
+    }
+  } finally {
+    if (!KEEP) {
+      await client.delete(created.project_ref || created.id || created.name, { force: true });
+      console.log('deleted');
+    }
   }
-} finally {
-  if (!KEEP) {
-    await client.delete(created.project_ref || created.id || created.name, { force: true });
-    console.log('deleted');
+} catch (error) {
+  if (error instanceof SupabaseBranchError && error.status === 402) {
+    console.error('Supabase accepted the PAT, but branching is not enabled for this project.');
+    console.error('Branching requires Supabase Pro or above. AIRLOCK will use the Postgres throwaway-schema verifier fallback.');
+    process.exit(3);
   }
+  throw error;
 }
