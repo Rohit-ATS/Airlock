@@ -11,6 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { parseDossier } from '../packages/contract/dist/index.js';
+import { buildErasureScopePlan } from '../packages/verifier/dist/index.js';
 
 const dbPath = process.env.SQLITE_PATH ?? path.join('data', 'airlock.sqlite');
 const outDir = process.env.AIRLOCK_DATA_DIR ?? '.airlock';
@@ -143,27 +144,10 @@ if (!user) {
     })),
   ];
 
-  const scopeRecords = [
-    { system: 'postgres', table: 'users', id: String(userId), action: 'anonymize', count: 1 },
-    { system: 'postgres', table: 'sessions', id: `user_id=${userId}`, action: 'delete', count: sessions },
-    { system: 'postgres', table: 'audit_log', id: `actor_user_id=${userId}`, action: 'anonymize', count: auditRows },
-    { system: 'stripe', table: 'customer', id: String(user.stripe_customer_id), action: 'delete', count: 1 },
-    { system: 'slack', table: 'user', id: String(user.slack_user_id), action: 'anonymize', count: 1 },
-    { system: 'object_storage', table: 'airlock-uploads', id: `${user.upload_prefix}*`, action: 'delete', count: uploads },
-  ].filter((record) => record.count > 0);
-
-  const exclusions = [
-    {
-      system: 'postgres',
-      table: 'invoices',
-      reason: 'Seven-year statutory retention. Personal fields must be redacted separately, but invoice rows are not deleted.',
-      count: retainedInvoices,
-    },
-  ].filter((record) => record.count > 0);
-
-  const recordCount =
-    scopeRecords.reduce((sum, record) => sum + record.count, 0) +
-    exclusions.reduce((sum, record) => sum + record.count, 0);
+  const scope = buildErasureScopePlan({
+    user,
+    counts: { sessions, auditRows, retainedInvoices, uploads },
+  });
 
   dossier = parseDossier({
     dossier_id: dossierId,
@@ -175,32 +159,19 @@ if (!user) {
     target: {
       project_ref: 'sqlite-local',
       branch_ref: null,
-      systems: ['postgres', 'stripe', 'slack', 'object_storage'],
+      systems: scope.target_systems,
     },
-    forward: [
-      { system: 'postgres', op: `anonymize users.id=${userId}`, reversible: false, proven: true },
-      { system: 'postgres', op: `DELETE FROM sessions WHERE user_id = ${userId};`, reversible: false, proven: true },
-      { system: 'postgres', op: `anonymize audit_log.actor_user_id=${userId}`, reversible: false, proven: true },
-      { system: 'stripe', op: `customers.delete("${user.stripe_customer_id}")`, reversible: false, proven: true },
-      { system: 'slack', op: `admin.users.session.reset + profile scrub for ${user.slack_user_id}`, reversible: false, proven: true },
-      { system: 'object_storage', op: `DELETE airlock-uploads/${user.upload_prefix}*`, reversible: false, proven: true },
-    ],
+    forward: scope.forward,
     rollback: [],
-    magnitude: { records: recordCount, people: 1, amount_minor: 0, undo_window_seconds: null },
+    magnitude: { records: scope.record_count, people: 1, amount_minor: 0, undo_window_seconds: null },
     certificate: {
       kind: 'SCOPE',
       status: 'PROVEN',
-      scope: { records: scopeRecords, exclusions },
+      scope: { records: scope.records, exclusions: scope.exclusions },
       sandbox_artifact_url: `file://${path.resolve(reportPath)}`,
       verified_at: verifiedAt,
     },
-    affected_tables: [
-      { system: 'postgres', name: 'users', rows: 1, operation: 'anonymize in place' },
-      { system: 'postgres', name: 'sessions', rows: sessions, operation: 'delete' },
-      { system: 'postgres', name: 'audit_log', rows: auditRows, operation: 'anonymize actor' },
-      { system: 'postgres', name: 'invoices', rows: retainedInvoices, operation: 'excluded by retention policy' },
-      { system: 'object_storage', name: 'airlock-uploads', rows: uploads, operation: 'delete objects' },
-    ],
+    affected_tables: scope.affected_tables,
     blast_radius: [],
     risk_notes: [
       {
