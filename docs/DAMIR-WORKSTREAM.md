@@ -55,8 +55,8 @@ Use the small scripts before promoting this into a larger package:
 - input: SQLite file, dossier id, request metadata
 - output: a Change Dossier JSON payload and a POST to the console
 
-Keep the first pass SQLite-only. Supabase branch lifecycle can wrap the same checksum
-flow once credentials are available.
+Keep the first pass SQLite-only. Supabase branch lifecycle now wraps the same
+checksum flow once a Management API personal access token is available.
 
 Suggested commands:
 
@@ -126,8 +126,10 @@ Migration verification also records pre-hosted safety analysis under
 After the schema migration works:
 
 1. Supabase branch lifecycle: create an ephemeral branch with data, poll it until
-   the preview project is healthy, and always tear it down after the verification
-   callback fails or succeeds. Started with `npm run branch:supabase -- airlock/smoke-test`;
+   the preview project is healthy, run the Postgres verifier on the branch ref,
+   and always tear it down after the verification callback fails or succeeds.
+   Implemented in the MCP verification path; live smoke needs
+   `SUPABASE_ACCESS_TOKEN=sbp_...` and runs with `npm run branch:supabase -- airlock/smoke-test`;
 2. data-operation verifier: intentionally detect a failed rollback and emit
    `status: "FAILED"` with a precise `failure_reason`. Started with
    `npm run verify:sqlite:failed -- --emit-only`, which executes rollback SQL but

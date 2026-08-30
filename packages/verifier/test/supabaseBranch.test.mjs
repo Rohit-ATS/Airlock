@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SupabaseBranchClient, SupabaseBranchError } from '../dist/index.js';
+import { SupabaseBranchClient, SupabaseBranchError, verifyOnSupabaseBranch } from '../dist/index.js';
 
 function json(body, status = 200) {
   return {
@@ -124,4 +124,69 @@ test('redacts Supabase tokens from Management API errors', async () => {
     assert.doesNotMatch(error.message, /sbp_secret_token_for_tests/);
     return true;
   });
+});
+
+test('verifies on the ready Supabase branch ref and tears it down afterwards', async () => {
+  const calls = [];
+  const digestA = 'a'.repeat(64);
+  const digestB = 'b'.repeat(64);
+  let digestCalls = 0;
+
+  const snapshot = (schema) => [
+    {
+      table: 'users',
+      relfilenode: schema === 'public' ? '10' : '20',
+      indexes: [],
+      constraints: [],
+    },
+  ];
+
+  const fetch = async (url, init = {}) => {
+    const method = init.method ?? 'GET';
+    calls.push({ url, method, body: init.body });
+
+    if (url.endsWith('/v1/projects/prodref123/branches') && method === 'POST') {
+      return json({ id: 'branch-id', name: 'airlock/dos_live', project_ref: 'branchref123' }, 201);
+    }
+    if (url.endsWith('/v1/projects/prodref123/branches/airlock%2Fdos_live') && method === 'GET') {
+      return json({ id: 'branch-id', name: 'airlock/dos_live', project_ref: 'branchref123', status: 'ACTIVE_HEALTHY' });
+    }
+    if (url.endsWith('/v1/branches/branchref123') && method === 'DELETE') {
+      return json({ message: 'ok' });
+    }
+    if (url.endsWith('/v1/projects/branchref123/database/query') && method === 'POST') {
+      const query = JSON.parse(init.body).query;
+      if (query.includes('pg_class') && query.includes("n.nspname = 'public'")) return json(snapshot('public'));
+      if (query.includes('pg_class') && query.includes("n.nspname = 'airlock_shadow_dos_live'")) {
+        return json(snapshot('airlock_shadow_dos_live'));
+      }
+      if (query.includes('count(*)::int')) return json([{ n: 2 }]);
+      if (query.includes('string_agg(t ||')) {
+        digestCalls += 1;
+        return json([{ digest: digestCalls === 2 ? digestB : digestA }]);
+      }
+      return json([]);
+    }
+
+    return json({ message: `unexpected ${method} ${url}` }, 500);
+  };
+
+  const result = await verifyOnSupabaseBranch({
+    projectRef: 'prodref123',
+    accessToken: 'sbp_secret_token_for_tests',
+    runId: 'dos_live',
+    tables: ['users'],
+    forward: ['alter table users add column tier text'],
+    rollback: ['alter table users drop column tier'],
+    fetch,
+  });
+
+  assert.equal(result.status, 'PROVEN');
+  assert.equal(result.checksums.pre, `sha256:${digestA}`);
+  assert.equal(result.checksums.post, `sha256:${digestB}`);
+  assert.equal(result.checksums.post_rollback, `sha256:${digestA}`);
+  assert.equal(result.row_counts.users, 2);
+  assert.equal(result.table_rewrite, false);
+  assert.ok(calls.some((call) => call.url === 'https://api.supabase.com/v1/projects/branchref123/database/query'));
+  assert.equal(calls.at(-1).url, 'https://api.supabase.com/v1/branches/branchref123');
 });

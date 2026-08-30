@@ -83,7 +83,16 @@ function fromDotEnv(...names) {
   return out;
 }
 
-const env = { ...fromDotEnv('SUPABASE_ACCESS_TOKEN', 'SUPABASE_URL'), ...process.env };
+const env = {
+  ...fromDotEnv(
+    'SUPABASE_ACCESS_TOKEN',
+    'SUPABASE_URL',
+    'SUPABASE_PROJECT_REF',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_SERVICE_ROLE_KEY',
+  ),
+  ...process.env,
+};
 const token = env.SUPABASE_ACCESS_TOKEN;
 const ref =
   env.SUPABASE_PROJECT_REF ?? /https:\/\/([a-z0-9]+)\.supabase\.co/i.exec(env.SUPABASE_URL ?? '')?.[1];
@@ -91,6 +100,15 @@ const ref =
 if (!token || !ref) {
   console.error(`${RED}Need SUPABASE_ACCESS_TOKEN and SUPABASE_URL (or SUPABASE_PROJECT_REF) in .env.${OFF}`);
   console.error(`${DIM}The access token is a personal admin credential from supabase.com/dashboard/account/tokens.${OFF}`);
+  if (!token && (env.SUPABASE_ANON_KEY || env.SUPABASE_SERVICE_ROLE_KEY)) {
+    console.error(`${DIM}Anon and service_role JWTs prove the project API, but Supabase's Management API needs a PAT that starts with sbp_.${OFF}`);
+  }
+  process.exit(2);
+}
+
+if (!token.startsWith('sbp_')) {
+  console.error(`${RED}SUPABASE_ACCESS_TOKEN must be a Supabase personal access token that starts with sbp_.${OFF}`);
+  console.error(`${DIM}Do not put the anon or service_role JWT in this variable; those cannot call the Management API.${OFF}`);
   process.exit(2);
 }
 
