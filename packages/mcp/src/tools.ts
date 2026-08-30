@@ -48,7 +48,7 @@ import {
   scanResolvedFacts,
   operationsFingerprint,
 } from '@airlock/contract';
-import { verifyOnSqliteShadow, verifyOnPostgresShadow } from '@airlock/verifier';
+import { verifyOnSqliteShadow, verifyOnSupabaseBranch } from '@airlock/verifier';
 import path from 'node:path';
 import type { ToolDefinition } from './protocol.js';
 
@@ -648,12 +648,13 @@ export function airlockTools(): ToolDefinition[] {
         // proof of somebody else's database proves nothing about this change.
         // The local SQLite file remains the fallback so a fresh clone still runs
         // with no credentials at all.
-        const usePostgres = Boolean(SUPABASE_PROJECT_REF && SUPABASE_ACCESS_TOKEN);
-        const result = usePostgres
-          ? await verifyOnPostgresShadow({
+        const useSupabaseBranch = Boolean(SUPABASE_PROJECT_REF && SUPABASE_ACCESS_TOKEN);
+        const result = useSupabaseBranch
+          ? await verifyOnSupabaseBranch({
               projectRef: SUPABASE_PROJECT_REF,
               accessToken: SUPABASE_ACCESS_TOKEN,
               runId,
+              branchName: `airlock/${runId}`,
               tables,
               forward,
               rollback,
@@ -692,13 +693,12 @@ export function airlockTools(): ToolDefinition[] {
           // The scheme is not decoration. `local-shadow://` says the proof ran
           // against a copy of a local file on this host — a real measurement of
           // a database that may not be the one the change is destined for.
-          // `pg-shadow://` says it ran against a throwaway schema inside the
-          // operator's own Postgres, populated from their own rows. A reader
+          // `pg-branch://` says the proof ran inside a disposable Supabase
+          // preview branch copied from the operator's own project. A reader
           // deciding how much a certificate is worth needs to be able to tell
-          // those apart, and a single hardcoded scheme quietly claimed the
-          // weaker one even when the stronger had happened.
-          sandbox_artifact_url: usePostgres
-            ? `pg-shadow://${SUPABASE_PROJECT_REF}/${runId}`
+          // that apart from a local file copy.
+          sandbox_artifact_url: useSupabaseBranch
+            ? `pg-branch://${SUPABASE_PROJECT_REF}/${runId}`
             : `local-shadow://${runId}`,
           // The statements this proof is about. The gate recomputes the
           // dossier's own fingerprint and refuses if they have diverged, so a
@@ -761,8 +761,8 @@ export function airlockTools(): ToolDefinition[] {
         // Postgres must not describe itself as a local file — that understates
         // the evidence exactly as badly as the reverse would overstate it.
         lines.push(
-          usePostgres
-            ? `  ran in      : throwaway schema in your Postgres, copied from live rows, dropped on exit`
+          useSupabaseBranch
+            ? `  ran in      : Supabase preview branch copied from live rows, deleted on exit`
             : `  ran in      : local shadow copy, destroyed on exit`,
           '',
           renderGate(saved),

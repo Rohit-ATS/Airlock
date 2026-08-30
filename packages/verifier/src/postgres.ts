@@ -63,6 +63,8 @@ export interface PostgresShadowInput {
   rollback: string[];
   /** Schema the real tables live in. Only ever read from. */
   sourceSchema?: string;
+  /** Test hook. Production uses global fetch. */
+  fetch?: typeof fetch;
 }
 
 export interface PostgresShadowResult {
@@ -147,7 +149,8 @@ function bareTable(name: string): string {
 }
 
 async function runSql(input: PostgresShadowInput, sql: string): Promise<unknown[]> {
-  const res = await fetch(`${API}/${encodeURIComponent(input.projectRef)}/database/query`, {
+  const fetchImpl = input.fetch ?? fetch;
+  const res = await fetchImpl(`${API}/${encodeURIComponent(input.projectRef)}/database/query`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${input.accessToken}`,

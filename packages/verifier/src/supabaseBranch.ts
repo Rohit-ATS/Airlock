@@ -1,3 +1,5 @@
+import { verifyOnPostgresShadow, type PostgresShadowInput, type PostgresShadowResult } from './postgres.js';
+
 /**
  * Supabase branch lifecycle for AIRLOCK proofs.
  *
@@ -48,12 +50,52 @@ export interface PollBranchInput {
   signal?: AbortSignal;
 }
 
+export interface SupabaseBranchVerificationInput extends Omit<PostgresShadowInput, 'projectRef'> {
+  /** The production project ref whose data should be copied into the branch. */
+  projectRef: string;
+  /** Stable branch name for auditability. Defaults to airlock/<runId>. */
+  branchName?: string;
+  gitBranch?: string;
+  branchTimeoutMs?: number;
+  branchIntervalMs?: number;
+}
+
 export class SupabaseBranchError extends Error {
   constructor(
     message: string,
     readonly status?: number,
   ) {
     super(message);
+  }
+}
+
+export async function verifyOnSupabaseBranch(input: SupabaseBranchVerificationInput): Promise<PostgresShadowResult> {
+  const client = new SupabaseBranchClient({
+    projectRef: input.projectRef,
+    accessToken: input.accessToken,
+    fetch: input.fetch,
+  });
+  const created = await client.create({
+    name: input.branchName ?? `airlock/${input.runId}`,
+    gitBranch: input.gitBranch,
+    withData: true,
+    persistent: false,
+  });
+  const branchName = created.name || input.branchName || `airlock/${input.runId}`;
+  const branchRef = created.project_ref || created.id || branchName;
+
+  try {
+    const ready = await client.waitUntilReady({
+      name: branchName,
+      timeoutMs: input.branchTimeoutMs,
+      intervalMs: input.branchIntervalMs,
+    });
+    return await verifyOnPostgresShadow({
+      ...input,
+      projectRef: ready.project_ref || branchRef,
+    });
+  } finally {
+    await client.delete(branchRef, { force: true }).catch(() => undefined);
   }
 }
 

@@ -26,12 +26,29 @@ function fromDotEnv(...names) {
   return out;
 }
 
-const env = { ...fromDotEnv('SUPABASE_ACCESS_TOKEN', 'SUPABASE_URL', 'SUPABASE_PROJECT_REF'), ...process.env };
+const env = {
+  ...fromDotEnv(
+    'SUPABASE_ACCESS_TOKEN',
+    'SUPABASE_URL',
+    'SUPABASE_PROJECT_REF',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_SERVICE_ROLE_KEY',
+  ),
+  ...process.env,
+};
 const token = env.SUPABASE_ACCESS_TOKEN;
 const ref = env.SUPABASE_PROJECT_REF ?? /https:\/\/([a-z0-9-]+)\.supabase\.co/i.exec(env.SUPABASE_URL ?? '')?.[1];
 
 if (!token || !ref) {
   console.error('Need SUPABASE_ACCESS_TOKEN and SUPABASE_URL (or SUPABASE_PROJECT_REF) in .env.');
+  if (!token && (env.SUPABASE_ANON_KEY || env.SUPABASE_SERVICE_ROLE_KEY)) {
+    console.error('Anon and service_role JWTs are not enough here; Supabase branch lifecycle needs a personal access token that starts with sbp_.');
+  }
+  process.exit(2);
+}
+
+if (!token.startsWith('sbp_')) {
+  console.error('SUPABASE_ACCESS_TOKEN must be a Supabase personal access token that starts with sbp_, not an anon or service_role JWT.');
   process.exit(2);
 }
 
