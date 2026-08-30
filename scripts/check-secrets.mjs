@@ -19,6 +19,9 @@ const secretPatterns = [
   { name: 'OpenAI project key', pattern: /sk-proj-[A-Za-z0-9_-]{20,}/ },
   { name: 'OpenAI secret key', pattern: /sk-[A-Za-z0-9_-]{20,}/ },
   { name: 'Daytona API key', pattern: /dtn_[A-Za-z0-9_-]{20,}/ },
+  { name: 'Supabase personal access token', pattern: /sbp_[a-f0-9]{32,}/i },
+  { name: 'Supabase secret key', pattern: /sb_secret_[A-Za-z0-9_-]{16,}/ },
+  { name: 'Supabase service role JWT', pattern: /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*c2VydmljZV9yb2xl[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+/ },
 ];
 
 const allowedTrackedMatches = new Map([
