@@ -749,6 +749,93 @@ body {
   backdrop-filter: blur(8px);
 }
 
+/* ---------------------------------------------------------------------------
+   Atmosphere.
+
+   Instrument's rule is that depth comes from hairlines and background steps
+   rather than from drop shadows, and that is right for a control room where
+   every pixel is load-bearing. A front door has a different job: the first
+   screen has to look like somewhere, not like an empty buffer. Hairlines alone
+   gave a page that was correct and inert — flat near-black, small type floating
+   in large voids, nothing to suggest a person had composed it.
+
+   So these three add depth without breaking the rule, because none of them is
+   a shadow and none of them carries meaning:
+
+     .lp-grid   a 56px rule grid, masked to fade before it reaches any text.
+                Engineering-drawing texture; it says "measured" for free.
+     .lp-glow   two very wide radial washes, ice and seal, at 8-10% mix. They
+                give the top of the page a light source, which is the whole
+                difference between "dark theme" and "lit room".
+     .lp-lit    a 1px top-edge highlight on a panel — the physical cue that a
+                surface is facing up into that light.
+
+   All three are decorative and inert: `pointer-events: none`, no text sits on
+   them, and every contrast pair on the page still measures against the flat
+   token underneath. `check:a11y` is the proof, not the intention.
+   --------------------------------------------------------------------------- */
+
+/* The grid is a real element, not a pseudo.
+
+   It was `.lp-grid::before`, and it rendered nothing, because the same div also
+   carried `.lp-lit` — whose highlight is also a `::before`. One element has one
+   `::before`, the later rule wins, and the grid silently lost. Nothing errors
+   and nothing warns; the class is in the markup and the rule is in the
+   stylesheet and the page just looks flat. `.lp-glow` survived only because it
+   happened to use `::after`.
+
+   A composable decoration should not be a pseudo-element for exactly this
+   reason: you cannot stack two of them. */
+.lp-atmos {
+  position: relative;
+  isolation: isolate;
+}
+
+.lp-grid-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* Mixed off white rather than off --hairline. Hairline is #1c212b, which is a
+     legible border ON a panel and invisible AS a line drawn on one. */
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 4%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 4%) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 85% 65% at 50% 0%, #000 20%, transparent 76%);
+  mask-image: radial-gradient(ellipse 85% 65% at 50% 0%, #000 20%, transparent 76%);
+}
+
+.lp-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 55% 45% at 12% -5%, color-mix(in srgb, var(--color-ice) 13%, transparent), transparent 68%),
+    radial-gradient(ellipse 45% 40% at 88% 4%, color-mix(in srgb, var(--color-seal) 7%, transparent), transparent 66%);
+  pointer-events: none;
+}
+
+/* A 1px gradient edge, drawn as a masked border rather than a shadow. */
+.lp-lit {
+  position: relative;
+}
+.lp-lit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 0%) 45%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
 /* A hairline that fades out, for section rules that should not read as a box. */
 .lp-rule {
   height: 1px;
