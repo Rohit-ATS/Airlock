@@ -405,7 +405,7 @@ const FLOW = [
 const STATS = [
   { value: '0', label: 'tools that write to production', tone: 'proven' as const },
   { value: '1,000,000', label: 'rows the demo proves against', tone: 'ink' as const },
-  { value: '346', label: 'tests', tone: 'ink' as const },
+  { value: '347', label: 'tests', tone: 'ink' as const },
   { value: '23', label: 'harness capabilities', tone: 'ink' as const },
 ];
 

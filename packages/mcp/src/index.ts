@@ -64,7 +64,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
 
   if (port !== null) {
     const { serveHttp } = await import('./http.js');
-    await serveHttp({ server, port, path: process.env.AIRLOCK_MCP_HTTP_PATH ?? '/mcp' });
+    await serveHttp({
+      server,
+      port,
+      path: process.env.AIRLOCK_MCP_HTTP_PATH ?? '/mcp',
+      host: process.env.AIRLOCK_MCP_HTTP_HOST ?? '0.0.0.0',
+      token: process.env.AIRLOCK_MCP_HTTP_TOKEN ?? '',
+    });
     return;
   }
 

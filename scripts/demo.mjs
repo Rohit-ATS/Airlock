@@ -57,6 +57,7 @@ const CYAN = '\x1b[36m';
 
 const CONSOLE_URL = process.env.AIRLOCK_CONSOLE_URL ?? 'http://localhost:3000';
 const MCP_URL = process.env.AIRLOCK_MCP_URL ?? 'http://localhost:8975/mcp';
+const MCP_TOKEN = envValue('AIRLOCK_MCP_HTTP_TOKEN');
 
 /* --- presentation --------------------------------------------------------- */
 
@@ -66,6 +67,17 @@ const no = (m) => say(`   ${RED}✗${OFF}  ${m}`);
 const held = (m) => say(`   ${AMBER}⧗${OFF}  ${m}`);
 const note = (m) => say(`      ${DIM}${m}${OFF}`);
 const n = (v) => Number(v ?? 0).toLocaleString('en-GB');
+
+function envValue(name) {
+  if (process.env[name]) return process.env[name];
+  const file = path.join(root, '.env');
+  if (!existsSync(file)) return '';
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)$/.exec(line);
+    if (m?.[1] === name) return m[2].trim().replace(/^["']|["']$/g, '');
+  }
+  return '';
+}
 
 function act(number, title, problem) {
   say(`\n${DIM}${'─'.repeat(78)}${OFF}`);
@@ -153,7 +165,11 @@ let rpcId = 0;
 async function mcp(tool, args) {
   const res = await fetch(MCP_URL, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      ...(MCP_TOKEN ? { authorization: `Bearer ${MCP_TOKEN}` } : {}),
+    },
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: ++rpcId,
@@ -232,7 +248,11 @@ await require_(
   async () => {
     const res = await fetch(MCP_URL, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        ...(MCP_TOKEN ? { authorization: `Bearer ${MCP_TOKEN}` } : {}),
+      },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 0,

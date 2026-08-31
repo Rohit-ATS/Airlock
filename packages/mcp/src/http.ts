@@ -19,6 +19,7 @@
  *   - GET (server-initiated SSE) -> 405, per the spec's allowance
  *   - DELETE (session teardown)  -> 405, because sessions carry no state here
  */
+import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { McpServer, log, type JsonRpcRequest } from './protocol.js';
 
@@ -32,12 +33,6 @@ function send(res: ServerResponse, status: number, body: unknown, headers: Recor
   res.writeHead(status, {
     'content-type': 'application/json',
     'content-length': Buffer.byteLength(payload).toString(),
-    // The console and the harness are different origins in every deployment
-    // this is meant for, and the server exposes nothing that is not already
-    // readable by anyone who can reach the console API.
-    'access-control-allow-origin': '*',
-    'access-control-allow-headers': 'content-type, mcp-session-id, mcp-protocol-version, authorization',
-    'access-control-allow-methods': 'POST, OPTIONS',
     ...headers,
   });
   res.end(payload);
@@ -81,9 +76,13 @@ export interface HttpOptions {
   /** Path the MCP endpoint is served at. Default `/mcp`. */
   path?: string;
   host?: string;
+  /** Bearer token required for MCP JSON-RPC requests. */
+  token: string;
 }
 
-export async function serveHttp({ server, port, path = '/mcp', host = '0.0.0.0' }: HttpOptions): Promise<void> {
+export async function serveHttp({ server, port, path = '/mcp', host = '0.0.0.0', token }: HttpOptions): Promise<void> {
+  if (!token) throw new Error('AIRLOCK_MCP_HTTP_TOKEN is required for the HTTP MCP transport.');
+
   const http = createServer((req, res) => {
     void handle(req, res).catch((error) => {
       log(`unhandled: ${String(error)}`);
@@ -95,7 +94,10 @@ export async function serveHttp({ server, port, path = '/mcp', host = '0.0.0.0' 
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 
     if (req.method === 'OPTIONS') {
-      send(res, 204, null);
+      send(res, 204, null, {
+        'access-control-allow-headers': 'content-type, mcp-session-id, mcp-protocol-version, authorization',
+        'access-control-allow-methods': 'POST, OPTIONS',
+      });
       return;
     }
 
@@ -121,6 +123,16 @@ export async function serveHttp({ server, port, path = '/mcp', host = '0.0.0.0' 
 
     if (req.method !== 'POST') {
       send(res, 405, { error: 'Method not allowed.' }, { allow: 'POST, OPTIONS' });
+      return;
+    }
+
+    if (!authorized(req, token)) {
+      send(
+        res,
+        401,
+        { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Unauthorized' } },
+        { 'www-authenticate': 'Bearer' },
+      );
       return;
     }
 
@@ -183,4 +195,13 @@ export async function serveHttp({ server, port, path = '/mcp', host = '0.0.0.0' 
 
   // Hold the process open until the socket closes.
   await new Promise<void>((resolve) => http.on('close', () => resolve()));
+}
+
+function authorized(req: IncomingMessage, expected: string): boolean {
+  const header = req.headers.authorization ?? '';
+  const value = Array.isArray(header) ? header[0] ?? '' : header;
+  const actual = /^Bearer\s+(.+)$/i.exec(value)?.[1] ?? '';
+  const a = Buffer.from(actual, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
 }

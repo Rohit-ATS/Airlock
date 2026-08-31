@@ -127,6 +127,45 @@ export function findSchemaQualifier(statement: string): string | null {
   return match ? `${match[1]}.${match[2]}` : null;
 }
 
+function statementForControlCheck(statement: string): string {
+  return statement
+    .replace(/'(?:''|[^'])*'/g, "''")
+    .replace(/"((?:[^"]|"")*)"/g, (_, raw: string) => {
+      const unquoted = raw.replace(/""/g, '"').replace(/[^A-Za-z0-9_]/g, '_');
+      return unquoted || '_';
+    })
+    .replace(/--[^\n\r]*/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+}
+
+export function findUnsafePostgresStatement(statement: string): string | null {
+  const visible = statementForControlCheck(statement);
+  if (/\bset_config\s*\(/i.test(visible)) return 'set_config';
+
+  for (const part of visible.split(';')) {
+    const words = part
+      .trim()
+      .match(/[A-Za-z_][A-Za-z0-9_]*/g)
+      ?.map((word) => word.toLowerCase()) ?? [];
+    const first = words[0];
+    if (!first) continue;
+    if (first === 'set' && (words[1] === 'schema' || words.includes('search_path'))) return 'set search_path';
+    if (first === 'set' && words[1] === 'role') return 'set role';
+    if (first === 'set' && words[1] === 'session' && words[2] === 'authorization') return 'set session authorization';
+    if (first === 'reset' && (words[1] === 'all' || words[1] === 'search_path' || words[1] === 'role')) return `reset ${words[1]}`;
+    if (first === 'reset' && words[1] === 'session' && words[2] === 'authorization') return 'reset session authorization';
+    if (first === 'begin' || first === 'start' || first === 'commit' || first === 'end' || first === 'rollback') return first;
+    if (first === 'savepoint' || first === 'release' || first === 'abort' || first === 'discard') return first;
+    if (first === 'do' || first === 'call' || first === 'prepare' || first === 'execute' || first === 'deallocate') return first;
+    if (first === 'create' && (words[1] === 'function' || words[1] === 'procedure')) return `create ${words[1]}`;
+    if (first === 'alter' && (words[1] === 'function' || words[1] === 'procedure' || words[1] === 'role' || words[1] === 'database')) {
+      return `alter ${words[1]}`;
+    }
+  }
+
+  return null;
+}
+
 export class PostgresShadowError extends Error {}
 
 /**
@@ -321,6 +360,16 @@ export async function verifyOnPostgresShadow(input: PostgresShadowInput): Promis
   // Refused before anything is created. See the note at the top of this file.
   for (const list of [input.forward, input.rollback]) {
     for (const statement of list) {
+      const unsafe = findUnsafePostgresStatement(statement);
+      if (unsafe) {
+        return {
+          ...base,
+          failure_reason:
+            `This statement uses ${unsafe}, which can change session or transaction state inside the proof. ` +
+            `A shadow proof is confined by its transaction and search_path, so session-control statements are refused before anything runs.`,
+        };
+      }
+
       const qualified = findSchemaQualifier(statement);
       if (qualified) {
         return {
