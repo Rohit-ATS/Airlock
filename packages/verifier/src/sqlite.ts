@@ -105,6 +105,33 @@ function explain(error: Error): string {
   return error.message;
 }
 
+function statementForControlCheck(statement: string): string {
+  return statement
+    .replace(/'(?:''|[^'])*'/g, "''")
+    .replace(/"((?:[^"]|"")*)"/g, (_, raw: string) => {
+      const unquoted = raw.replace(/""/g, '"').replace(/[^A-Za-z0-9_]/g, '_');
+      return unquoted || '_';
+    })
+    .replace(/--[^\n\r]*/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+}
+
+export function findUnsafeSqliteStatement(statement: string): string | null {
+  const visible = statementForControlCheck(statement);
+  if (/\bload_extension\s*\(/i.test(visible)) return 'load_extension';
+
+  for (const part of visible.split(';')) {
+    const trimmed = part.trim();
+    const first = /^([A-Za-z_][A-Za-z0-9_]*)\b/i.exec(trimmed)?.[1]?.toLowerCase();
+    if (!first) continue;
+    if (first === 'attach' || first === 'detach') return first;
+    if (first === 'vacuum' && /\binto\b/i.test(trimmed)) return 'vacuum into';
+    if (first === 'pragma') return 'pragma';
+  }
+
+  return null;
+}
+
 function tableColumns(db: DatabaseSync, table: string): string[] {
   return (db.prepare(`PRAGMA table_info(${quote(table)})`).all() as Array<{ name: unknown }>)
     .map((row) => String(row.name))
@@ -193,6 +220,21 @@ export function verifyOnSqliteShadow(input: ShadowRunInput): ShadowRunResult {
       failure_reason:
         'No rollback statements were supplied. An UNDO certificate is the claim that a change can be taken back, and no inverse was offered to execute.',
     };
+  }
+
+  for (const list of [input.forward, input.rollback]) {
+    for (const statement of list) {
+      const unsafe = findUnsafeSqliteStatement(statement);
+      if (unsafe) {
+        return {
+          ...base,
+          status: 'FAILED',
+          failure_reason:
+            `This statement uses ${unsafe}, which can open or modify files outside the shadow database. ` +
+            `SQLite shadow proofs execute only against the copied database, so file-affecting statements are refused before anything runs.`,
+        };
+      }
+    }
   }
 
   mkdirSync(input.shadowDir, { recursive: true });

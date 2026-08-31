@@ -49,14 +49,20 @@ function fromDotEnv(...names) {
   return out;
 }
 
-const env = { ...fromDotEnv('OPENAI_API_KEY', 'OPENAI_API', 'ANTHROPIC_API_KEY'), ...process.env };
+const env = { ...fromDotEnv('OPENAI_API_KEY', 'OPENAI_API', 'ANTHROPIC_API_KEY', 'AIRLOCK_MCP_HTTP_TOKEN'), ...process.env };
 const openai = env.OPENAI_API_KEY || env.OPENAI_API;
 const anthropic = env.ANTHROPIC_API_KEY;
+const mcpToken = env.AIRLOCK_MCP_HTTP_TOKEN;
 
 if (!openai && !anthropic) {
   console.error('No model key found. Put one in .env at the repo root:');
   console.error('  OPENAI_API_KEY=sk-...');
   console.error('  # or ANTHROPIC_API_KEY=sk-ant-...');
+  process.exit(2);
+}
+
+if (!mcpToken) {
+  console.error('No AIRLOCK_MCP_HTTP_TOKEN found. Run `npm run up` once to generate it, or add one to .env.');
   process.exit(2);
 }
 
@@ -187,6 +193,7 @@ const manifest = {
   url: MCP_URL,
   description:
     'AIRLOCK change control. Open a change, attach a proof, ask a human. There is no tool that applies a change to production.',
+  auth: { type: 'header', headers: { Authorization: `Bearer ${mcpToken}` } },
 };
 
 const mcp = known.has('airlock')

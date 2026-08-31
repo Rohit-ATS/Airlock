@@ -397,7 +397,7 @@ export function AfterSection() {
  * Checked by `scripts/verify-claims.mjs`, which counts the real things and fails
  * the build if these drift.
  *
- * They had drifted. This said 201 tests and 16 fixtures against an actual 346
+ * They had drifted. This said 201 tests and 16 fixtures against an actual 347
  * and 18 — while the README's copies of the same numbers were correct, because
  * the README was checked and this was not. The comment in verify-claims.mjs
  * explaining why the check exists opens with the words "201 tests was true when
@@ -405,7 +405,7 @@ export function AfterSection() {
  * file over, for a year.
  */
 const NUMBERS = [
-  { value: '346', label: 'tests', note: 'properties, not implementations' },
+  { value: '347', label: 'tests', note: 'properties, not implementations' },
   { value: '23', label: 'harness capabilities', note: 'each lit only by a real event' },
   { value: '18', label: 'fixtures', note: 'seven distinct refusals' },
   { value: '0', label: 'tools that write to production', note: 'asserted in CI' },

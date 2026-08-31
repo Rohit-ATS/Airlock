@@ -10,7 +10,7 @@
 </p>
 
 <p>
-  <img alt="tests" src="https://img.shields.io/badge/tests-346%20passing-35d6a4?style=flat">
+  <img alt="tests" src="https://img.shields.io/badge/tests-347%20passing-35d6a4?style=flat">
   <img alt="claims" src="https://img.shields.io/badge/README%20claims-32%20anchored%20to%20code-4fc3f7?style=flat">
   <img alt="capabilities" src="https://img.shields.io/badge/harness%20capabilities-23-f7942f?style=flat">
   <img alt="write path" src="https://img.shields.io/badge/tools%20that%20write%20to%20production-0-ff5257?style=flat">
@@ -417,7 +417,7 @@ it and the command that demonstrates it.
 ```bash
 npm test
 ```
-> `346 tests, 0 fail` · `18 fixtures check out.` · `4 agent spec(s) check out.` ·
+> `347 tests, 0 fail` · `18 fixtures check out.` · `4 agent spec(s) check out.` ·
 > `airlock.policy.yaml checks out` · `32 claims, every one anchored to a line that exists.` ·
 > `Console HTTP surface checks out — 53 assertions against a running server.`
 >
@@ -1249,7 +1249,7 @@ computed-style probe — which is to say, by measuring rather than by looking.
 ## Tests
 
 ```bash
-npm test        # 346 tests, 18 fixtures, 4 agent specs, 1 policy file, 32 claims, 4 SVG assets
+npm test        # 347 tests, 18 fixtures, 4 agent specs, 1 policy file, 32 claims, 4 SVG assets
 ```
 
 Those four numbers are **checked, not typed**. `verify-claims.mjs` runs the suite, counts the
@@ -1257,7 +1257,7 @@ files and compares them against this line, so adding a test and forgetting the R
 build. A reader who counts 206 against a README promising 201 has been handed a reason to
 disbelieve the other twenty-three claims, and that is a lot of damage for a stale integer.
 
-Twenty-three suites, and each pins a property rather than an implementation:
+Twenty-four suites, and each pins a property rather than an implementation:
 
 | Suite | What it holds down |
 | --- | --- |
