@@ -11,5 +11,5 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": { "@airlock/contract": "*" },
-  "devDependencies": { "@types/node": "^24.3.0", "typescript": "^5.9.2" }
+  "devDependencies": { "@types/node": "^24.13.6", "typescript": "^5.9.2" }
 }
