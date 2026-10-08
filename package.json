@@ -67,8 +67,8 @@
     "@assistant-ui/tap": "0.9.6"
   },
   "devDependencies": {
-    "axe-core": "^4.13.0",
-    "playwright-core": "^1.62.1",
-    "yaml": "^2.9.0"
+    "axe-core": "^4.14.0",
+    "playwright-core": "^1.63.0",
+    "yaml": "^2.9.1"
   }
 }
